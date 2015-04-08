@@ -1,0 +1,112 @@
+=================
+Backup collection
+=================
+
+A "backup" is a copy of a collection of files as they were at a
+particular time. The backup also stores the tree structure of these
+files, and possibly some other meta-data.
+
+A "backup collection" is a collection of backups stored
+together. Typically these are backups of the same collection of files
+made at different times.
+
+
+Backup collection on disk
+=========================
+
+On disk, a backup collection is a single directory containing at
+least:
+
+- "db": A directory holding various information about the backups. See
+  database.txt for details.
+
+- "content": A directory holding the actual file contents of the
+  backups. See the "content storage" section for details.
+
+- <Year>: (e.g. "2015") A directory holding "backup trees". See the
+  "backup trees" section for details.
+
+
+Backup database
+===============
+
+The "db" top-level directory of the backup collection contains a
+"database" of information about the backup collection as a whole as
+well as each backup. The data in the backup database is sufficient to
+reconstruct the original source of each backup made, except that it
+refers to the items in the "content storage" for the actual content of
+each file.
+
+See database.txt for details about the backup database.
+
+
+Content storage
+===============
+
+The "content" top-level directory of the backup collection contains
+the actual content of every file backed up. Each item in the content
+storage has a "content id" that identifies it. Typically, the content
+id is a checksum of the content itself. See the "content id"
+subsection for details about this.
+
+Each content item is stored in the "content" directory using a file
+name derived from the content id. If the content id is binary (which
+is typically the case), it is first hex-encoded. The encoded content
+id is split into 1 or more pieces which become the path components of
+the file where the content is stored. How the encoded content id is
+split into path components is up to the implementation, but should
+typically be chosen to balance the depth of the resulting tree with
+how many files are in each directory.
+
+However, there are some rules:
+
+- Each intermediate directory can only contain directories. No files.
+- Each leaf directory can only contain files. No directories.
+- The name of every directory in the same intermediate directory must
+  have the same length. Files in different directories are not
+  restricted this way, neither are the files in the leaf directories.
+
+All of the above may change in a future revision of this document.
+
+
+The content id
+--------------
+
+Each item in the content storage is identified by its "content
+id". The content id of an item is the checksum of the content
+itself. The checksum algorithm used is the common checksum algorithm
+given by the "main" database file.
+
+However, the content id MUST be unique, and a checksum does not
+guarantee this. If a new item is added to the content storage and its
+checksum is the same as the content id of an existing but different
+item already in the storage, this new item will have to be given a
+different content id. There are several possibilities. The simplest is
+probably just to append one extra octet to the digest to make the
+content id unique.
+
+
+Backup trees
+============
+
+The top-level directories of the backup collection which are simply
+named as numbers are "backup trees". Each backup tree looks like a
+plain copy of the original files. But each file is hardlinked to its
+content in the content storage.
+
+A backup tree is named after the time at which the backup started. A
+backup that started on March 16, 2015 at 19:18:05 would have its
+backup tree stored at "2015/03-16T19:18", where the "/" is a path
+separator. That is, inside the top-level directory "2015" (the year)
+there would be another directory called "03-16T19:18" which is the
+root of the backup tree for this backup.
+
+Since the backup trees are named by the minute, there can not be two
+backups started the same minute (in the same backup collection). In
+practice, I expect this will not be a problem.
+
+The backup trees are made for convenience. They can be reconstructed
+completely from the backup database (in the "db" top-level directory)
+and the content storage (in the "content" top-level directory). Thus
+deleting a backup tree does not lose any data (assuming "db" and
+"content" are intact).

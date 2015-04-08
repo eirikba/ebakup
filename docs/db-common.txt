@@ -1,0 +1,88 @@
+===========================
+Common database file format
+===========================
+
+All the data files in the database follow this common file format. The
+common file format provides a basic structure and a means to detect
+corruptions.
+
+
+Block structure
+===============
+
+The file is a sequence of fixed-size blocks. Each block carries a
+checksum at the end of the block:
+
+  <file> = <block>+
+  <block> = <blockdata> <padding> <checksum>
+
+  <blockdata> = various
+  <padding> = 0x00*
+  <checksum> = binary checksum of everything before <checksum>
+
+The size of each block and the size and algorithm of the <checksum> is
+not part of the common format, but must be known by other means. (In
+the case of the backup database, the "main" file provides these
+values.)
+
+
+The first block
+===============
+
+The first block in the file is the "settings" block. It provides
+global data about the file.
+
+  <blockdata> = <magic> LF <setting>*
+  <setting> = <setting-key> ":" <setting-value> LF
+
+<magic> identifies the file and can not contain any LF characters.
+
+Each <setting> provides one setting. The <setting-key> identifies
+which setting, and <setting-value> provides the value for that
+setting. Neither <setting-key> nor <setting-value> can contain any LF
+characters. And <setting-key> can not contain any ":" characters.
+
+Due to the setting block being a single block, the total amount of
+setting data is strictly limited by the block size. In practice, I
+doubt this will be a problem.
+
+
+Data block internal format
+==========================
+
+All blocks except the first block are "data blocks" and have the same
+internal format:
+
+   <blockdata> = <dataentry>*
+
+The first <dataentry> of each block starts at the beginning of the
+block. Thus every <dataentry> must be fully contained in a single
+block, and the size of a single <dataentry> is strictly limited by the
+block size. If there is a need to store arbitrarily large data items
+in the database, it must be split into multiple <dataentries>.
+
+It must be unambiguous where one <dataentry> ends and the next
+starts. It doesn't matter how this is accomplished. Maybe each
+<dataentry> indicates its own size, or it ends with some special octet
+that can not occur elsewhere in a <dataentry>. Or maybe it starts with
+a sequence of octets that can not occur elsewhere. Or any other scheme
+that works.
+
+It is quite acceptable to use a scheme that requires scanning through
+every <dataentry> of a block in order. Since the first <dataentry> of
+a block can always be found at the start of the block, at worst this
+would require scanning the whole block to find the <dataentry> of
+interest. The block size should be sufficiently small that this is no
+great burden.
+
+It must be possible to interpret each <dataentry> on its own. This is
+a very limited requirement. It is quite possible to have a <dataentry>
+whose interpretation is "here is 312 octets that is referenced by some
+other <dataentry>". I expect it will typically make sense to pack a
+bit more information in each <dataentry>, but this would fulfill the
+requirement.
+
+When reading a part of the block, it is assumed that the whole block
+is available. So it would be possible to have e.g. the first
+<dataentry> of the block provide necessary information to be able to
+interpret the rest of the block.

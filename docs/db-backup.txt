@@ -1,0 +1,150 @@
+============================
+The backup description files
+============================
+
+Each of these files describe the state of the source tree when it was
+backed up.
+
+The files live in directories named after the year in which the backup
+started. And the files themselves are named after the time (to the
+precision of minutes) when the backup started without the year.
+
+Example: A backup that started on April 1, 2015 at 12:45:53 would have
+one of these files in a directory called "2015". The file itself would
+be called "04-01T12:45".
+
+This means that two backups can not start in the same minute. In
+practice I doubt this will be a problem.
+
+These files are immutable after being created. So there is no need to
+take any locks to read these files.
+
+The backup description files follow the "common format" described in
+db-common.txt.
+
+
+Settings block
+==============
+
+<magic> = "ebakup backup data"
+
+Required settings:
+
+ "start": The time when the backup was started
+     (e.g. "2015-04-01T12:45:53")
+
+ "end": The time when the backup was completed
+     (e.g. "2015-04-01T13:12:50")
+
+If an unknown setting is encountered, chances are that the file format
+has changed. So in that case, it is probably best to give up.
+
+
+Data stored in the file
+=======================
+
+In this file is stored information about every file that is backed up
+during a single backup run:
+
+- The path at which the file existed
+- The content id of a copy of the content
+- The size of the file
+- The last-modified time stamp of the original file
+
+The content id refers to the content in the content storage, and also
+doubles as the checksum of the file's content (due to the way content
+ids are created).
+
+
+Directories
+===========
+
+<dataentry> = 0x90 <dirid> <dirparent> <namelength> <dirname>
+
+<dirid>, <dirparent> = continued high bit octet sequence
+<namelength> = continued high bit little endian unsigned integer
+<dirname> = <namelength> octets
+
+<dirid> values 0-7 are reserved.
+
+These entries describe the tree of directories where the files
+live. <dirparent> is the <dirid> of the parent directory, with 0 being
+the unnamed "root" directory. <dirname> gives the name of the
+directory itself. Systems where file names are strings should encode
+the file name using utf-8.
+
+
+Files
+=====
+
+<dataentry> =
+    0x91 <dirparent> <namelength> <filename>
+    <cidlength> <contentid> <size> <mtime>
+
+<dirparent> = continued high bit octet sequence
+<namelength>, <cidlength> =
+    continued high bit little endian unsigned integer
+<filename> = <namelength> octets
+<contentid> = <cidlength> octets
+<size> = continued high bit little endian unsigned integer
+<mtime> = <seconds> <nanoseconds>
+
+Each of these entries describe one file that was backed
+up. <dirparent> indicates which directory the file lives in, again
+with 0 being the unnamed "root" directory. <filename> gives the name
+of the file. Systems where file names are strings should encode the
+file name using utf-8.
+
+<contentid> refers to the content of the file in the content
+storage. Also, due to the way content ids are constructed, it doubles
+as a checksum of the file's content.
+
+<mtime> consists of a seconds-after-epoch part and a nanoseconds
+part. The <seconds> is the standard unix time stamp. It is converted
+to a date and time by assuming that all minutes have 60 seconds, all
+hours have 60 minutes, all days have 24 hours and all months have the
+familiar number of days. Including the leap days as defined by the
+gregorian calendar (every 4 years except every 100 years but again
+every 400 years). And 0 is at midnight at the beginning of 1970-01-01
+UTC. <nanoseconds> is quite simply a number between 0 and 999999999
+inclusive.
+
+<seconds> and <nanoseconds> together make up 8 octets. The first 4
+octets and the 2 high bits of the 5th octet is a little-endian
+unsigned integer giving <seconds> and the rest is a little-endian
+unsigned integer giving <nanoseconds>. Any time that is
+unrepresentable or unknown or otherwise problematic should be set as
+all 0 (i.e. 1970-01-01T00:00:00).
+
+This means that time stamps are limited to be between 1970 and 2514
+(if I didn't mess up the calculation), which should be sufficient for
+my limited use.
+
+When writing these values it is important to use the correct
+<mtime>. If there is doubt as to what the correct <mtime> value is for
+the data that was actually backed up, store 0.
+
+
+Making changes
+==============
+
+These files are immutable once created. When creating a file:
+
+- Create the yearly directory (if needed)
+- Create the file with a ".new" suffix
+- Lock whole file for writing
+- Check file is empty
+- Check that the final file does not exist
+- Write initial settings block
+- Unlock file
+- Write the data to the new file
+- Make sure all data is flushed to the OS
+- rename ".new" to the real name
+
+The locking and writing of the initial settings block is to protect
+against having two processes writing the same file in parallel. If the
+.new file already exists (or is not empty after you obtain the lock),
+assume that something else is making a backup and give up.
+
+"Write initial settings block" can obviously not fill in the "end"
+setting. That will have to be added after the backup is complete.

@@ -1,0 +1,104 @@
+===============
+Backup database
+===============
+
+The backup database stores all the information about the backup except
+for the actual contents of the files themselves. The content of each
+file is stored in the "content storage" (see backup_collection.txt).
+
+The backup database is stored in the "db" top-level directory in the
+database collection. In this directory there are:
+
+- "main": This provides global information about the database. It must
+  always be present.
+
+- "content": This provides information about the items in the content
+  storage. Realistically, this should always be present.
+
+- <YYYY/MM-DDThh:mm>: These files provide information about each
+  backup in the backup collection.
+
+More files may be added in future revisions of this document.
+
+
+Common file format
+==================
+
+All the files in the database follow a common file format. See
+db-common.txt for a description of this format.
+
+
+Locks
+=====
+
+To safely read and write any of the files in the database, take out
+locks. Always take a read lock on any part of any file that you want
+to make sure doesn't change, and definitely take a write lock on any
+part of any file you want to change.
+
+The lock should be an "fcntl" lock. In python, use fcntl.lockf().
+
+If you need to hold more than a single lock at a time, you MUST take a
+lock on the whole of "main" before taking any other lock and you MUST
+drop all other locks before dropping the one on "main". Otherwise you
+risk deadlocks. (The lock on "main" should be a write lock if any of
+the other locks is a write lock. Do NOT upgrade the lock on "main"
+from a read lock to a write lock. Downgrading, however, is safe.)
+
+Keep in mind that some files may be modified by being replaced
+wholesale. Thus, after obtaining a lock on a file, you MUST check that
+the file you have a lock on is the current version of the file and not
+an old, obsolete one.
+
+
+The "main" file
+===============
+
+There MUST be a file called "main" in the backup database
+directory. This file MUST start with "ebakup database v1" followed by
+an LF. If this is not found, the directory is not a backup database.
+
+The "main" file indicates that the directory is a backup database and
+also provides general information about the database. The file format
+follows the "common format" described in db-common.txt with:
+
+   <magic> = "ebakup database v1"
+
+This identifies the whole directory as being a backup database
+following this specification. The file only has a settings block. The
+currently defined settings are:
+
+  "block-size": The block size of all files in the backup database
+      where not otherwise given. The value is a decimal
+      number. Default: "4096".
+
+  "checksum": The checksum algorithm used everywhere (unless otherwise
+      given). Default: "sha256".
+
+
+The "content" file
+==================
+
+The "content" file holds data about the items in the content
+storage. In particular, what checksum each item should have and when
+it was last checked.
+
+The file format follows the "common format" described in db-common.txt.
+
+   <magic> = "ebakup content data"
+
+See db-content.txt for details.
+
+
+The backup description files
+============================
+
+The files in the numbered directories describe each individual
+backup. The directories are named after the year in which the backup
+started.
+
+The file format follows the "common format" described in db-common.txt.
+
+   <magic> = "ebakup backup data"
+
+See db-backup.txt for details.

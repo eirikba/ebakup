@@ -1,0 +1,122 @@
+=======================
+The "content" data file
+=======================
+
+This file describes the "content" file in the backup database. (See
+database.txt for general information about the backup database.)
+
+The content file follows the "common format" described in
+db-common.txt.
+
+
+Settings block
+==============
+
+<magic> = "ebakup content data"
+
+No settings are defined yet.
+
+If an unknown setting is encountered, chances are that the file format
+has changed. So in that case, it is probably best to give up.
+
+
+Data stored in the file
+=======================
+
+For each item in the content storage, identified by its content id
+(see database.txt for a description of content ids) the content data
+file stores:
+
+- When the content item was added
+- What its checksum was at that time (the "good" checksum)
+- When the checksum was last checked
+- What the checksum was at that time
+- When (every time) the checksum of the file was found to have changed
+- The last time the file's checksum was checked before it changed
+
+
+Overall data format
+===================
+
+The file is a collection of entries, one for each content item. Each
+data block MUST have non-empty <padding>, so that there is always a
+<dataentry> starting with x00 to mark the end of data for a block.
+
+
+Content item entries
+====================
+
+<dataentry> =
+    0xdd <cidlength> <checksumlength>
+    <cid/checksum> <first> <last> <checksumdata>+
+<cidlength>, <checksumlength> =
+    continued high bit little endian unsigned integer
+<cid/checksum> = max(<cidlength>, <checksumlength>) octets
+<first>, <last> = time stamp. 4 octets, little endian unsigned
+    integer, "seconds after epoch"
+<checksumdata> =
+    0xa0 <first> <last> |
+    0xa1 <checksum> <first> <last>
+
+Each <dataentry> describes a single content item. The content item in
+question is the one with the content id equal to the first <cidlength>
+octets of <cid/checksum>. This content item was added to the data
+storage at <first>, at which point its checksum was equal to the first
+<checksumlength> octets of <cid/checksum>. The last time the content
+item was checked and the checksum had not changed was <last>.
+
+Every <checksumdata> indicates that the content item was checked and
+found to have a different checksum than last time. Again <first>
+indicates the first time the content item was checked and found to
+have this new checksum, while <last> indicates the last time the
+content item was checked and the checksum had not changed.
+
+Note that the <last> values do not indicate the last time the content
+item had the given checksum. The <first>-<last> pairs indicates the
+time span in which the checksum did not change at all (as far as the
+system knows).
+
+There are two <checksumdata> types: 0xa0 indicates that the content
+item was restored from a "known good" (or at least "believed good"
+source). 0xa1 indicates that the checksum has changed and provides the
+new checksum (<checksum> is, of course, <checksumlength> octets long).
+
+Note that 0xa0 does not merely mean that the checksum is found to be
+the same as the original checksum, but also that there is a further
+reason to believe that the content is truly the same as it was
+originally. If the checksum just happens to be the same as the
+original, use an 0xa1 entry with that checksum.
+
+
+Making changes
+==============
+
+To modify this file, the whole file should be replaced. As follows:
+
+- Take a write lock on the whole file
+- Create a new temporary file called content.new
+- Write the new data to content.new
+- Rotate old content backup files (see below)
+- Hardlink content.0 to content
+- Make sure all writes to content.new are flushed to the OS
+- Rename content.new to content
+- Drop the write lock
+
+This ensures that "content" always exists and that no modifications
+will happen to the file after some other process is able to obtain a
+lock on it.
+
+The "Rotate old content backup files" point prepares for creating the
+hard link of content.0 by ensuring there is no content.0. If there is
+a content.0 when reaching this point (which there typically will be),
+it should be renamed to content.1. If you want to keep more backups,
+start with the highest numbered backup you want to keep and rename
+each one in turn to one higher number. Thus content.0 will be renamed
+to content.1 and it will be possible to hard link the current version
+to content.0.
+
+Another complication is that content.new may exist after getting the
+write lock. In this case, the most likely explanation is that the
+application that created it crashed before renaming it to content. If
+the last-modified time stamp of content.new is more than 2 hours ago,
+feel free to just delete it (after getting the write lock, of course).

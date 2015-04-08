@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+
+import argparse
+import re
+import unittest
+
+
+expected_tests = set((
+    'database_tests.TestSimpleDatabase.test_get_out_of_range_backups',
+    'database_tests.TestSimpleDatabase.test_read_simple_database',
+    'dbfile_tests.TestBrokenFiles.test_non_matching_checksum_of_data_block',
+    'dbfile_tests.TestBrokenFiles.test_non_matching_checksum_of_settings_block',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_multi_value_from_nonexisting_setting_bytes',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_multi_value_from_nonexisting_setting_string',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_multi_value_from_single_value_setting_bytes',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_multi_value_from_single_value_setting_string',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_multi_value_setting_with_default_bytes',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_multi_value_setting_with_default_string',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_single_value_from_multi_value_setting_bytes',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_single_value_from_multi_value_setting_string',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_single_value_from_multi_value_setting_with_default_bytes',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_single_value_from_multi_value_setting_with_default_string',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_single_value_from_nonexisting_setting_bytes',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_single_value_from_nonexisting_setting_string',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_single_value_setting_with_default_bytes',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_single_value_setting_with_default_string',
+    'dbfile_tests.TestReadSimpleDBFile.test_magic',
+    'dbfile_tests.TestReadSimpleDBFile.test_multi_value_setting_bytes',
+    'dbfile_tests.TestReadSimpleDBFile.test_multi_value_setting_string',
+    'dbfile_tests.TestReadSimpleDBFile.test_setting_key_list',
+    'dbfile_tests.TestReadSimpleDBFile.test_single_value_setting_bytes',
+    'dbfile_tests.TestReadSimpleDBFile.test_single_value_setting_string',
+    'dbfile_tests.TestReadBlockConfigurationFromSettings.test_read_block_checksum_algorithm_from_settings',
+    'dbfile_tests.TestReadBlockConfigurationFromSettings.test_read_block_size_from_settings',
+    'dbfile_tests.TestReadBlockConfigurationFromSettings.test_read_other_block_checksum_algorithm_from_settings',
+    'dbfile_tests.TestReadBlockConfigurationFromSettings.test_read_other_block_size_from_settings',
+    'dbfile_tests.TestOtherOperations.test_open_for_reading_context',
+    'dbfile_tests.TestReadSimpleDBFile.test_read_block_1',
+    'dbfile_tests.TestReadSimpleDBFile.test_read_first_block_beyond_end',
+    'dbfile_tests.TestReadSimpleDBFile.test_read_last_block',
+    'dbfile_tests.TestReadSimpleDBFile.test_read_second_block_beyond_end',
+))
+expected_test_count = len(expected_tests)
+
+def find_tests():
+    loader = unittest.defaultTestLoader
+    tests = loader.discover('tests', '*_tests.py')
+    return tests
+
+def strip_prefix(string, prefix):
+    if string.startswith(prefix):
+        return string[len(prefix):]
+    return string
+
+def name_of_test(test):
+    '''Returns None if 'test' is not a single test.
+    '''
+    try:
+        name = test.id()
+    except AttributeError:
+        return None
+    # When run from the main directory, the "tests." prefix is not
+    # present, but when run from elsewhere it is.
+    return strip_prefix(name, 'tests.')
+
+def make_test_name_list(tests):
+    names = []
+    name = name_of_test(tests)
+    if name:
+        names.append(name)
+    try:
+        testiter = iter(tests)
+    except TypeError:
+        testiter = []
+    for test in testiter:
+        names += make_test_name_list(test)
+    return names
+
+def main_manual():
+    tests = find_tests()
+    results = unittest.TestResult()
+    tests.run(results)
+    print(results)
+    print('Total tests run: ' + str(results.testsRun))
+    print('Skipped: ' + str(len(results.skipped)))
+    for item in results.skipped:
+        print(item)
+    print('Expected failures: ' + str(len(results.expectedFailures)))
+    for item in results.expectedFailures:
+        print(item)
+    print('Unexpected successes: ' + str(len(results.unexpectedSuccesses)))
+    for item in results.unexpectedSuccesses:
+        print(item)
+    print('Errors: ' + str(len(results.errors)))
+    for item in results.errors:
+        print(item)
+    print('Failures: ' + str(len(results.failures)))
+    for item in results.failures:
+        print(item)
+    if results.wasSuccessful():
+        print('SUCCESS!')
+    else:
+        print('FAILURE!')
+
+def filter_tests(test):
+    if not args.filter:
+        return test
+    main = None
+    name = name_of_test(test)
+    if name and (name.startswith('unittest') or re.search(args.filter, name)):
+        main = test
+    try:
+        testiter = iter(test)
+    except TypeError:
+        testiter = ()
+    subs = []
+    for subtest in testiter:
+        sub = filter_tests(subtest)
+        if sub:
+            subs.append(sub)
+    if subs:
+        filtered = unittest.TestSuite(subs)
+        if main:
+            filtered.addTest(main)
+        return filtered
+    return main
+
+def parse_args():
+    global args
+    ap = argparse.ArgumentParser(description='Run tests')
+    ap.add_argument('filter', nargs='?',
+                    help='A regular expression. All tests whose names are '
+                    'matched by the regular expression are included in the '
+                    'test run.')
+    args = ap.parse_args()
+
+def main_texttestrunner():
+    parse_args()
+    tests = find_tests()
+    test_names = make_test_name_list(tests)
+    nameset = set(test_names)
+    filtered = filter_tests(tests)
+    if not filtered:
+        print('No tests left after filtering.')
+        return
+    runner = unittest.TextTestRunner()
+    results = runner.run(filtered)
+
+    if tests == filtered:
+        if results.testsRun != expected_test_count:
+            print('ERROR: Expected {} tests, got {}'.format(expected_test_count, results.testsRun))
+        if results.testsRun != len(test_names):
+            print('ERROR: Different number of test names ({}) than tests run ({})'.
+                  format(len(test_names), results.testsRun))
+        if len(nameset) != len(test_names):
+            print('ERROR: Only {} unique test names out of {}'.
+                  format(len(nameset), len(test_names)))
+        unexpected_tests = nameset - expected_tests
+        if unexpected_tests:
+            print('ERROR: {} unexpected tests:'.format(len(unexpected_tests)))
+            for test in sorted(unexpected_tests):
+                print("    '" + test + "',")
+        missing_tests = expected_tests - nameset
+        if missing_tests:
+            print('ERROR: {} missing tests:'.format(len(missing_tests)))
+            for test in sorted(missing_tests):
+                print("    '" + test + "',")
+    else:
+        print('Filtered tests, {} tests run out of {}'.format(
+                results.testsRun, len(test_names)))
+        unexpected_tests = nameset - expected_tests
+        if unexpected_tests:
+            print('ERROR: {} unexpected tests:'.format(len(unexpected_tests)))
+            for test in sorted(unexpected_tests):
+                print("    '" + test + "',")
+
+
+main_texttestrunner()
