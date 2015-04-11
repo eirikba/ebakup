@@ -11,6 +11,7 @@ expected_tests = set((
     'database_tests.TestSimpleDatabase.test_read_simple_database',
     'dbfile_tests.TestBrokenFiles.test_non_matching_checksum_of_data_block',
     'dbfile_tests.TestBrokenFiles.test_non_matching_checksum_of_settings_block',
+    'dbfile_tests.TestReadSimpleDBFile.test_get_block_size',
     'dbfile_tests.TestReadSimpleDBFile.test_get_multi_value_from_nonexisting_setting_bytes',
     'dbfile_tests.TestReadSimpleDBFile.test_get_multi_value_from_nonexisting_setting_string',
     'dbfile_tests.TestReadSimpleDBFile.test_get_multi_value_from_single_value_setting_bytes',

@@ -89,6 +89,9 @@ class TestReadSimpleDBFile(unittest.TestCase):
         dbf = self.dbfile
         self.assertEqual(b'dbfile magic', dbf.get_magic())
 
+    def test_get_block_size(self):
+        self.assertEqual(4064, self.dbfile.get_block_size())
+
     def test_setting_key_list(self):
         dbf = self.dbfile
         self.assertCountEqual((b'key', b'a setting'), dbf.get_setting_keys())

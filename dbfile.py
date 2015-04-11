@@ -307,3 +307,7 @@ class DBFile(object):
             raise DataCorruptError(
                 'Block checksum of block ' + str(index) + ' did not match')
         return data
+
+    def get_block_size(self):
+        '''Return the size of the data in each block (in octets).'''
+        return self._block_size - self._block_checksum().digest_size
