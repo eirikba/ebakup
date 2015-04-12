@@ -31,25 +31,31 @@ class FakeDirectory(object):
             return False
         return 'write' in access
 
+    def _is_write_to_file_object_allowed(self, fobj):
+        current = self._files.get(fobj._path)
+        if current is not fobj._data:
+            return False
+        return self._is_write_allowed(fobj._path)
+
     def _allow_modification(self, path):
         access = self._allowed_access.get(path, set())
+        if not access:
+            self._allowed_access[path] = access
         if 'write' not in access:
-            self._allowed_access[path] = access.add('write')
+            access.add('write')
 
     def _disallow_modification(self, path):
         access = self._allowed_access.get(path)
         if access is None:
             return
-        access = [x for x in access if x != 'write' ]
-        if access:
-            self._allowed_access[path] = access
-        else:
+        access.remove('write')
+        if not access:
             del self._allowed_access[path]
 
     def get_item_at_path(self, path):
         data = self._files.get(path)
         if data:
-            return FakeFile(data)
+            return FakeFile(self, path, data)
         for k in self._files:
             if k[:len(path)] == path:
                 raise AssertionError('directories not supported yet')
@@ -57,7 +63,9 @@ class FakeDirectory(object):
 
 
 class FakeFile(object):
-    def __init__(self, data):
+    def __init__(self, tree, path, data):
+        self._tree = tree
+        self._path = path
         self._data = data
         self._locked = 0 # 0: unlocked, 1: read locked, True: write locked
 
@@ -88,6 +96,8 @@ class FakeFile(object):
     def write_data_slice(self, start, data):
         if self._locked is not True:
             raise AssertionError('Write to unlocked file')
+        if not self._tree._is_write_to_file_object_allowed(self):
+            raise AssertionError('Unexpected write to ' + str(self._path))
         old = self._data.content
         self._data.content = old[:start] + data + old[start+len(data):]
 
@@ -544,7 +554,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_add_new_setting_string(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.set_setting('new key', 'new value')
+            self.tree._disallow_modification(('path', 'to', 'file'))
             self.assertEqual(
                 'new value', self.dbfile.get_single_setting('new key'))
             self.assertEqual(
@@ -552,7 +564,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_add_new_setting_string_durable(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.set_setting('new key', 'new value')
+            self.tree._disallow_modification(('path', 'to', 'file'))
         with self.dbfile.open_for_reading():
             self.assertEqual(b'dbfile magic', self.dbfile.get_magic())
             self.assertEqual(
@@ -562,7 +576,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_add_new_setting_bytes(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.set_setting(b'new key', b'new value')
+            self.tree._disallow_modification(('path', 'to', 'file'))
             self.assertEqual(
                 'new value', self.dbfile.get_single_setting('new key'))
             self.assertEqual(
@@ -570,7 +586,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_add_new_setting_bytes_durable(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.set_setting(b'new key', b'new value')
+            self.tree._disallow_modification(('path', 'to', 'file'))
         with self.dbfile.open_for_reading():
             self.assertEqual(
                 'new value', self.dbfile.get_single_setting('new key'))
@@ -579,7 +597,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_replace_old_setting_string(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.set_setting('a setting', 'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
             self.assertEqual(
                 'changed', self.dbfile.get_single_setting('a setting'))
             self.assertEqual(
@@ -587,7 +607,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_replace_old_setting_string_durable(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.set_setting('a setting', 'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
         with self.dbfile.open_for_reading():
             self.assertEqual(
                 'changed', self.dbfile.get_single_setting('a setting'))
@@ -596,7 +618,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_replace_old_setting_bytes(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.set_setting(b'a setting', b'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
             self.assertEqual(
                 'changed', self.dbfile.get_single_setting('a setting'))
             self.assertEqual(
@@ -604,7 +628,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_replace_old_setting_bytes_durable(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.set_setting(b'a setting', b'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
         with self.dbfile.open_for_reading():
             self.assertEqual(
                 'changed', self.dbfile.get_single_setting('a setting'))
@@ -613,7 +639,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_replace_old_multi_setting_string(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.set_setting('key', 'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
             self.assertEqual(
                 'changed', self.dbfile.get_single_setting('key'))
             self.assertEqual(
@@ -621,7 +649,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_replace_old_multi_setting_string_durable(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.set_setting('key', 'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
         with self.dbfile.open_for_reading():
             self.assertEqual(
                 'changed', self.dbfile.get_single_setting('key'))
@@ -630,7 +660,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_replace_old_multi_setting_bytes(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.set_setting(b'key', b'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
             self.assertEqual(
                 'changed', self.dbfile.get_single_setting('key'))
             self.assertEqual(
@@ -638,7 +670,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_replace_old_multi_setting_bytes_durable(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.set_setting(b'key', b'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
         with self.dbfile.open_for_reading():
             self.assertEqual(
                 'changed', self.dbfile.get_single_setting('key'))
@@ -659,7 +693,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_append_new_setting_string(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.append_setting('new key', 'new value')
+            self.tree._disallow_modification(('path', 'to', 'file'))
             self.assertEqual(
                 'new value', self.dbfile.get_single_setting('new key'))
             self.assertEqual(
@@ -667,7 +703,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_append_new_setting_string_durable(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.append_setting('new key', 'new value')
+            self.tree._disallow_modification(('path', 'to', 'file'))
         with self.dbfile.open_for_reading():
             self.assertEqual(
                 'new value', self.dbfile.get_single_setting('new key'))
@@ -676,7 +714,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_append_new_setting_bytes(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.append_setting(b'new key', b'new value')
+            self.tree._disallow_modification(('path', 'to', 'file'))
             self.assertEqual(
                 'new value', self.dbfile.get_single_setting('new key'))
             self.assertEqual(
@@ -684,7 +724,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_append_new_setting_bytes_durable(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.append_setting(b'new key', b'new value')
+            self.tree._disallow_modification(('path', 'to', 'file'))
         with self.dbfile.open_for_reading():
             self.assertEqual(
                 'new value', self.dbfile.get_single_setting('new key'))
@@ -693,7 +735,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_append_old_setting_string(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.append_setting('a setting', 'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
             self.assertEqual(
                 (' its value', 'changed'),
                 self.dbfile.get_multi_setting('a setting'))
@@ -703,7 +747,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_append_old_setting_string_durable(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.append_setting('a setting', 'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
         with self.dbfile.open_for_reading():
             self.assertEqual(
                 (' its value', 'changed'),
@@ -714,7 +760,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_append_old_setting_bytes(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.append_setting(b'a setting', b'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
             self.assertEqual(
                 (' its value', 'changed'),
                 self.dbfile.get_multi_setting('a setting'))
@@ -724,7 +772,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_append_old_setting_bytes_durable(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.append_setting(b'a setting', b'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
         with self.dbfile.open_for_reading():
             self.assertEqual(
                 (' its value', 'changed'),
@@ -735,7 +785,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_append_old_multi_setting_string(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.append_setting('key', 'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
             self.assertEqual(
                 ('value', 'another value', 'changed'),
                 self.dbfile.get_multi_setting('key'))
@@ -745,7 +797,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_append_old_multi_setting_string_durable(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.append_setting('key', 'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
         with self.dbfile.open_for_reading():
             self.assertEqual(
                 ('value', 'another value', 'changed'),
@@ -756,7 +810,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_append_old_multi_setting_bytes(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.append_setting(b'key', b'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
             self.assertEqual(
                 ('value', 'another value', 'changed'),
                 self.dbfile.get_multi_setting('key'))
@@ -766,7 +822,9 @@ class TestModifySimpleDBFile(unittest.TestCase):
 
     def test_append_old_multi_setting_bytes_durable(self):
         with self.dbfile.open_for_in_place_modification():
+            self.tree._allow_modification(('path', 'to', 'file'))
             self.dbfile.append_setting(b'key', b'changed')
+            self.tree._disallow_modification(('path', 'to', 'file'))
         with self.dbfile.open_for_reading():
             self.assertEqual(
                 ('value', 'another value', 'changed'),
