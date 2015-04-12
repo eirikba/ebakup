@@ -99,6 +99,10 @@ class DBFile(object):
             raise AssertionError('DBFile already open')
         self._read_file = self._directory.get_item_at_path(self._path)
         self._read_file.lock_for_reading()
+        self._prepare_read_file()
+        return OpenContext(self)
+
+    def _prepare_read_file(self):
         if self._block_size_setting or self._block_checksum_setting:
             self._read_block_configuration_from_settings()
         if not self._block_size:
@@ -106,7 +110,6 @@ class DBFile(object):
         if not self._block_checksum:
             raise NotTestedError()
         self._parse_settings(self.get_block(0))
-        return OpenContext(self)
 
     def _read_block_configuration_from_settings(self):
         data = self._read_file.get_data_slice(0, 10000)
@@ -178,6 +181,13 @@ class DBFile(object):
         Make sure to call close_and_unlock() to drop the lock on the
         file. This applies even if this method raises an exception.
         '''
+        if self._read_file or self._write_file:
+            raise AssertionError('DBFile already open')
+        self._read_file = self._directory.get_item_at_path(self._path)
+        self._write_file = self._read_file
+        self._write_file.lock_for_writing()
+        self._prepare_read_file()
+        return OpenContext(self)
 
     def open_for_full_rewrite(self):
         '''This locks and opens the file for complete rewrite.
@@ -192,6 +202,8 @@ class DBFile(object):
         Make sure to call close_and_unlock() to drop the lock on the
         file. This applies even if this method raises an exception.
         '''
+        if self._read_file or self._write_file:
+            raise AssertionError('DBFile already open')
 
     def close_and_unlock(self):
         '''This will unlock the file, allowing other processes to read and
@@ -308,6 +320,49 @@ class DBFile(object):
                 'Block checksum of block ' + str(index) + ' did not match')
         return data
 
-    def get_block_size(self):
+    def get_block_count(self):
+        '''Return the number of blocks in the file.'''
+        dbfile = self._read_file
+        if not dbfile:
+            dbfile = self._write_file
+        if not dbfile:
+            dbfile = self._directory.get_item_at_path(self._path)
+        size = dbfile.get_size()
+        count = size // self._block_size
+        if count * self._block_size != size:
+            raise NotTestedError(
+                'DBFile not containing a whole number of blocks')
+        return count
+
+    def get_block_data_size(self):
         '''Return the size of the data in each block (in octets).'''
         return self._block_size - self._block_checksum().digest_size
+
+    def set_block(self, index, data):
+        '''Replace the 'index'th block with 'data'.
+
+        If 'data' is larger than get_block_size(), an exception is raised.
+        '''
+        if self._write_file is None:
+            raise DBFileUsageError('File not open for writing')
+        if index < 0:
+            raise DBFileUsageError(
+                'Can not change data before beginning of file')
+        if index < 1:
+            raise DBFileUsageError(
+                'Can not overwrite blocks before the first data block')
+        offset = index * self._block_size
+        size = self._write_file.get_size()
+        if offset > size+1:
+            raise DBFileUsageError('Can not skip empty space when adding data')
+        padding_size = (
+            self._block_size - self._block_checksum().digest_size - len(data))
+        if padding_size < 0:
+            raise DBFileUsageError('Block data too big for block size')
+        block_data = data + b'\x00' * padding_size
+        checksummer = self._block_checksum()
+        checksummer.update(block_data)
+        checksum = checksummer.digest()
+        block = block_data + checksum
+        assert len(block) == self._block_size
+        self._write_file.write_data_slice(offset, block)
