@@ -216,8 +216,10 @@ class DBFile(object):
         done on the file (until it is opened again, of course).
         '''
         if self._write_file:
-            if self._read_file is self._write_file:
-                self._read_file = None
+            if self._read_file is not self._write_file:
+                self._close_unlock_and_replace()
+                return
+            self._read_file = None
             self._write_file.close()
             self._write_file = None
         if self._read_file:
