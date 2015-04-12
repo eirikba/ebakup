@@ -301,6 +301,62 @@ class DBFile(object):
             return tuple(x.decode('utf-8') for x in value)
         return tuple(value)
 
+    def set_setting(self, key, value):
+        '''Delete all old values for 'key' and add 'value' instead.
+        '''
+        if self._write_file is None:
+            raise DBFileUsageError('File not open for writing')
+        use_key = key
+        use_value = value
+        if isinstance(key, str):
+            use_key = key.encode('utf-8')
+        if isinstance(value, str):
+            use_value = value.encode('utf-8')
+        if b':' in use_key:
+            raise DBFileUsageError(
+                'Setting keys can not contain ":": ' + repr(key))
+        if b'\n' in use_key:
+            raise DBFileUsageError(
+                'Setting keys can not contain newlines: ' + repr(key))
+        if b'\n' in use_value:
+            raise DBFileUsageError(
+                'Setting values can not contain newlines: ' + repr(value))
+        settings = [ x for x in self._settings if x[0] != use_key ]
+        settings.append( (use_key, use_value) )
+        self._settings = settings
+        if self._write_file is self._read_file:
+            self._write_settings_to_file()
+
+    def _write_settings_to_file(self):
+        data = [ x[0] + b':' + x[1] for x in self._settings ]
+        data = [ self._magic ] + data + [ b'' ]
+        data = b'\n'.join(data)
+        self._write_block_to_file(0, data)
+
+    def append_setting(self, key, value):
+        '''Add 'value' as the last multi-value for 'key'.
+        '''
+        if self._write_file is None:
+            raise DBFileUsageError('File not open for writing')
+        use_key = key
+        use_value = value
+        if isinstance(key, str):
+            use_key = key.encode('utf-8')
+        if isinstance(value, str):
+            use_value = value.encode('utf-8')
+        if b':' in use_key:
+            raise DBFileUsageError(
+                'Setting keys can not contain ":": ' + repr(key))
+        if b'\n' in use_key:
+            raise DBFileUsageError(
+                'Setting keys can not contain newlines: ' + repr(key))
+        if b'\n' in use_value:
+            raise DBFileUsageError(
+                'Setting values can not contain newlines: ' + repr(value))
+        self._settings.append( (use_key, use_value) )
+        if self._write_file is self._read_file:
+            self._write_settings_to_file()
+
     def get_block(self, index):
         '''Return the 'index'th block of the file.'''
         if self._read_file is None:
@@ -353,6 +409,9 @@ class DBFile(object):
         if index < 1:
             raise DBFileUsageError(
                 'Can not overwrite blocks before the first data block')
+        self._write_block_to_file(index, data)
+
+    def _write_block_to_file(self, index, data):
         offset = index * self._block_size
         size = self._write_file.get_size()
         if offset > size+1:

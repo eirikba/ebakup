@@ -542,6 +542,251 @@ class TestModifySimpleDBFile(unittest.TestCase):
             dbfile.DBFileUsageError, 'not open for writing',
             self.dbfile.set_block, 1, b'added block')
 
+    def test_add_new_setting_string(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.set_setting('new key', 'new value')
+            self.assertEqual(
+                'new value', self.dbfile.get_single_setting('new key'))
+            self.assertEqual(
+                b'new value', self.dbfile.get_single_setting(b'new key'))
+
+    def test_add_new_setting_string_durable(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.set_setting('new key', 'new value')
+        with self.dbfile.open_for_reading():
+            self.assertEqual(b'dbfile magic', self.dbfile.get_magic())
+            self.assertEqual(
+                'new value', self.dbfile.get_single_setting('new key'))
+            self.assertEqual(
+                b'new value', self.dbfile.get_single_setting(b'new key'))
+
+    def test_add_new_setting_bytes(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.set_setting(b'new key', b'new value')
+            self.assertEqual(
+                'new value', self.dbfile.get_single_setting('new key'))
+            self.assertEqual(
+                b'new value', self.dbfile.get_single_setting(b'new key'))
+
+    def test_add_new_setting_bytes_durable(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.set_setting(b'new key', b'new value')
+        with self.dbfile.open_for_reading():
+            self.assertEqual(
+                'new value', self.dbfile.get_single_setting('new key'))
+            self.assertEqual(
+                b'new value', self.dbfile.get_single_setting(b'new key'))
+
+    def test_replace_old_setting_string(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.set_setting('a setting', 'changed')
+            self.assertEqual(
+                'changed', self.dbfile.get_single_setting('a setting'))
+            self.assertEqual(
+                b'changed', self.dbfile.get_single_setting(b'a setting'))
+
+    def test_replace_old_setting_string_durable(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.set_setting('a setting', 'changed')
+        with self.dbfile.open_for_reading():
+            self.assertEqual(
+                'changed', self.dbfile.get_single_setting('a setting'))
+            self.assertEqual(
+                b'changed', self.dbfile.get_single_setting(b'a setting'))
+
+    def test_replace_old_setting_bytes(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.set_setting(b'a setting', b'changed')
+            self.assertEqual(
+                'changed', self.dbfile.get_single_setting('a setting'))
+            self.assertEqual(
+                b'changed', self.dbfile.get_single_setting(b'a setting'))
+
+    def test_replace_old_setting_bytes_durable(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.set_setting(b'a setting', b'changed')
+        with self.dbfile.open_for_reading():
+            self.assertEqual(
+                'changed', self.dbfile.get_single_setting('a setting'))
+            self.assertEqual(
+                b'changed', self.dbfile.get_single_setting(b'a setting'))
+
+    def test_replace_old_multi_setting_string(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.set_setting('key', 'changed')
+            self.assertEqual(
+                'changed', self.dbfile.get_single_setting('key'))
+            self.assertEqual(
+                b'changed', self.dbfile.get_single_setting(b'key'))
+
+    def test_replace_old_multi_setting_string_durable(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.set_setting('key', 'changed')
+        with self.dbfile.open_for_reading():
+            self.assertEqual(
+                'changed', self.dbfile.get_single_setting('key'))
+            self.assertEqual(
+                b'changed', self.dbfile.get_single_setting(b'key'))
+
+    def test_replace_old_multi_setting_bytes(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.set_setting(b'key', b'changed')
+            self.assertEqual(
+                'changed', self.dbfile.get_single_setting('key'))
+            self.assertEqual(
+                b'changed', self.dbfile.get_single_setting(b'key'))
+
+    def test_replace_old_multi_setting_bytes_durable(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.set_setting(b'key', b'changed')
+        with self.dbfile.open_for_reading():
+            self.assertEqual(
+                'changed', self.dbfile.get_single_setting('key'))
+            self.assertEqual(
+                b'changed', self.dbfile.get_single_setting(b'key'))
+
+    def test_set_setting_with_disallowed_characters_fails(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.assertRaisesRegex(
+                dbfile.DBFileUsageError, 'keys can not contain.*:.*ke:y',
+                self.dbfile.set_setting, 'ke:y', 'value')
+            self.assertRaisesRegex(
+                dbfile.DBFileUsageError, 'keys can not contain newline',
+                self.dbfile.set_setting, 'ke\ny', 'value')
+            self.assertRaisesRegex(
+                dbfile.DBFileUsageError, 'values can not contain newline',
+                self.dbfile.set_setting, 'key', 'val\nue')
+
+    def test_append_new_setting_string(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.append_setting('new key', 'new value')
+            self.assertEqual(
+                'new value', self.dbfile.get_single_setting('new key'))
+            self.assertEqual(
+                b'new value', self.dbfile.get_single_setting(b'new key'))
+
+    def test_append_new_setting_string_durable(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.append_setting('new key', 'new value')
+        with self.dbfile.open_for_reading():
+            self.assertEqual(
+                'new value', self.dbfile.get_single_setting('new key'))
+            self.assertEqual(
+                b'new value', self.dbfile.get_single_setting(b'new key'))
+
+    def test_append_new_setting_bytes(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.append_setting(b'new key', b'new value')
+            self.assertEqual(
+                'new value', self.dbfile.get_single_setting('new key'))
+            self.assertEqual(
+                b'new value', self.dbfile.get_single_setting(b'new key'))
+
+    def test_append_new_setting_bytes_durable(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.append_setting(b'new key', b'new value')
+        with self.dbfile.open_for_reading():
+            self.assertEqual(
+                'new value', self.dbfile.get_single_setting('new key'))
+            self.assertEqual(
+                b'new value', self.dbfile.get_single_setting(b'new key'))
+
+    def test_append_old_setting_string(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.append_setting('a setting', 'changed')
+            self.assertEqual(
+                (' its value', 'changed'),
+                self.dbfile.get_multi_setting('a setting'))
+            self.assertEqual(
+                (b' its value', b'changed'),
+                self.dbfile.get_multi_setting(b'a setting'))
+
+    def test_append_old_setting_string_durable(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.append_setting('a setting', 'changed')
+        with self.dbfile.open_for_reading():
+            self.assertEqual(
+                (' its value', 'changed'),
+                self.dbfile.get_multi_setting('a setting'))
+            self.assertEqual(
+                (b' its value', b'changed'),
+                self.dbfile.get_multi_setting(b'a setting'))
+
+    def test_append_old_setting_bytes(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.append_setting(b'a setting', b'changed')
+            self.assertEqual(
+                (' its value', 'changed'),
+                self.dbfile.get_multi_setting('a setting'))
+            self.assertEqual(
+                (b' its value', b'changed'),
+                self.dbfile.get_multi_setting(b'a setting'))
+
+    def test_append_old_setting_bytes_durable(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.append_setting(b'a setting', b'changed')
+        with self.dbfile.open_for_reading():
+            self.assertEqual(
+                (' its value', 'changed'),
+                self.dbfile.get_multi_setting('a setting'))
+            self.assertEqual(
+                (b' its value', b'changed'),
+                self.dbfile.get_multi_setting(b'a setting'))
+
+    def test_append_old_multi_setting_string(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.append_setting('key', 'changed')
+            self.assertEqual(
+                ('value', 'another value', 'changed'),
+                self.dbfile.get_multi_setting('key'))
+            self.assertEqual(
+                (b'value', b'another value', b'changed'),
+                self.dbfile.get_multi_setting(b'key'))
+
+    def test_append_old_multi_setting_string_durable(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.append_setting('key', 'changed')
+        with self.dbfile.open_for_reading():
+            self.assertEqual(
+                ('value', 'another value', 'changed'),
+                self.dbfile.get_multi_setting('key'))
+            self.assertEqual(
+                (b'value', b'another value', b'changed'),
+                self.dbfile.get_multi_setting(b'key'))
+
+    def test_append_old_multi_setting_bytes(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.append_setting(b'key', b'changed')
+            self.assertEqual(
+                ('value', 'another value', 'changed'),
+                self.dbfile.get_multi_setting('key'))
+            self.assertEqual(
+                (b'value', b'another value', b'changed'),
+                self.dbfile.get_multi_setting(b'key'))
+
+    def test_append_old_multi_setting_bytes_durable(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.dbfile.append_setting(b'key', b'changed')
+        with self.dbfile.open_for_reading():
+            self.assertEqual(
+                ('value', 'another value', 'changed'),
+                self.dbfile.get_multi_setting('key'))
+            self.assertEqual(
+                (b'value', b'another value', b'changed'),
+                self.dbfile.get_multi_setting(b'key'))
+
+    def test_append_setting_with_disallowed_characters_fails(self):
+        with self.dbfile.open_for_in_place_modification():
+            self.assertRaisesRegex(
+                dbfile.DBFileUsageError, 'keys can not contain.*:.*ke:y',
+                self.dbfile.append_setting, 'ke:y', 'value')
+            self.assertRaisesRegex(
+                dbfile.DBFileUsageError, 'keys can not contain newline',
+                self.dbfile.append_setting, 'ke\ny', 'value')
+            self.assertRaisesRegex(
+                dbfile.DBFileUsageError, 'values can not contain newline',
+                self.dbfile.append_setting, 'key', 'val\nue')
+
 class TestOtherOperations(unittest.TestCase):
     def test_open_for_reading_context(self):
         self.tree = FakeDirectory()
