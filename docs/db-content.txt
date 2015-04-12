@@ -35,12 +35,23 @@ file stores:
 - The last time the file's checksum was checked before it changed
 
 
-Overall data format
-===================
+Data entries (overview)
+=======================
 
-The file is a collection of entries, one for each content item. Each
-data block MUST have non-empty <padding>, so that there is always a
-<dataentry> starting with x00 to mark the end of data for a block.
+The data entries that occur in this file are:
+
+- Content item entries: Each of these describe one item in the content
+  storage.
+
+- Update entries: Each of these add one "observation" to one item in
+  the content storage.
+
+- End of data entry: The presence of this entry indicates that the
+  file has become immutable.
+
+Due to the presence of "update entries", it is necessary to read the
+whole file in order to be sure that all information about a single
+content item has been obtained.
 
 
 Content item entries
@@ -88,12 +99,68 @@ originally. If the checksum just happens to be the same as the
 original, use an 0xa1 entry with that checksum.
 
 
-Making changes
+Update entries
 ==============
 
-To modify this file, the whole file should be replaced. As follows:
+<dataentry> =
+    0xd0 <cidlength> <checksumlength> <cid/goodcheck> <tag> <checksum> <when>
+
+<cidlength>, <checksumlength> =
+    continued high bit little endian unsigned integer
+<cid/goodcheck> = max(<cidlength>, <checksumlength>) octets
+<tag> = 0xa0 | 0xa1
+<checksum> = <checksumlength> octets
+<when> = time stamp. 4 octets, little endian unsigned
+    integer, "seconds after epoch"
+
+Each of these entries provide a single observation about a single
+content item. At time <when>, the content item with content id <cid>
+(The first <cidlength> octets of <cid/goodcheck>) and "good checksum"
+<goodcheck> (the first <checksumlength> octets of <cid/goodcheck>)was
+observed to have the checksum <checksum>. If <tag> is 0xa1, that's all
+there is to it. If <tag> is 0xa0, <checksum> and <goodcheck> MUST be
+the same, and this indicates that the file has been restored from a
+"believed good" source.
+
+
+End of data entry
+=================
+
+<dataentry> = 0xcc "closed"
+
+If there is one of these entries in the file, it MUST be the last
+<dataentry> in the file, and it MUST be in the last data block of the
+file. The presence of this entry means that the file is "closed" and
+should not be modified. This entry SHOULD be added before replacing
+the file.
+
+
+Making changes: Adding data
+===========================
+
+When making changes to an existing file, it is recommended not to
+modify existing data. If something fails, there is always the danger
+of losing the data that is being modified. In particular, any
+modifications to "old" data is bad, while modifying "recent" data is
+less of a problem. Typically, the only changes that are reasonable to
+do to a file is to add new entries to the end of the file. In any
+case, the algorithm is:
+
+- Take a write lock on the file
+    It is enough to lock the blocks to be modified, but locking the
+    whole file is fine too.
+- Make modifications
+- Drop the write lock
+
+
+Making changes: replacing the file
+==================================
+
+One way of making changes to the file is to replace it in whole. That
+should be done as follows:
 
 - Take a write lock on the whole file
+- Add an "end of data entry" to the end of the file
 - Create a new temporary file called content.new
 - Write the new data to content.new
 - Rotate old content backup files (see below)
