@@ -25,6 +25,13 @@ class FakeDirectory(object):
             parent = parent[:-1]
         self._files[path] = FileData(self, content)
 
+    def _is_path_directory(self, path):
+        pathlen = len(path)
+        for k in self._files:
+            if len(k) > pathlen and k[:pathlen] == path:
+                return True
+        return False
+
     def _is_write_allowed(self, path):
         access = self._allowed_access.get(path)
         if not access:
@@ -37,34 +44,103 @@ class FakeDirectory(object):
             return False
         return self._is_write_allowed(fobj._path)
 
-    def _allow_modification(self, path):
+    def _is_create_file_allowed(self, path):
+        access = self._allowed_access.get(path)
+        if not access:
+            return False
+        return 'create' in access
+
+    def _is_rename_file_allowed(self, source_path):
+        access = self._allowed_access.get(source_path)
+        if not access:
+            return False
+        return 'rename' in access
+
+    def _is_overwrite_file_allowed(self, path):
+        access = self._allowed_access.get(path)
+        if not access:
+            return False
+        return 'overwrite' in access
+
+    def _allow_create_regular_file(self, path):
+        self._add_allowed_access(path, 'create')
+
+    def _add_allowed_access(self, path, what):
         access = self._allowed_access.get(path, set())
         if not access:
             self._allowed_access[path] = access
-        if 'write' not in access:
-            access.add('write')
+        access.add(what)
 
-    def _disallow_modification(self, path):
+    def _disallow_create_regular_file(self, path):
+        self._remove_allowed_access(path, 'create')
+
+    def _remove_allowed_access(self, path, what):
         access = self._allowed_access.get(path)
         if access is None:
             return
-        access.remove('write')
+        access.remove(what)
         if not access:
             del self._allowed_access[path]
+
+    def _allow_modification(self, path):
+        self._add_allowed_access(path, 'write')
+
+    def _disallow_modification(self, path):
+        self._remove_allowed_access(path, 'write')
+
+    def _allow_overwrite_file(self, path):
+        self._add_allowed_access(path, 'overwrite')
+
+    def _disallow_overwrite_file(self, path):
+        self._remove_allowed_access(path, 'overwrite')
+
+    def _allow_rename_file(self, path):
+        self._add_allowed_access(path, 'rename')
+
+    def _disallow_rename_file(self, path):
+        self._remove_allowed_access(path, 'rename')
 
     def get_item_at_path(self, path):
         data = self._files.get(path)
         if data:
-            return FakeFile(self, path, data)
+            return FakeFile(path, data)
         for k in self._files:
             if k[:len(path)] == path:
                 raise AssertionError('directories not supported yet')
         raise FileNotFoundError('No such file: ' + repr(path))
 
+    def create_regular_file(self, path):
+        assert isinstance(path, tuple)
+        if not self._is_create_file_allowed(path):
+            raise AssertionError(
+                'Unexpected creation of regular file: ' + str(path))
+        if path in self._files:
+            raise FileExistsError('Path already exists: ' + str(path))
+        for k in self._files:
+            if k == path[:len(k)]:
+                raise NotAdirectoryError('Not a directory: ' + str(path))
+            if k[:len(path)] == path:
+                raise IsADirectoryError('Is a directory: ' + str(path))
+        fd = FileData(self, b'')
+        self._files[path] = fd
+        return FakeFile(path, fd)
+
+    def rename_and_overwrite(self, sourcepath, targetpath):
+        if not self._is_overwrite_file_allowed(targetpath):
+            raise AssertionError(
+                'Unexpected rename, overwrite of ' + repr(targetpath))
+        if not self._is_rename_file_allowed(sourcepath):
+            raise AssertionError(
+                'Unexpected rename of ' + repr(sourcepath))
+        if self._is_path_directory(targetpath):
+            raise IsADirectoryError('Is a directory: ' + str(targetpath))
+        data = self._files[sourcepath]
+        del self._files[sourcepath]
+        self._files[targetpath] = data
+
 
 class FakeFile(object):
-    def __init__(self, tree, path, data):
-        self._tree = tree
+    def __init__(self, path, data):
         self._path = path
         self._data = data
         self._locked = 0 # 0: unlocked, 1: read locked, True: write locked
@@ -96,7 +172,7 @@ class FakeFile(object):
     def write_data_slice(self, start, data):
         if self._locked is not True:
             raise AssertionError('Write to unlocked file')
-        if not self._tree._is_write_to_file_object_allowed(self):
+        if not self._data.tree._is_write_to_file_object_allowed(self):
             raise AssertionError('Unexpected write to ' + str(self._path))
         old = self._data.content
         self._data.content = old[:start] + data + old[start+len(data):]
@@ -873,3 +949,64 @@ class TestOtherOperations(unittest.TestCase):
                 b'second block\n' + b'\x00' * 4051, self.dbfile.get_block(1))
             self.assertNotEqual(None, self.dbfile._read_file)
         self.assertEqual(None, self.dbfile._read_file)
+
+    def test_create_empty_file(self):
+        tree = FakeDirectory()
+        dbf = dbfile.DBFile(tree, ('new', 'db'))
+        dbf.set_block_size(4096)
+        dbf.set_block_checksum_algorithm(hashlib.sha256)
+        tree._allow_create_regular_file(('new', 'db'))
+        tree._allow_create_regular_file(('new', 'db.new'))
+        tree._allow_modification(('new', 'db.new'))
+        with dbf.create(b'new db magic'):
+            tree._disallow_create_regular_file(('new', 'db'))
+            tree._disallow_create_regular_file(('new', 'db.new'))
+            tree._disallow_modification(('new', 'db.new'))
+            self.assertEqual(b'', tree._files[('new', 'db')].content)
+            tree._allow_overwrite_file(('new', 'db'))
+            tree._allow_rename_file(('new', 'db.new'))
+        tree._disallow_overwrite_file(('new', 'db'))
+        tree._disallow_rename_file(('new', 'db.new'))
+        self.assertEqual(
+            b'new db magic\n' + b'\x00' * 4051 +
+            b'\xe8\xe6\x0e~\xa3\x05\xcc\xa1\xb4\xd1\x7f'
+            b'\xda\xe6\x00\xde\x0f\xcf\x88j\xbfj/\x86c\xd7kC\x84\xaf 6\r',
+            tree._files[('new', 'db')].content)
+
+    def test_create_fails_if_file_exists(self):
+        tree = FakeDirectory()
+        tree._add_file(
+            ('file', 'already', 'exists'),
+            b'Hello world')
+        dbf = dbfile.DBFile(tree, ('file', 'already', 'exists'))
+        tree._allow_create_regular_file(('file', 'already', 'exists'))
+        self.assertRaises(FileExistsError, dbf.create, b'db magic')
+
+    def test_create_file_with_data(self):
+        tree = FakeDirectory()
+        dbf = dbfile.DBFile(tree, ('path', 'to', 'db'))
+        dbf.set_block_size(4096)
+        dbf.set_block_checksum_algorithm(hashlib.sha256)
+        tree._allow_create_regular_file(('path', 'to', 'db'))
+        tree._allow_create_regular_file(('path', 'to', 'db.new'))
+        tree._allow_modification(('path', 'to', 'db.new'))
+        with dbf.create(b'ebadb file'):
+            tree._disallow_create_regular_file(('path', 'to', 'db'))
+            tree._disallow_create_regular_file(('path', 'to', 'db.new'))
+            dbf.set_setting('first setting', 'yes')
+            dbf.set_setting('another setting', 'no')
+            dbf.set_block(1, b'And some data')
+            tree._disallow_modification(('path', 'to', 'db.new'))
+            tree._allow_overwrite_file(('path', 'to', 'db'))
+            tree._allow_rename_file(('path', 'to', 'db.new'))
+        tree._disallow_overwrite_file(('path', 'to', 'db'))
+        tree._disallow_rename_file(('path', 'to', 'db.new'))
+        self.assertEqual(
+            b'ebadb file\nfirst setting:yes\nanother setting:no\n' +
+            b'\x00' * 4016 +
+            b'\xe5\xf3\xc4\xb91\xc1\xa7\x0e\x19`a\x0c\x85\x9e'
+            b'\xb9eXJ\xdc\x1f\x99\xcbWYo\xbc\x05\xaeS+\xfc4'
+            b'And some data' + b'\x00' * 4051 +
+            b'\xc4\xd5d\xe7ZV\x18\x1bw\x0cC\xce9\xaa\xdd'
+            b'\xa9_\x7f\xddb\xc6\xaa(\xe8J\xb9\x90\xe5\x02\x82z\xdd',
+            tree._files[('path', 'to', 'db')].content)

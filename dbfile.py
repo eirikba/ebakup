@@ -29,6 +29,8 @@ class DBFile(object):
         self._block_checksum_setting = None
         self._read_file = None
         self._write_file = None
+        self._write_path = None # When _write_file is temporary
+        self._target_file = None # When _write_file is temporary
 
     def create(self, magic):
         '''Create the file.
@@ -46,6 +48,22 @@ class DBFile(object):
 
         You can not read from the file while it is being created.
         '''
+        final_file = self._directory.create_regular_file(self._path)
+        final_file.lock_for_writing()
+        if final_file.get_size() != 0:
+            final_file.unlock()
+            raise NotTestedError('Database file non-empty after creation')
+        self._target_file = final_file
+        temp_path = self._path[:-1] + (self._path[-1] + '.new',)
+        temp_file = self._directory.create_regular_file(temp_path)
+        self._write_path = temp_path
+        self._read_file = None
+        self._magic = magic
+        self._settings = {}
+        self._write_file = temp_file
+        self._write_file.lock_for_writing()
+        self._write_settings_to_file()
+        return OpenContext(self)
 
     def set_block_size(self, block_size):
         '''Set the block size of the file.
@@ -97,6 +115,7 @@ class DBFile(object):
         '''
         if self._read_file or self._write_file:
             raise AssertionError('DBFile already open')
+        assert self._target_file is None
         self._read_file = self._directory.get_item_at_path(self._path)
         self._read_file.lock_for_reading()
         self._prepare_read_file()
@@ -148,7 +167,6 @@ class DBFile(object):
                 raise DataCorruptError(
                     'Unknown checksum algorithm: ' + str(check))
 
-
     def _parse_settings(self, block):
         self._magic = None
         self._settings = []
@@ -183,6 +201,7 @@ class DBFile(object):
         '''
         if self._read_file or self._write_file:
             raise AssertionError('DBFile already open')
+        assert self._target_file is None
         self._read_file = self._directory.get_item_at_path(self._path)
         self._write_file = self._read_file
         self._write_file.lock_for_writing()
@@ -204,6 +223,7 @@ class DBFile(object):
         '''
         if self._read_file or self._write_file:
             raise AssertionError('DBFile already open')
+        assert self._target_file is None
 
     def close_and_unlock(self):
         '''This will unlock the file, allowing other processes to read and
@@ -219,12 +239,29 @@ class DBFile(object):
             if self._read_file is not self._write_file:
                 self._close_unlock_and_replace()
                 return
+            assert self._target_file is None
             self._read_file = None
             self._write_file.close()
             self._write_file = None
+        assert self._target_file is None
+        assert self._write_path is None
         if self._read_file:
             self._read_file.close()
             self._read_file = None
+
+    def _close_unlock_and_replace(self):
+        assert self._write_file is not None
+        assert self._write_file is not self._read_file
+        assert self._target_file is not None
+        if self._read_file:
+            self._read_file.close()
+            self._read_file = None
+        self._write_file.close()
+        self._write_file = None
+        self._directory.rename_and_overwrite(self._write_path, self._path)
+        self._write_path = None
+        self._target_file.close()
+        self._target_file = None
 
     def get_magic(self):
         '''Return the first line of the file (aka the "magic").'''
@@ -324,8 +361,7 @@ class DBFile(object):
         settings = [ x for x in self._settings if x[0] != use_key ]
         settings.append( (use_key, use_value) )
         self._settings = settings
-        if self._write_file is self._read_file:
-            self._write_settings_to_file()
+        self._write_settings_to_file()
 
     def _write_settings_to_file(self):
         data = [ x[0] + b':' + x[1] for x in self._settings ]
@@ -354,8 +390,7 @@ class DBFile(object):
             raise DBFileUsageError(
                 'Setting values can not contain newlines: ' + repr(value))
         self._settings.append( (use_key, use_value) )
-        if self._write_file is self._read_file:
-            self._write_settings_to_file()
+        self._write_settings_to_file()
 
     def get_block(self, index):
         '''Return the 'index'th block of the file.'''
