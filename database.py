@@ -13,6 +13,21 @@ def create_database(directory, path):
 
     A Database object for the new database is returned.
     '''
+    if directory.does_path_exist(path):
+        raise FileExistsError('Path already exists: ' + str(path))
+    main = dbfile.DBFile(directory, path + ('main',))
+    main.set_block_checksum_algorithm(hashlib.sha256)
+    main.set_block_size(4096)
+    with main.create(b'ebakup database v1'):
+        main.set_setting('checksum', 'sha256')
+        main.set_setting('blocksize', '4096')
+        main.commit()
+    content = dbfile.DBFile(directory, path + ('content',))
+    content.set_block_checksum_algorithm(hashlib.sha256)
+    content.set_block_size(4096)
+    content.create(b'ebakup content data')
+    content.commit()
+    return Database(directory, path)
 
 def _parse_uint32(data, done):
     value = 0
@@ -172,14 +187,6 @@ class Database(object):
         Return the content id of the newly added item.
         '''
 
-    def commit_content_data(self):
-        '''Write all changes made to content data to disk.
-
-        The changes made related to content items are not written to
-        disk until and unless this method is called. This method may
-        take substantial time to run, even when very little changes
-        have been made.
-        '''
 
 ContentData = collections.namedtuple(
     'ContentData', ('contentid', 'checksum', 'timeline'))

@@ -315,3 +315,53 @@ class TestSimpleDatabase(unittest.TestCase):
             None,
             db.get_most_recent_backup_before(
                 datetime.datetime(2015, 4, 3, 10, 46, 6)))
+
+class TestWriteDatabase(unittest.TestCase):
+
+    def create_empty_database(self, tree, path):
+        tree._allow_create_regular_file(path + ('main',))
+        tree._allow_create_regular_file(path + ('main.new',))
+        tree._allow_modification(path + ('main.new',))
+        tree._allow_overwrite_file(path + ('main',))
+        tree._allow_rename_file(path + ('main.new',))
+        tree._allow_create_regular_file(path + ('content',))
+        tree._allow_create_regular_file(path + ('content.new',))
+        tree._allow_modification(path + ('content.new',))
+        tree._allow_overwrite_file(path + ('content',))
+        tree._allow_rename_file(path + ('content.new',))
+        database.create_database(tree, ('path', 'to', 'db'))
+        tree._disallow_overwrite_file(path + ('content',))
+        tree._disallow_rename_file(path + ('content.new',))
+        tree._disallow_modification(path + ('content.new',))
+        tree._disallow_create_regular_file(path + ('content',))
+        tree._disallow_create_regular_file(path + ('content.new',))
+        tree._disallow_overwrite_file(path + ('main',))
+        tree._disallow_rename_file(path + ('main.new',))
+        tree._allow_modification(path + ('main.new',))
+        tree._disallow_create_regular_file(path + ('main',))
+        tree._disallow_create_regular_file(path + ('main.new',))
+
+    def test_create_empty_database(self):
+        tree = FakeDirectory()
+        self.create_empty_database(tree, ('path', 'to', 'db'))
+        self.assertCountEqual(
+            (('path', 'to', 'db', 'main'),('path', 'to', 'db', 'content')),
+            tree._files.keys())
+        db = database.Database(tree, ('path', 'to', 'db'))
+        self.assertEqual(None, db.get_most_recent_backup())
+        self.assertEqual(None, db.get_oldest_backup())
+        self.assertEqual('sha256', db.get_checksum_algorithm())
+
+    def test_create_database_in_existing_directory_fails(self):
+        tree = FakeDirectory()
+        tree._add_file(('path', 'to', 'db', 'ignore_me'), b'hi')
+        self.assertRaisesRegex(
+            FileExistsError, 'already exists:.*path.*to.*db',
+            database.create_database, tree, ('path', 'to', 'db'))
+
+    def test_create_database_over_existing_file_fails(self):
+        tree = FakeDirectory()
+        tree._add_file(('path', 'to', 'db'), b'hi')
+        self.assertRaisesRegex(
+            FileExistsError, 'already exists:.*path.*to.*db',
+            database.create_database, tree, ('path', 'to', 'db'))

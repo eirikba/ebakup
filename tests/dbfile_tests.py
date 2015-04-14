@@ -116,6 +116,13 @@ class FakeDirectory(object):
             return None
         return self._files.get(proxypath, True)
 
+    def does_path_exist(self, path):
+        plen = len(path)
+        for k in self._files:
+            if k[:plen] == path:
+                return True
+        return False
+
     def get_item_at_path(self, path):
         data = self._files.get(path)
         if data:

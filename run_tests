@@ -9,6 +9,9 @@ import unittest
 expected_tests = set((
     'database_tests.TestSimpleDatabase.test_get_out_of_range_backups',
     'database_tests.TestSimpleDatabase.test_read_simple_database',
+    'database_tests.TestWriteDatabase.test_create_database_in_existing_directory_fails',
+    'database_tests.TestWriteDatabase.test_create_database_over_existing_file_fails',
+    'database_tests.TestWriteDatabase.test_create_empty_database',
     'dbfile_tests.TestBrokenFiles.test_non_matching_checksum_of_data_block',
     'dbfile_tests.TestBrokenFiles.test_non_matching_checksum_of_settings_block',
     'dbfile_tests.TestInspectUnopenedSimpleDBFile.test_get_block_count',
