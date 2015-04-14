@@ -15,6 +15,7 @@ class FakeDirectory(object):
     def __init__(self):
         self._files = {}
         self._allowed_access = {}
+        self._lock_proxies = {}
 
     def _add_file(self, path, content):
         assert path
@@ -88,6 +89,12 @@ class FakeDirectory(object):
     def _disallow_modification(self, path):
         self._remove_allowed_access(path, 'write')
 
+    def _allow_delete_file(self, path):
+        self._add_allowed_access(path, 'delete')
+
+    def _disallow_delete_file(self, path):
+        self._remove_allowed_access(path, 'delete')
+
     def _allow_overwrite_file(self, path):
         self._add_allowed_access(path, 'overwrite')
 
@@ -99,6 +106,15 @@ class FakeDirectory(object):
 
     def _disallow_rename_file(self, path):
         self._remove_allowed_access(path, 'rename')
+
+    def _set_lock_proxy(self, path, lockpath):
+        self._lock_proxies[path] = lockpath
+
+    def _get_lock_proxy(self, path):
+        proxypath = self._lock_proxies.get(path)
+        if proxypath is None:
+            return None
+        return self._files.get(proxypath, True)
 
     def get_item_at_path(self, path):
         data = self._files.get(path)
@@ -165,13 +181,23 @@ class FakeFile(object):
         return len(self._data.content)
 
     def get_data_slice(self, start, end):
-        if self._locked == 0:
+        lockproxy = self._data.tree._get_lock_proxy(self._path)
+        if lockproxy is None and self._locked == 0:
             raise AssertionError('Read from unlocked file')
+        if lockproxy is True:
+            raise AssertionError('Read from unlocked file (no proxy)')
+        if lockproxy is not None and lockproxy.locked == 0:
+            raise AssertionError('Read from unlocked file (proxy lock)')
         return self._data.content[start:end]
 
     def write_data_slice(self, start, data):
-        if self._locked is not True:
+        lockproxy = self._data.tree._get_lock_proxy(self._path)
+        if lockproxy is None and  self._locked is not True:
             raise AssertionError('Write to unlocked file')
+        if lockproxy is True:
+            raise AssertionError('Write to unlocked file (no proxy)')
+        if lockproxy is not None and lockproxy.locked is not True:
+            raise AssertionError('Write to unlocked file (proxy lock)')
         if not self._data.tree._is_write_to_file_object_allowed(self):
             raise AssertionError('Unexpected write to ' + str(self._path))
         old = self._data.content
@@ -921,6 +947,114 @@ class TestModifySimpleDBFile(unittest.TestCase):
                 dbfile.DBFileUsageError, 'values can not contain newline',
                 self.dbfile.append_setting, 'key', 'val\nue')
 
+    def test_rewrite_file_write_nothing(self):
+        old_content = self.tree._files[('path', 'to', 'file')].content
+        self.tree._set_lock_proxy(
+            ('path', 'to', 'file.new'), ('path', 'to', 'file'))
+        self.tree._allow_create_regular_file(('path', 'to', 'file.new'))
+        self.tree._allow_modification(('path', 'to', 'file.new'))
+        with self.dbfile.open_for_full_rewrite():
+            self.tree._disallow_create_regular_file(('path', 'to', 'file.new'))
+            self.tree._allow_rename_file(('path', 'to', 'file.new'))
+            self.tree._allow_overwrite_file(('path', 'to', 'file'))
+            self.dbfile.commit()
+            self.tree._disallow_rename_file(('path', 'to', 'file.new'))
+            self.tree._disallow_overwrite_file(('path', 'to', 'file'))
+        self.assertEqual(
+            old_content[:4096],
+            self.tree._files[('path', 'to', 'file')].content)
+
+    def test_rewrite_file_add_setting(self):
+        old_content = self.tree._files[('path', 'to', 'file')].content
+        self.tree._set_lock_proxy(
+            ('path', 'to', 'file.new'), ('path', 'to', 'file'))
+        self.tree._allow_create_regular_file(('path', 'to', 'file.new'))
+        self.tree._allow_modification(('path', 'to', 'file.new'))
+        with self.dbfile.open_for_full_rewrite():
+            self.tree._disallow_create_regular_file(('path', 'to', 'file.new'))
+            self.dbfile.set_setting('new setting', 'good value')
+            self.dbfile.set_block(1, self.dbfile.get_block(1))
+            self.dbfile.set_block(2, self.dbfile.get_block(2))
+            self.tree._disallow_modification(('path', 'to', 'file.new'))
+            self.tree._allow_rename_file(('path', 'to', 'file.new'))
+            self.tree._allow_overwrite_file(('path', 'to', 'file'))
+            self.dbfile.commit()
+            self.tree._disallow_rename_file(('path', 'to', 'file.new'))
+            self.tree._disallow_overwrite_file(('path', 'to', 'file'))
+        self.assertEqual(
+            b'dbfile magic\n'
+            b'key:value\n'
+            b'a setting: its value\n'
+            b'key:another value\n'
+            b'new setting:good value\n'
+            + b'\x00' * 3979 +
+            b'\xc0j\xaecI\xf0H\xe1\xb8\x05:, ?\xb4o5\xbb\xa4'
+            b'\x05Q\x95\xa9-S\xe2\xe94\x9b\xa3\xdc0' +
+            old_content[4096:],
+            self.tree._files[('path', 'to', 'file')].content)
+
+    def test_rewrite_file_set_setting(self):
+        old_content = self.tree._files[('path', 'to', 'file')].content
+        self.tree._set_lock_proxy(
+            ('path', 'to', 'file.new'), ('path', 'to', 'file'))
+        self.tree._allow_create_regular_file(('path', 'to', 'file.new'))
+        self.tree._allow_modification(('path', 'to', 'file.new'))
+        with self.dbfile.open_for_full_rewrite():
+            self.tree._disallow_create_regular_file(('path', 'to', 'file.new'))
+            self.dbfile.set_setting('new setting', 'good value')
+            self.tree._disallow_modification(('path', 'to', 'file.new'))
+            self.tree._allow_rename_file(('path', 'to', 'file.new'))
+            self.tree._allow_overwrite_file(('path', 'to', 'file'))
+            self.dbfile.commit()
+            self.tree._disallow_rename_file(('path', 'to', 'file.new'))
+            self.tree._disallow_overwrite_file(('path', 'to', 'file'))
+        self.assertEqual(
+            b'dbfile magic\n'
+            b'key:value\n'
+            b'a setting: its value\n'
+            b'key:another value\n'
+            b'new setting:good value\n'
+            + b'\x00' * 3979 +
+            b'\xc0j\xaecI\xf0H\xe1\xb8\x05:, ?\xb4o5\xbb\xa4'
+            b'\x05Q\x95\xa9-S\xe2\xe94\x9b\xa3\xdc0',
+            self.tree._files[('path', 'to', 'file')].content)
+
+    def test_rewrite_file_swap_blocks(self):
+        old_content = self.tree._files[('path', 'to', 'file')].content
+        self.tree._set_lock_proxy(
+            ('path', 'to', 'file.new'), ('path', 'to', 'file'))
+        self.tree._allow_create_regular_file(('path', 'to', 'file.new'))
+        self.tree._allow_modification(('path', 'to', 'file.new'))
+        with self.dbfile.open_for_full_rewrite():
+            self.tree._disallow_create_regular_file(('path', 'to', 'file.new'))
+            self.dbfile.set_block(1, self.dbfile.get_block(2))
+            self.dbfile.set_block(2, self.dbfile.get_block(1))
+            self.tree._disallow_modification(('path', 'to', 'file.new'))
+            self.tree._allow_rename_file(('path', 'to', 'file.new'))
+            self.tree._allow_overwrite_file(('path', 'to', 'file'))
+            self.dbfile.commit()
+            self.tree._disallow_rename_file(('path', 'to', 'file.new'))
+            self.tree._disallow_overwrite_file(('path', 'to', 'file'))
+        self.assertEqual(
+            old_content[:4096] + old_content[8192:] + old_content[4096:8192],
+            self.tree._files[('path', 'to', 'file')].content)
+
+    def test_rewrite_file_without_explicit_commit_will_abort(self):
+        old_content = self.tree._files[('path', 'to', 'file')].content
+        self.tree._set_lock_proxy(
+            ('path', 'to', 'file.new'), ('path', 'to', 'file'))
+        self.tree._allow_create_regular_file(('path', 'to', 'file.new'))
+        self.tree._allow_modification(('path', 'to', 'file.new'))
+        with self.dbfile.open_for_full_rewrite():
+            self.tree._disallow_create_regular_file(('path', 'to', 'file.new'))
+            self.dbfile.set_setting('new setting', 'good value')
+            self.tree._allow_delete_file(('path', 'to', 'file.new'))
+            self.tree._allow_delete_file(('path', 'to', 'file'))
+        self.tree._disallow_delete_file(('path', 'to', 'file.new'))
+        self.tree._disallow_delete_file(('path', 'to', 'file'))
+        self.assertEqual(
+            old_content, self.tree._files[('path', 'to', 'file')].content)
+
 class TestOtherOperations(unittest.TestCase):
     def test_open_for_reading_context(self):
         self.tree = FakeDirectory()
@@ -965,8 +1099,9 @@ class TestOtherOperations(unittest.TestCase):
             self.assertEqual(b'', tree._files[('new', 'db')].content)
             tree._allow_overwrite_file(('new', 'db'))
             tree._allow_rename_file(('new', 'db.new'))
-        tree._disallow_overwrite_file(('new', 'db'))
-        tree._disallow_rename_file(('new', 'db.new'))
+            dbf.commit()
+            tree._disallow_overwrite_file(('new', 'db'))
+            tree._disallow_rename_file(('new', 'db.new'))
         self.assertEqual(
             b'new db magic\n' + b'\x00' * 4051 +
             b'\xe8\xe6\x0e~\xa3\x05\xcc\xa1\xb4\xd1\x7f'
@@ -999,8 +1134,9 @@ class TestOtherOperations(unittest.TestCase):
             tree._disallow_modification(('path', 'to', 'db.new'))
             tree._allow_overwrite_file(('path', 'to', 'db'))
             tree._allow_rename_file(('path', 'to', 'db.new'))
-        tree._disallow_overwrite_file(('path', 'to', 'db'))
-        tree._disallow_rename_file(('path', 'to', 'db.new'))
+            dbf.commit()
+            tree._disallow_overwrite_file(('path', 'to', 'db'))
+            tree._disallow_rename_file(('path', 'to', 'db.new'))
         self.assertEqual(
             b'ebadb file\nfirst setting:yes\nanother setting:no\n' +
             b'\x00' * 4016 +
@@ -1010,3 +1146,23 @@ class TestOtherOperations(unittest.TestCase):
             b'\xc4\xd5d\xe7ZV\x18\x1bw\x0cC\xce9\xaa\xdd'
             b'\xa9_\x7f\xddb\xc6\xaa(\xe8J\xb9\x90\xe5\x02\x82z\xdd',
             tree._files[('path', 'to', 'db')].content)
+
+    def test_create_without_explicit_commit_will_abort(self):
+        tree = FakeDirectory()
+        dbf = dbfile.DBFile(tree, ('path', 'to', 'db'))
+        dbf.set_block_size(4096)
+        dbf.set_block_checksum_algorithm(hashlib.sha256)
+        tree._allow_create_regular_file(('path', 'to', 'db'))
+        tree._allow_create_regular_file(('path', 'to', 'db.new'))
+        tree._allow_modification(('path', 'to', 'db.new'))
+        with dbf.create(b'ebadb file'):
+            tree._disallow_create_regular_file(('path', 'to', 'db'))
+            tree._disallow_create_regular_file(('path', 'to', 'db.new'))
+            dbf.set_setting('first setting', 'yes')
+            dbf.set_setting('another setting', 'no')
+            dbf.set_block(1, b'And some data')
+            tree._disallow_modification(('path', 'to', 'db.new'))
+            tree._allow_delete_file(('path', 'to', 'db.new'))
+            tree._allow_delete_file(('path', 'to', 'db'))
+        tree._disallow_delete_file(('path', 'to', 'db'))
+        tree._disallow_delete_file(('path', 'to', 'db'))

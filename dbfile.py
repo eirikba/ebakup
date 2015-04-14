@@ -41,10 +41,14 @@ class DBFile(object):
         Will raise FileExistsError if the file already exists.
 
         When this method returns, the file contains the "magic" line
-        and nothing else. The file is not really completely created
-        yet. When you have filled in all the initial data of the file,
-        you must call close_and_unlock() to make the creation
-        complete.
+        and nothing else. However, the file is not really completely
+        created yet. When you have filled in all the initial data of
+        the file, you must call commit() to create the real file with
+        the correct data.
+
+        Make sure to call commit() or close_and_unlock() to drop the
+        lock on the file. Using the returned object as a context will
+        automatically call close_and_unlock when the context exits.
 
         You can not read from the file while it is being created.
         '''
@@ -62,7 +66,11 @@ class DBFile(object):
         self._settings = {}
         self._write_file = temp_file
         self._write_file.lock_for_writing()
-        self._write_settings_to_file()
+        try:
+            self._write_settings_to_file()
+        except:
+            self.close_and_unlock()
+            raise
         return OpenContext(self)
 
     def set_block_size(self, block_size):
@@ -107,18 +115,20 @@ class DBFile(object):
     def open_for_reading(self):
         '''This locks and opens the file for reading.
 
-        Make sure to call close_and_unlock() to drop the lock on the
-        file. This applies even if this method raises an exception.
-
-        Returns an object that can be used as a context to
-        automatically call close_and_unlock().
+        Make sure to call commit() or close_and_unlock() to drop the
+        lock on the file. Using the returned object as a context will
+        automatically call close_and_unlock when the context exits.
         '''
         if self._read_file or self._write_file:
             raise AssertionError('DBFile already open')
         assert self._target_file is None
         self._read_file = self._directory.get_item_at_path(self._path)
         self._read_file.lock_for_reading()
-        self._prepare_read_file()
+        try:
+            self._prepare_read_file()
+        except:
+            self.close_and_unlock()
+            raise
         return OpenContext(self)
 
     def _prepare_read_file(self):
@@ -196,8 +206,9 @@ class DBFile(object):
         The file is also open for reading, so you can read and write
         freely.
 
-        Make sure to call close_and_unlock() to drop the lock on the
-        file. This applies even if this method raises an exception.
+        Make sure to call commit() or close_and_unlock() to drop the
+        lock on the file. Using the returned object as a context will
+        automatically call close_and_unlock when the context exits.
         '''
         if self._read_file or self._write_file:
             raise AssertionError('DBFile already open')
@@ -205,44 +216,88 @@ class DBFile(object):
         self._read_file = self._directory.get_item_at_path(self._path)
         self._write_file = self._read_file
         self._write_file.lock_for_writing()
-        self._prepare_read_file()
+        try:
+            self._prepare_read_file()
+        except:
+            self.close_and_unlock()
+            raise
         return OpenContext(self)
 
     def open_for_full_rewrite(self):
         '''This locks and opens the file for complete rewrite.
 
         This creates a new file where all the changes are written to.
-        This is equivalent to create(), except that the magic is taken
-        from the old file, and the file is also open for reading. All
-        reading will be done on the old file. As with create(), the
-        new data will not replace the old data until
-        close_and_unlock() is called.
+        This is equivalent to create(), except that the magic and the
+        initial settings are taken from the old file, and the file is
+        also open for reading. All reading will be done on the old
+        file. As with create(), the new data will not replace the old
+        data until commit() is called. Calling close_and_unlock() will
+        abort all changes.
 
-        Make sure to call close_and_unlock() to drop the lock on the
-        file. This applies even if this method raises an exception.
+        Make sure to call commit() or close_and_unlock() to drop the
+        lock on the file. Using the returned object as a context will
+        automatically call close_and_unlock when the context exits.
+
         '''
         if self._read_file or self._write_file:
             raise AssertionError('DBFile already open')
         assert self._target_file is None
+        self._read_file = self._directory.get_item_at_path(self._path)
+        self._read_file.lock_for_writing()
+        try:
+            self._prepare_read_file()
+            self._target_file = self._read_file
+            self._write_path = self._path[:-1] + (self._path[-1] + '.new',)
+            self._write_file = self._directory.create_regular_file(
+                self._write_path)
+            self._write_settings_to_file()
+        except:
+            self.close_and_unlock()
+            raise
+        return OpenContext(self)
+
+    def commit(self):
+        '''This will unlock the file, allowing other processes to read and
+        write it.
+
+        If the file is opened by open_for_full_rewrite() or create(),
+        this will also commit the new data. That is, this method will
+        make the changed data actually replace the old data.
+
+        After this method is called, no more reading or writing can be
+        done on the file (until it is opened again, of course).
+        '''
+        if self._write_file and self._read_file is not self._write_file:
+            self._close_unlock_and_replace()
+        else:
+            self.close_and_unlock()
+        assert self._target_file is None
+        assert self._write_path is None
 
     def close_and_unlock(self):
         '''This will unlock the file, allowing other processes to read and
         write it.
 
         If the file is opened by open_for_full_rewrite() or create(),
-        this will also commit the new data.
+        this will abort the changes and leave the file with the old
+        data intact.
 
         After this method is called, no more reading or writing can be
         done on the file (until it is opened again, of course).
         '''
         if self._write_file:
-            if self._read_file is not self._write_file:
-                self._close_unlock_and_replace()
-                return
-            assert self._target_file is None
-            self._read_file = None
-            self._write_file.close()
-            self._write_file = None
+            if self._write_file is not self._read_file:
+                self._write_file.close()
+                self._write_file = None
+                # Delete or not delete? Not sure.
+                #self._directory.remove_file(self._write_path)
+                self._write_path = None
+                self._target_file.close()
+                self._target_file = None
+            else:
+                self._read_file = None
+                self._write_file.close()
+                self._write_file = None
         assert self._target_file is None
         assert self._write_path is None
         if self._read_file:
