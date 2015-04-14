@@ -125,6 +125,20 @@ class FakeDirectory(object):
                 raise AssertionError('directories not supported yet')
         raise FileNotFoundError('No such file: ' + repr(path))
 
+    def iterate_item_names(self, path=()):
+        if path in self._files:
+            raise NotADirectoryError('Not a directory')
+        names = []
+        pathlen = len(path)
+        for cand in self._files:
+            if cand[:pathlen] != path:
+                continue
+            name = cand[pathlen]
+            if name not in names:
+                names.append(name)
+        for name in names:
+            yield name
+
     def create_regular_file(self, path):
         assert isinstance(path, tuple)
         if not self._is_create_file_allowed(path):

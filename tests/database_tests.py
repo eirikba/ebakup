@@ -2,74 +2,10 @@
 
 import database
 
+from dbfile_tests import FileData, FakeDirectory, FakeFile
+
 import datetime
 import unittest
-
-class FileData(object):
-    def __init__(self, content):
-        self.content = content
-        self.locked = 0 # True: write locked, number: count of read locks
-
-class FakeDirectory(object):
-    def __init__(self):
-        self._files = {}
-
-    def _add_file(self, path, content):
-        assert path
-        assert path not in self._files
-        parent = path[:-1]
-        while parent:
-            assert parent not in self._files
-            parent = parent[:-1]
-        self._files[path] = FileData(content)
-
-    def get_item_at_path(self, path):
-        data = self._files.get(path)
-        if data:
-            return FakeFile(data)
-        for k in self._files:
-            if k[:len(path)] == path:
-                raise AssertionError('Directories not supported')
-        raise FileNotFoundError('No such file: ' + repr(path))
-
-    def iterate_item_names(self, path=()):
-        if path in self._files:
-            raise NotADirectoryError('Not a directory')
-        names = []
-        pathlen = len(path)
-        for cand in self._files:
-            if cand[:pathlen] != path:
-                continue
-            name = cand[pathlen]
-            if name not in names:
-                names.append(name)
-        for name in names:
-            yield name
-
-class FakeFile(object):
-    def __init__(self, data):
-        self._data = data
-        self._locked = 0
-
-    def lock_for_reading(self):
-        if self._locked == 1:
-            return
-        if self._data.locked is True:
-            raise AssertionError('Deadlock!')
-        self._locked = 1
-        self._data.locked += 1
-
-    def get_data_slice(self, start, end):
-        if self._locked == 0:
-            raise AssertionError('Read from unlocked file')
-        return self._data.content[start:end]
-
-    def close(self):
-        if self._locked == 1:
-            assert self._data.locked > 0
-            self._data.locked -= 1
-            self._locked = 0
-        assert self._locked == 0
 
 class TestSimpleDatabase(unittest.TestCase):
     def test_read_simple_database(self):
