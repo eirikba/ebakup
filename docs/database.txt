@@ -68,7 +68,7 @@ This identifies the whole directory as being a backup database
 following this specification. The file only has a settings block. The
 currently defined settings are:
 
-  "block-size": The block size of all files in the backup database
+  "blocksize": The block size of all files in the backup database
       where not otherwise given. The value is a decimal
       number. Default: "4096".
 
