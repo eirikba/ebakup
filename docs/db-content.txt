@@ -59,7 +59,7 @@ Content item entries
 
 <dataentry> =
     0xdd <cidlength> <checksumlength>
-    <cid/checksum> <first> <last> <checksumdata>+
+    <cid/checksum> <first> <last> <checksumdata>*
 <cidlength>, <checksumlength> =
     continued high bit little endian unsigned integer
 <cid/checksum> = max(<cidlength>, <checksumlength>) octets
