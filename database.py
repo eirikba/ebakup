@@ -35,6 +35,15 @@ def _parse_uint32(data, done):
         value += data[done+i] << (i * 8)
     return value
 
+def _make_uint32(value):
+    if value < 0:
+        raise ValueError('Can not make uint32 from negative number')
+    if value > 0xffffffff:
+        raise ValueError('Value too big for uint32: ' + str(value))
+    return bytes((
+        value & 0xff, (value >> 8) & 0xff,
+        (value >> 16) & 0xff, (value >> 32) & 0xff))
+
 def _parse_varuint(data, done):
     value = 0
     shift = 0
@@ -44,6 +53,18 @@ def _parse_varuint(data, done):
         if data[done] < 0x80:
             return value, done + 1
         done += 1
+
+def _make_varuint(value):
+    if value < 0:
+        raise ValueError('Can not make varuint from negative number')
+    if value == 0:
+        return b'\x00'
+    data = []
+    while value > 0x7f:
+        data.append((value & 0x7f) | 0x80)
+        value >>= 7
+    data.append(value)
+    return bytes(data)
 
 def _parse_mtime(data, done):
     secs = 0
@@ -56,11 +77,32 @@ def _parse_mtime(data, done):
     mtime = datetime.datetime.utcfromtimestamp(secs)
     return mtime, nsecs
 
+def _make_mtime_with_nsec(mtime, nsec):
+    assert mtime.microsecond == 0
+    if nsec < 0 or nsec >= 1000000000:
+        raise ValueError('nsec out of range: ' + str(nsec))
+    timestamp = int((mtime - datetime.datetime(1970, 1, 1)) /
+                    datetime.timedelta(seconds=1))
+    data = []
+    for i in range(5):
+        data.append((timestamp >> (i * 8)) & 0xff)
+    if (data[-1] & 0x3f) != 0:
+        raise ValueError('mtime outside representable range: ' + str(mtime))
+    data[-1] = data[-1] | (nsec & 0x3f)
+    for i in range(3):
+        data.append((nsec >> (i * 8 + 6)) & 0xff)
+    return bytes(data)
+
 def _bytes_to_path_component(component):
     try:
         return component.decode('utf-8')
     except UnicodeDecodeError:
         return component
+
+def _path_component_to_bytes(component):
+    if isinstance(component, bytes):
+        return component
+    return component.encode('utf-8')
 
 class Database(object):
     def __init__(self, directory, path):
@@ -154,6 +196,7 @@ class Database(object):
         backup. The new backup object will not be made part of the
         database until commit() is called on the returned object.
         '''
+        return BackupInfoBuilder(self, datetime.datetime.utcnow())
 
     def get_checksum_algorithm(self):
         '''Return the name of the checksum algorithm used to identify file
@@ -174,11 +217,7 @@ class Database(object):
         '''Return a sequence of ContentInfo objects for all the content items
         that have the "good" checksum 'checksum'.
         '''
-        infos = []
-        for item in self._content.contentdata.values():
-            if item.checksum == checksum:
-                infos.append(ContentInfo(self, item))
-        return infos
+        return self._content.get_all_content_infos_with_checksum(checksum)
 
     def add_content_item(self, when, checksum):
         '''Add a new content item to the database, which had the checksum
@@ -186,6 +225,8 @@ class Database(object):
 
         Return the content id of the newly added item.
         '''
+        return self._content.add_content_item(when, checksum)
+
 
 
 ContentData = collections.namedtuple(
@@ -204,6 +245,9 @@ class ContentInfoFile(object):
     def _read_file(self):
         self.contentdata = {}
         with self._dbfile.open_for_reading():
+            if self._dbfile.get_magic() != b'ebakup content data':
+                raise NotTestedError(
+                    'Unexpected magic: ' + str(self._dbfile.get_magic()))
             for key in self._dbfile.get_setting_keys():
                 raise NotTestedError('Unknown setting: ' + str(key))
             blockidx = 1
@@ -220,6 +264,7 @@ class ContentInfoFile(object):
                 # Not supposed to happen
                 return
             if data[done] == 0:
+                assert data[done:] == b'\x00' * (len(data) - done)
                 return
             if data[done] == 0xdd:
                 cidlen, done = _parse_varuint(data, done + 1)
@@ -258,6 +303,79 @@ class ContentInfoFile(object):
             else:
                 raise NotTestedError(
                     'Unknown content entry type: ' + str(data[done]))
+
+    def get_all_content_infos_with_checksum(self, checksum):
+        '''Return a sequence of ContentInfo objects for all the content items
+        that have the "good" checksum 'checksum'.
+        '''
+        infos = []
+        for item in self.contentdata.values():
+            if item.checksum == checksum:
+                infos.append(ContentInfo(self._db, item))
+        return infos
+
+    def add_content_item(self, when, checksum):
+        '''Add the given content item to the file and return its content id.
+        '''
+        timestamp = int((when - datetime.datetime(1970, 1, 1)) /
+                        datetime.timedelta(seconds=1))
+        timestamp32 = _make_uint32(timestamp)
+        current = set(self.get_all_content_infos_with_checksum(checksum))
+        contentid = checksum
+        extra = b'\x00'
+        while contentid in current:
+            contentid = checksum + extra
+            if extra[-1] == 255:
+                extra += b'\x00'
+            else:
+                extra = extra[:-1] + bytes((extra[-1] + 1,))
+        assert contentid.startswith(checksum)
+        entry = b''.join((
+            b'\xdd',
+            _make_varuint(len(contentid)),
+            _make_varuint(len(checksum)),
+            contentid,
+            timestamp32,
+            timestamp32))
+        self._add_entry(entry)
+        return contentid
+
+    def _add_entry(self, entry):
+        with self._dbfile.open_for_in_place_modification():
+            blocksize = self._dbfile.get_block_data_size()
+            if len(entry) > blocksize:
+                raise ValueError('Entry too big {} for block size {}'.format(
+                    len(entry), blocksize))
+            blockno = self._dbfile.get_block_count() - 1
+            if blockno > 0:
+                block = self._dbfile.get_block(blockno)
+                block = self._trim_block(block)
+                if len(block) + len(entry) <= blocksize:
+                    self._dbfile.set_block(blockno, block + entry)
+                    return
+            blockno += 1
+            assert blockno > 0
+            self._dbfile.set_block(blockno, entry)
+
+    def _trim_block(self, block):
+        '''Return the actual data in 'block'.
+        '''
+        done = 0
+        while done < len(block) and block[done] != 0:
+            if block[done] == 0xdd:
+                cidlen, done = _parse_varuint(block, done)
+                cklen, done = _parse_varuint(block, done)
+                done += max(cidlen, cklen) + 8
+                while (done < len(block) and
+                       (block[done] == 0xa0 or block[done] == 0xa1)):
+                    if block[done] == 0xa1:
+                        done += cklen
+                    done += 9
+            else:
+                raise NotTestedError('Unknown data entry')
+        assert block[done:] == b'\x00' * (len(block) - done)
+        return block[:done]
+
 
 class ContentInfo(object):
     def __init__(self, db, data):
@@ -309,14 +427,122 @@ class ContentInfo(object):
         raise NotImplementedError()
 
 class BackupInfoBuilder(object):
-    def close(self):
+    def __init__(self, db, start):
+        self._db = db
+        self._path = self._db._path + (
+            str(start.year),
+            '{:02}-{:02}T{:02}:{:02}'.format(
+                start.month, start.day, start.hour, start.minute))
+        self._block_no = 1
+        self._block_data = b''
+        self._next_dirid = 8
+        self._directories = { (): 0 }
+        self._dbfile = dbfile.DBFile(self._db._directory, self._path)
+        self._dbfile.set_block_size(self._db._get_block_size())
+        self._dbfile.set_block_checksum_algorithm(
+            self._db._get_block_checksum_algorithm())
+        self._dbfile.create(b'ebakup backup data')
+        try:
+            self._dbfile.set_setting(
+                'start',
+                '{:04}-{:02}-{:02}T{:02}:{:02}:{:02}'.format(
+                    start.year, start.month, start.day,
+                    start.hour, start.minute, start.second))
+        except:
+            self._dbfile.close_and_unlock()
+            raise
+
+    def __enter__(self):
+        '''Using a BackupInfoBuilder as a context will make it call abort()
+        when the context exits.
+        '''
+        return self
+
+    def __exit__(self, a, b, c):
+        self.abort()
+
+    def commit(self):
         '''Add this backup data object to the database. It can no longer be
         modified after this method is called.
         '''
+        self._write_current_block()
+        end = datetime.datetime.utcnow()
+        self._dbfile.set_setting(
+            'end',
+            '{:04}-{:02}-{:02}T{:02}:{:02}:{:02}'.format(
+                end.year, end.month, end.day,
+                end.hour, end.minute, end.second))
+        self._dbfile.commit()
 
-    def add_file(self, path, content_id, size, mtime):
-        '''Add a file to the backup data object.
+    def abort(self):
+        '''If commit() has not been called yet, this method will delete the
+        backup data object
         '''
+        self._dbfile.close_and_unlock()
+
+    def add_file(self, path, content_id, size, mtime, mtime_nsec):
+        '''Add a file to the backup data object.
+
+        Note: mtime.microsecond will be ignored!
+        '''
+        dirid = 0
+        for i in range(1, len(path)):
+            dirid = self.add_directory(path[:i])
+        name = path[-1]
+        entry = b''.join(
+            (b'\x91',
+             _make_varuint(dirid),
+             _make_varuint(len(name)),
+             _path_component_to_bytes(name),
+             _make_varuint(len(content_id)),
+             content_id,
+             _make_varuint(size),
+             _make_mtime_with_nsec(mtime, mtime_nsec)))
+        self._add_data_entry(entry)
+
+    def _add_data_entry(self, entry):
+        block_size = self._dbfile.get_block_data_size()
+        if len(self._block_data) + len(entry) <= block_size:
+            self._block_data += entry
+            return
+        if len(entry) > block_size:
+            raise ValueError(
+                'Size of entry ({}) exceeds block data size ({})'.format(
+                    len(entry), block_size))
+        self._write_current_block()
+        assert self._block_data == b''
+        self._block_data = entry
+
+    def _write_current_block(self):
+        if len(self._block_data) <= 0:
+            return
+        blockno = self._block_no
+        self._block_no += 1
+        blockdata = self._block_data
+        self._block_data = b''
+        self._dbfile.set_block(blockno, blockdata)
+
+    def add_directory(self, path):
+        dirid = self._directories.get(path)
+        if dirid is not None:
+            return dirid
+        name = path[-1]
+        parent = path[:-1]
+        parentid = self._directories.get(parent)
+        if parentid is None:
+            assert path != parent
+            parentid = self.add_directory(parent)
+        dirid = self._next_dirid
+        self._next_dirid += 1
+        self._directories[path] = dirid
+        entry = b''.join((
+            b'\x90',
+            _make_varuint(dirid),
+            _make_varuint(parentid),
+            _make_varuint(len(name)),
+            _path_component_to_bytes(name)))
+        self._add_data_entry(entry)
+        return dirid
 
 class DirectoryData(object):
     def __init__(self, name, parentid):

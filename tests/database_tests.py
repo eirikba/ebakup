@@ -6,6 +6,30 @@ from dbfile_tests import FileData, FakeDirectory, FakeFile
 
 import datetime
 import unittest
+from unittest.mock import patch
+
+def set_utcnow(when):
+    FakeDatetime._utcnow = when
+
+def utcnow():
+    return FakeDatetime._utcnow
+
+
+class FakeDatetime(object):
+    _utcnow = None
+    _real_datetime = datetime.datetime
+
+    def __new__(cls, *args):
+        return FakeDatetime._real_datetime(*args)
+
+    @staticmethod
+    def utcnow():
+        assert FakeDatetime._utcnow is not None
+        return FakeDatetime._utcnow
+
+    @staticmethod
+    def utcfromtimestamp(ts):
+        return FakeDatetime._real_datetime.utcfromtimestamp(ts)
 
 class TestSimpleDatabase(unittest.TestCase):
     def test_read_simple_database(self):
@@ -318,6 +342,11 @@ class TestSimpleDatabase(unittest.TestCase):
 
 class TestWriteDatabase(unittest.TestCase):
 
+    def patch_one(self, name, double, create=False):
+        patcher = patch(name, double, create=create)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def create_empty_database(self, tree, path):
         tree._allow_create_regular_file(path + ('main',))
         tree._allow_create_regular_file(path + ('main.new',))
@@ -329,7 +358,7 @@ class TestWriteDatabase(unittest.TestCase):
         tree._allow_modification(path + ('content.new',))
         tree._allow_overwrite_file(path + ('content',))
         tree._allow_rename_file(path + ('content.new',))
-        database.create_database(tree, ('path', 'to', 'db'))
+        db = database.create_database(tree, ('path', 'to', 'db'))
         tree._disallow_overwrite_file(path + ('content',))
         tree._disallow_rename_file(path + ('content.new',))
         tree._disallow_modification(path + ('content.new',))
@@ -340,6 +369,23 @@ class TestWriteDatabase(unittest.TestCase):
         tree._allow_modification(path + ('main.new',))
         tree._disallow_create_regular_file(path + ('main',))
         tree._disallow_create_regular_file(path + ('main.new',))
+        return db
+
+    def allow_create_dbfile(self, tree, path):
+        newpath = path[:-1] + (path[-1] + '.new',)
+        tree._allow_create_regular_file(path)
+        tree._allow_create_regular_file(newpath)
+        tree._allow_modification(newpath)
+        tree._allow_overwrite_file(path)
+        tree._allow_rename_file(newpath)
+
+    def disallow_create_dbfile(self, tree, path):
+        newpath = path[:-1] + (path[-1] + '.new',)
+        tree._disallow_create_regular_file(path)
+        tree._disallow_create_regular_file(newpath)
+        tree._disallow_modification(newpath)
+        tree._disallow_overwrite_file(path)
+        tree._disallow_rename_file(newpath)
 
     def test_create_empty_database(self):
         tree = FakeDirectory()
@@ -365,3 +411,105 @@ class TestWriteDatabase(unittest.TestCase):
         self.assertRaisesRegex(
             FileExistsError, 'already exists:.*path.*to.*db',
             database.create_database, tree, ('path', 'to', 'db'))
+
+    def test_create_database_with_single_backup(self):
+        real_datetime = datetime.datetime
+        self.patch_one('datetime.datetime', FakeDatetime)
+        tree = FakeDirectory()
+        db = self.create_empty_database(tree, ('path', 'to', 'db'))
+        set_utcnow(real_datetime(2015, 4, 14, 21, 36, 12))
+        self.allow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+        backup = db.start_backup()
+        with backup:
+            set_utcnow(real_datetime(2015, 4, 14, 21, 36, 14))
+            tree._allow_modification(('path', 'to', 'db', 'content'))
+            cid = db.add_content_item(
+                real_datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
+            backup.add_file(
+                ('home', 'me', 'important', 'stuff.txt'),
+                cid, 111, real_datetime(2014, 9, 12, 11, 9, 15), 0)
+            cid = db.add_content_item(
+                real_datetime(2015, 4, 14, 21, 36, 38), b'02' + b'0' * 30)
+            backup.add_file(
+                ('home', 'me', 'important', 'other.txt'),
+                cid, 2323, real_datetime(2014, 5, 5, 19, 23, 2), 0)
+            cid = db.add_content_item(
+                real_datetime(2015, 4, 14, 21, 36, 39), b'03' + b'0' * 30)
+            backup.add_file(
+                ('toplevel',),
+                cid, 2323, real_datetime(2015, 4, 13, 13, 0, 0), 397261917)
+            set_utcnow(real_datetime(2015, 4, 14, 21, 36, 41))
+            tree._disallow_modification(('path', 'to', 'db', 'content'))
+            backup.commit()
+            set_utcnow(real_datetime(2015, 4, 14, 21, 36, 43))
+        self.disallow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+
+        db = database.Database(tree, ('path', 'to', 'db'))
+        backup = db.get_most_recent_backup()
+        self.assertEqual(
+            real_datetime(2015, 4, 14, 21, 36, 12), backup.get_start_time())
+        self.assertEqual(
+            real_datetime(2015, 4, 14, 21, 36, 41), backup.get_end_time())
+        self.assertCountEqual(
+            ('home', 'toplevel'), backup.get_directory_listing(()))
+        self.assertTrue(backup.is_directory(('home',)))
+        self.assertFalse(backup.is_file(('home',)))
+        self.assertTrue(backup.is_file(('toplevel',)))
+        self.assertFalse(backup.is_directory(('toplevel',)))
+        self.assertCountEqual(
+            ('me',), backup.get_directory_listing(('home',)))
+        self.assertTrue(backup.is_directory(('home', 'me')))
+        self.assertCountEqual(
+            ('important',), backup.get_directory_listing(('home', 'me')))
+        self.assertTrue(backup.is_directory(('home', 'me', 'important')))
+        self.assertCountEqual(
+            ('stuff.txt', 'other.txt'),
+            backup.get_directory_listing(('home', 'me', 'important')))
+        self.assertFalse(backup.is_directory(
+            ('home', 'me', 'important', 'stuff.txt')))
+        self.assertFalse(backup.is_directory(
+            ('home', 'me', 'important', 'other.txt')))
+        self.assertTrue(backup.is_file(
+            ('home', 'me', 'important', 'stuff.txt')))
+        self.assertTrue(backup.is_file(
+            ('home', 'me', 'important', 'other.txt')))
+        bkd = tree._files[('path', 'to', 'db', '2015', '04-14T21:36')].content
+        first = bkd.find(b'\x09important')
+        self.assertGreater(first, 4000)
+        second = bkd.find(b'\x09important', first+1)
+        self.assertEqual(-1, second)
+        filedata = backup.get_file_info(('toplevel',))
+        self.assertNotEqual(None, filedata)
+        self.assertEqual(2323, filedata.size)
+        self.assertEqual(real_datetime(2015, 4, 13, 13, 0, 0), filedata.mtime)
+        self.assertEqual(397261917, filedata.mtime_nsec)
+        contentinfo = db.get_content_info(filedata.contentid)
+        self.assertNotEqual(None, contentinfo)
+        self.assertEqual(b'03' + b'0' * 30, contentinfo.get_good_checksum())
+        self.assertEqual(
+            b'03' + b'0' * 30, contentinfo.get_last_known_checksum())
+        filedata = backup.get_file_info(
+            ('home', 'me', 'important', 'stuff.txt'))
+        self.assertNotEqual(None, filedata)
+        self.assertEqual(111, filedata.size)
+        self.assertEqual(real_datetime(2014, 9, 12, 11, 9, 15), filedata.mtime)
+        self.assertEqual(0, filedata.mtime_nsec)
+        contentinfo = db.get_content_info(filedata.contentid)
+        self.assertNotEqual(None, contentinfo)
+        self.assertEqual(b'01' + b'0' * 30, contentinfo.get_good_checksum())
+        self.assertEqual(
+            b'01' + b'0' * 30, contentinfo.get_last_known_checksum())
+        filedata = backup.get_file_info(
+            ('home', 'me', 'important', 'other.txt'))
+        self.assertNotEqual(None, filedata)
+        self.assertEqual(2323, filedata.size)
+        self.assertEqual(real_datetime(2014, 5, 5, 19, 23, 2), filedata.mtime)
+        self.assertEqual(0, filedata.mtime_nsec)
+        contentinfo = db.get_content_info(filedata.contentid)
+        self.assertNotEqual(None, contentinfo)
+        self.assertEqual(b'02' + b'0' * 30, contentinfo.get_good_checksum())
+        self.assertEqual(
+            b'02' + b'0' * 30, contentinfo.get_last_known_checksum())
+        self.assertEqual(None, backup.get_file_info(('home', 'me')))
