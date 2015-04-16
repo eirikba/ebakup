@@ -189,14 +189,18 @@ class Database(object):
         starting time.
         '''
 
-    def start_backup(self):
+    def start_backup(self, when):
         '''Adds a new backup object to the database.
+
+        The backup is registered as having been started at 'when'
+        (which should be a naive datetime.datetime in utc timezone).
 
         Returns an object to be used to fill in the data of this
         backup. The new backup object will not be made part of the
         database until commit() is called on the returned object.
+
         '''
-        return BackupInfoBuilder(self, datetime.datetime.utcnow())
+        return BackupInfoBuilder(self, when)
 
     def get_checksum_algorithm(self):
         '''Return the name of the checksum algorithm used to identify file
@@ -461,17 +465,19 @@ class BackupInfoBuilder(object):
     def __exit__(self, a, b, c):
         self.abort()
 
-    def commit(self):
+    def commit(self, when):
         '''Add this backup data object to the database. It can no longer be
         modified after this method is called.
+
+        The backup is registered as having been completed at 'when'
+        (which should be a naive datetime.datetime in utc timezone).
         '''
         self._write_current_block()
-        end = datetime.datetime.utcnow()
         self._dbfile.set_setting(
             'end',
             '{:04}-{:02}-{:02}T{:02}:{:02}:{:02}'.format(
-                end.year, end.month, end.day,
-                end.hour, end.minute, end.second))
+                when.year, when.month, when.day,
+                when.hour, when.minute, when.second))
         self._dbfile.commit()
 
     def abort(self):
