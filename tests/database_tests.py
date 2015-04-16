@@ -301,12 +301,16 @@ class TestSimpleDatabase(unittest.TestCase):
                 datetime.datetime(2015, 4, 3, 10, 46, 6)))
         self.assertEqual(
             None,
-            db.get_most_recent_backup_before(
-                datetime.datetime(2015, 4, 2, 12, 49, 9)))
+            db.get_oldest_backup_after(
+                datetime.datetime(2005, 4, 3, 10, 46, 6)))
         self.assertEqual(
             None,
             db.get_most_recent_backup_before(
-                datetime.datetime(2010, 8, 7, 18, 50, 24)))
+                datetime.datetime(2005, 4, 2, 12, 49, 9)))
+        self.assertEqual(
+            None,
+            db.get_most_recent_backup_before(
+                datetime.datetime(2001, 8, 7, 18, 50, 24)))
         self.assertEqual(
             None,
             db.get_most_recent_backup_before(
@@ -314,7 +318,7 @@ class TestSimpleDatabase(unittest.TestCase):
         self.assertEqual(
             None,
             db.get_most_recent_backup_before(
-                datetime.datetime(2015, 4, 3, 10, 46, 6)))
+                datetime.datetime(2005, 4, 3, 10, 46, 6)))
 
 class TestWriteDatabase(unittest.TestCase):
 
@@ -486,3 +490,165 @@ class TestWriteDatabase(unittest.TestCase):
         self.assertEqual(
             b'02' + b'0' * 30, contentinfo.get_last_known_checksum())
         self.assertEqual(None, backup.get_file_info(('home', 'me')))
+
+    def test_database_with_multiple_backups(self):
+        tree = FakeDirectory()
+        db = self.create_empty_database(tree, ('path', 'to', 'db'))
+
+        self.allow_create_dbfile(
+            tree, ('path', 'to', 'db', '2011', '08-30T04:30'))
+        backup = db.start_backup(datetime.datetime(2011, 8, 30, 4, 30, 0))
+        with backup:
+            tree._allow_modification(('path', 'to', 'db', 'content'))
+            cid5 = db.add_content_item(
+                datetime.datetime(2009, 4, 14, 21, 36, 36), b'05' + b'0' * 30)
+            tree._disallow_modification(('path', 'to', 'db', 'content'))
+            backup.add_file(
+                ('store', 'big'),
+                cid5, 2291407333111,
+                datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
+            backup.commit(datetime.datetime(2011, 8, 30, 5, 2, 11))
+        self.disallow_create_dbfile(
+            tree, ('path', 'to', 'db', '2011', '08-30T04:30'))
+
+        self.allow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+        backup = db.start_backup(datetime.datetime(2015, 4, 14, 21, 36, 12))
+        with backup:
+            tree._allow_modification(('path', 'to', 'db', 'content'))
+            cid1 = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
+            backup.add_file(
+                ('home', 'me', 'important', 'stuff.txt'),
+                cid1, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
+            cid2 = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 38), b'02' + b'0' * 30)
+            backup.add_file(
+                ('home', 'me', 'important', 'other.txt'),
+                cid2, 2323, datetime.datetime(2014, 5, 5, 19, 23, 2), 0)
+            cid3 = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 39), b'03' + b'0' * 30)
+            backup.add_file(
+                ('toplevel',),
+                cid3, 2323, datetime.datetime(2015, 4, 13, 13, 0, 0), 397261917)
+            tree._disallow_modification(('path', 'to', 'db', 'content'))
+            backup.commit(datetime.datetime(2015, 4, 14, 21, 36, 41))
+        self.disallow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+
+        self.allow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-16T19:50'))
+        backup = db.start_backup(datetime.datetime(2015, 4, 16, 19, 50, 36))
+        with backup:
+            tree._allow_modification(('path', 'to', 'db', 'content'))
+            cid4 = db.add_content_item(
+                datetime.datetime(2015, 4, 16, 19, 50, 42), b'04' + b'0' * 30)
+            backup.add_file(
+                ('home', 'me', 'important', 'stuff.txt'),
+                cid4, 5111,
+                datetime.datetime(2015, 4, 16, 12, 22, 5), 121198088)
+            backup.add_file(
+                ('home', 'me', 'important', 'other.txt'),
+                cid2, 2323, datetime.datetime(2014, 5, 5, 19, 23, 2), 0)
+            backup.add_file(
+                ('toplevel',),
+                cid3, 2323, datetime.datetime(2015, 4, 13, 13, 0, 0), 397261917)
+            tree._disallow_modification(('path', 'to', 'db', 'content'))
+            backup.commit(datetime.datetime(2015, 4, 16, 19, 50, 55))
+        self.disallow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-16T19:50'))
+
+        db = database.Database(tree, ('path', 'to', 'db'))
+
+        self.allow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-16T21:02'))
+        backup = db.start_backup(datetime.datetime(2015, 4, 16, 21, 2, 6))
+        with backup:
+            tree._allow_modification(('path', 'to', 'db', 'content'))
+            cid6 = db.add_content_item(
+                datetime.datetime(2015, 4, 16, 21, 2, 11), b'06' + b'0' * 30)
+            backup.add_file(
+                ('home', 'me', 'important', 'stuff.txt'),
+                cid6, 128,
+                datetime.datetime(2015, 4, 16, 19, 58, 47), 650620639)
+            backup.add_file(
+                ('home', 'me', 'important', 'other.txt'),
+                cid2, 2323, datetime.datetime(2014, 5, 5, 19, 23, 2), 0)
+            backup.add_file(
+                ('toplevel',),
+                cid3, 2323, datetime.datetime(2015, 4, 13, 13, 0, 0), 397261917)
+            tree._disallow_modification(('path', 'to', 'db', 'content'))
+            backup.commit(datetime.datetime(2015, 4, 16, 19, 50, 55))
+        self.disallow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-16T19:50'))
+
+        db = database.Database(tree, ('path', 'to', 'db'))
+
+        backup = db.get_most_recent_backup()
+        self.assertEqual(
+            datetime.datetime(2015, 4, 16, 21, 2, 6), backup.get_start_time())
+
+        backup = db.get_most_recent_backup_before(
+            datetime.datetime(2015, 4, 16, 21, 2, 7))
+        self.assertEqual(
+            datetime.datetime(2015, 4, 16, 21, 2, 6), backup.get_start_time())
+
+        backup = db.get_most_recent_backup_before(
+            datetime.datetime(2015, 4, 16, 21, 2, 6))
+        self.assertEqual(
+            datetime.datetime(2015, 4, 16, 19, 50, 36), backup.get_start_time())
+
+        backup = db.get_most_recent_backup_before(
+            datetime.datetime(2015, 4, 16, 19, 50, 36))
+        self.assertEqual(
+            datetime.datetime(2015, 4, 14, 21, 36, 12), backup.get_start_time())
+
+        backup = db.get_most_recent_backup_before(
+            datetime.datetime(2015, 4, 14, 21, 36, 12))
+        self.assertEqual(
+            datetime.datetime(2011, 8, 30, 4, 30, 0), backup.get_start_time())
+
+        backup = db.get_most_recent_backup_before(
+            datetime.datetime(2011, 8, 30, 4, 30, 0))
+        self.assertEqual(None, backup)
+
+        backup = db.get_most_recent_backup_before(
+            datetime.datetime(1257, 8, 30, 4, 30, 0))
+        self.assertEqual(None, backup)
+
+        backup = db.get_oldest_backup()
+        self.assertEqual(
+            datetime.datetime(2011, 8, 30, 4, 30, 0), backup.get_start_time())
+
+        backup = db.get_oldest_backup_after(
+            datetime.datetime(2011, 8, 30, 4, 29, 59))
+        self.assertEqual(
+            datetime.datetime(2011, 8, 30, 4, 30, 0), backup.get_start_time())
+
+        backup = db.get_oldest_backup_after(
+            datetime.datetime(2011, 8, 30, 4, 30, 0))
+        self.assertEqual(
+            datetime.datetime(2015, 4, 14, 21, 36, 12), backup.get_start_time())
+
+        backup = db.get_oldest_backup_after(
+            datetime.datetime(2015, 4, 14, 21, 36, 11))
+        self.assertEqual(
+            datetime.datetime(2015, 4, 14, 21, 36, 12), backup.get_start_time())
+
+        backup = db.get_oldest_backup_after(
+            datetime.datetime(2015, 4, 14, 21, 36, 12))
+        self.assertEqual(
+            datetime.datetime(2015, 4, 16, 19, 50, 36), backup.get_start_time())
+
+        backup = db.get_oldest_backup_after(
+            datetime.datetime(2015, 4, 16, 19, 50, 36))
+        self.assertEqual(
+            datetime.datetime(2015, 4, 16, 21, 2, 6), backup.get_start_time())
+
+        backup = db.get_oldest_backup_after(
+            datetime.datetime(2015, 4, 16, 21, 2, 6))
+        self.assertEqual(None, backup)
+
+        backup = db.get_oldest_backup_after(
+            datetime.datetime(2066, 8, 30, 4, 30, 0))
+        self.assertEqual(None, backup)

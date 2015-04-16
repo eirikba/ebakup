@@ -183,11 +183,65 @@ class Database(object):
         '''Obtain the data for the most recent backup before 'when' according
         to the starting time.
         '''
+        yearly = self._get_backup_paths_for_year(when.year)
+        when_name = '{:02}-{:02}T{:02}:{:02}'.format(
+            when.month, when.day, when.hour, when.minute)
+        candidates = [x for x in yearly if x[1] <= when_name]
+        backup = None
+        if candidates:
+            backup_path = candidates[-1]
+            backup = BackupInfo(self, self._path + backup_path)
+            if backup.get_start_time() >= when:
+                if len(candidates) > 1:
+                    backup_path = candidates[-2]
+                    backup = BackupInfo(self, self._path + backup_path)
+                else:
+                    backup = None
+        if not backup:
+            years = self._get_backup_year_list()
+            years = [ x for x in years if x < when.year ]
+            if not years:
+                return None
+            backup_path = self._get_backup_paths_for_year(years[-1])[-1]
+            backup = BackupInfo(self, self._path + backup_path)
+        start = backup.get_start_time()
+        assert backup_path == (
+            str(start.year),
+            '{:02}-{:02}T{:02}:{:02}'.format(
+                start.month, start.day, start.hour, start.minute))
+        return backup
 
     def get_oldest_backup_after(self, when):
         '''Obtain the data for the oldest backup after 'when' according to the
         starting time.
         '''
+        yearly = self._get_backup_paths_for_year(when.year)
+        when_name = '{:02}-{:02}T{:02}:{:02}'.format(
+            when.month, when.day, when.hour, when.minute)
+        candidates = [x for x in yearly if x[1] >= when_name]
+        backup = None
+        if candidates:
+            backup_path = candidates[0]
+            backup = BackupInfo(self, self._path + backup_path)
+            if backup.get_start_time() <= when:
+                if len(candidates) > 1:
+                    backup_path = candidates[1]
+                    backup = BackupInfo(self, self._path + backup_path)
+                else:
+                    backup = None
+        if not backup:
+            years = self._get_backup_year_list()
+            years = [ x for x in years if x > when.year ]
+            if not years:
+                return None
+            backup_path = self._get_backup_paths_for_year(years[0])[0]
+            backup = BackupInfo(self, self._path + backup_path)
+        start = backup.get_start_time()
+        assert backup_path == (
+            str(start.year),
+            '{:02}-{:02}T{:02}:{:02}'.format(
+                start.month, start.day, start.hour, start.minute))
+        return backup
 
     def start_backup(self, when):
         '''Adds a new backup object to the database.
