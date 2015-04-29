@@ -458,13 +458,17 @@ class ContentInfo(object):
     def get_checksum_timeline(self):
         '''Return a list of objects describing how the checksum of this
         content item has changed over time. Each object in the list
-        has (at least) the properties 'checksum', 'first' and 'last',
-        where 'checksum' is the checksum and 'first' and 'last' gives
-        the start and end time of the time span when the item had this
-        checksum. The objects in the list are sorted on time, and the
-        time spans are not overlapping. (Thus the first object is the
-        "good" checksum and the last object is the last known
-        checksum.)
+        has (at least) the properties 'checksum', 'first', 'last' and
+        'restored'. 'checksum' is the checksum and 'first' and 'last'
+        gives the first and last time during this time span when the
+        item was verified to have this checksum. The 'restored' value
+        is True if the content was found to be the same as a "believed
+        good" source, and False otherwise. If 'restored' is True,
+        'checksum' MUST be the same as get_good_checksum().
+
+        The objects in the list are sorted on time, and the time spans
+        are not overlapping. (Thus the first object is the "good"
+        checksum and the last object is the last known checksum.)
         '''
         return self._data.timeline
 

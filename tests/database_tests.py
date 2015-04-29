@@ -154,6 +154,7 @@ class TestSimpleDatabase(unittest.TestCase):
             datetime.datetime(2015, 3, 27, 11, 35, 20), checks[0].first)
         self.assertEqual(
             datetime.datetime(2015, 4, 5, 16, 55, 37), checks[0].last)
+        self.assertTrue(checks[0].restored)
         info = db.get_content_info(
             b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
             b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde')
@@ -179,6 +180,7 @@ class TestSimpleDatabase(unittest.TestCase):
             datetime.datetime(2015, 3, 27, 11, 35, 20), checks[0].first)
         self.assertEqual(
             datetime.datetime(2015, 3, 27, 11, 35, 20), checks[0].last)
+        self.assertTrue(checks[0].restored)
         self.assertEqual(
             b'k\x8c\xba\x8b\x17\x8b\rL\x13\xde\xc9$<\x90\x04\xeb\xc3'
             b'\x03\xcbJ\xaf\xe93\x0c\x8d\x12^.\x94yS\xae',
@@ -187,6 +189,7 @@ class TestSimpleDatabase(unittest.TestCase):
             datetime.datetime(2015, 3, 29, 17, 3, 1), checks[1].first)
         self.assertEqual(
             datetime.datetime(2015, 4, 1, 12, 53, 31), checks[1].last)
+        self.assertFalse(checks[1].restored)
         self.assertEqual(
             b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
             b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
@@ -195,6 +198,7 @@ class TestSimpleDatabase(unittest.TestCase):
             datetime.datetime(2015, 4, 1, 12, 57, 31), checks[2].first)
         self.assertEqual(
             datetime.datetime(2015, 4, 5, 16, 55, 37), checks[2].last)
+        self.assertTrue(checks[2].restored)
         info = db.get_content_info(
             b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
             b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98\x37\x73")
@@ -220,6 +224,7 @@ class TestSimpleDatabase(unittest.TestCase):
             datetime.datetime(2015, 3, 26, 9, 52, 17), checks[0].first)
         self.assertEqual(
             datetime.datetime(2015, 3, 28, 11, 25, 32), checks[0].last)
+        self.assertTrue(checks[0].restored)
         self.assertEqual(
             b'\x01\xfa\x04^\x9c\x11\xd5\x8d\xfe\x19]}\xd1((\x0c'
             b'\x00h\xad0\x13\xa3(\xb5\xe8\xb3\xac\xa3\x9e_\xfbb',
@@ -228,6 +233,7 @@ class TestSimpleDatabase(unittest.TestCase):
             datetime.datetime(2015, 3, 29, 8, 2, 25), checks[1].first)
         self.assertEqual(
             datetime.datetime(2015, 4, 2, 9, 55, 12), checks[1].last)
+        self.assertFalse(checks[1].restored)
         self.assertEqual(None, db.get_content_info(
             b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
             b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98"))
