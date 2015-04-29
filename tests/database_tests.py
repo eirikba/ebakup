@@ -88,20 +88,21 @@ class TestSimpleDatabase(unittest.TestCase):
         self.assertEqual(
             datetime.datetime(2015, 4, 3, 10, 47, 59),
             backup.get_end_time())
-        self.assertCountEqual(
-            ('path', 'file'),
-            backup.get_directory_listing(()))
+        dirlist = backup.get_directory_listing(())
+        self.assertCountEqual(('path',), dirlist[0])
+        self.assertCountEqual(('file',), dirlist[1])
         self.assertTrue(backup.is_directory(('path',)))
         self.assertFalse(backup.is_file(('path',)))
         self.assertFalse(backup.is_directory(('file',)))
         self.assertTrue(backup.is_file(('file',)))
-        self.assertCountEqual(
-            ('to',),
-            backup.get_directory_listing(('path',)))
+        dirlist = backup.get_directory_listing(('path',))
+        self.assertCountEqual(('to',), dirlist[0])
+        self.assertCountEqual((), dirlist[1])
         self.assertTrue(backup.is_directory(('path','to')))
         self.assertFalse(backup.is_file(('path', 'to')))
-        self.assertCountEqual(
-            ('file',), backup.get_directory_listing(('path','to')))
+        dirlist = backup.get_directory_listing(('path','to'))
+        self.assertCountEqual((), dirlist[0])
+        self.assertCountEqual(('file',), dirlist[1])
         self.assertFalse(backup.is_directory(('path','to','file')))
         self.assertTrue(backup.is_file(('path', 'to','file')))
         info = backup.get_file_info(('file',))
@@ -426,21 +427,24 @@ class TestWriteDatabase(unittest.TestCase):
             datetime.datetime(2015, 4, 14, 21, 36, 12), backup.get_start_time())
         self.assertEqual(
             datetime.datetime(2015, 4, 14, 21, 36, 41), backup.get_end_time())
-        self.assertCountEqual(
-            ('home', 'toplevel'), backup.get_directory_listing(()))
+        dirlist = backup.get_directory_listing(())
+        self.assertCountEqual(('home',), dirlist[0])
+        self.assertCountEqual(('toplevel',), dirlist[1])
         self.assertTrue(backup.is_directory(('home',)))
         self.assertFalse(backup.is_file(('home',)))
         self.assertTrue(backup.is_file(('toplevel',)))
         self.assertFalse(backup.is_directory(('toplevel',)))
-        self.assertCountEqual(
-            ('me',), backup.get_directory_listing(('home',)))
+        dirlist = backup.get_directory_listing(('home',))
+        self.assertCountEqual(('me',), dirlist[0])
+        self.assertCountEqual((), dirlist[1])
         self.assertTrue(backup.is_directory(('home', 'me')))
-        self.assertCountEqual(
-            ('important',), backup.get_directory_listing(('home', 'me')))
+        dirlist = backup.get_directory_listing(('home', 'me'))
+        self.assertCountEqual(('important',), dirlist[0])
+        self.assertCountEqual((), dirlist[1])
         self.assertTrue(backup.is_directory(('home', 'me', 'important')))
-        self.assertCountEqual(
-            ('stuff.txt', 'other.txt'),
-            backup.get_directory_listing(('home', 'me', 'important')))
+        dirlist = backup.get_directory_listing(('home', 'me', 'important'))
+        self.assertCountEqual((), dirlist[0])
+        self.assertCountEqual(('stuff.txt', 'other.txt'), dirlist[1])
         self.assertFalse(backup.is_directory(
             ('home', 'me', 'important', 'stuff.txt')))
         self.assertFalse(backup.is_directory(

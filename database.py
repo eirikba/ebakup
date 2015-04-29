@@ -752,13 +752,17 @@ class BackupInfo(object):
             int(match.group(4)), int(match.group(5)), int(match.group(6)))
 
     def get_directory_listing(self, path):
-        '''Return the names of all the items in the directory at 'path'. (Use
+        '''Return the names of all the items in the directory at 'path'. Use
         an empty path, i.e. (), to get the items at the root.
+
+        The names are returned as a pair (dirs, files) of names, where
+        the first item is the names of all the directories and the
+        second is the names of all the regular files.
         '''
         dirdata = self.directories[0]
         for comp in path:
             dirdata = dirdata.directories[comp]
-        return [ x for x in dirdata.directories ] + [ x for x in dirdata.files ]
+        return [ x for x in dirdata.directories ], [ x for x in dirdata.files ]
 
     def is_directory(self, path):
         '''Return True if 'path' represents a directory, False otherwise.
