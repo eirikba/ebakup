@@ -121,7 +121,10 @@ class Database(object):
         return self.get_checksum_algorithm_name()
 
     def _get_block_checksum_algorithm(self):
-        name = self._get_block_checksum_algorithm_name()
+        return self._get_checksum_algorithm_from_name(
+            self.get_checksum_algorithm_name())
+
+    def _get_checksum_algorithm_from_name(self, name):
         if name == 'sha256':
             return hashlib.sha256
         raise AssertionError('Unknown checksum algorithm: ' + str(check_name))
@@ -262,6 +265,16 @@ class Database(object):
         '''
         with self._main.open_for_reading():
             return self._main.get_single_setting('checksum')
+
+    def get_checksum_algorithm(self):
+        '''Return the checksum algorithm used to identify file contents.
+
+        The returned object is factory creating objects that largely
+        follows the hashlib standard (and in many cases is likely to
+        be a class from hashlib).
+        '''
+        name = self.get_checksum_algorithm_name()
+        return self._get_checksum_algorithm_from_name(name)
 
     def get_content_info(self, content_id):
         '''Return a ContentInfo for the content with 'content_id' as id.

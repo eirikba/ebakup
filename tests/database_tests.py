@@ -384,6 +384,14 @@ class TestWriteDatabase(unittest.TestCase):
         self.assertEqual(None, db.get_most_recent_backup())
         self.assertEqual(None, db.get_oldest_backup())
         self.assertEqual('sha256', db.get_checksum_algorithm_name())
+        checksum_algo = db.get_checksum_algorithm()
+        self.assertNotEqual(None, checksum_algo)
+        checksummer = checksum_algo()
+        checksummer.update(b'Some text')
+        self.assertEqual(
+            b'L.\x9em\xa3\x1ad\xc7\x06#a\x9cD\x9a\x04\th\xcd'
+            b'\xbe\xa8YE\xbf8O\xa3\x0e\xd2\xd5\xd2O\xa3',
+            checksummer.digest())
 
     def test_create_database_in_existing_directory_fails(self):
         tree = FakeDirectory()
