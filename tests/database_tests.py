@@ -80,7 +80,7 @@ class TestSimpleDatabase(unittest.TestCase):
             b'\x16\xeb7 \xfb\xc1\x00\x02\xfe\xa2\xf1\x1a\xea'
             )
         db = database.Database(d, ('db',))
-        self.assertEqual('sha256', db.get_checksum_algorithm())
+        self.assertEqual('sha256', db.get_checksum_algorithm_name())
         backup = db.get_most_recent_backup()
         self.assertEqual(
             datetime.datetime(2015, 4, 3, 10, 46, 6),
@@ -383,7 +383,7 @@ class TestWriteDatabase(unittest.TestCase):
         db = database.Database(tree, ('path', 'to', 'db'))
         self.assertEqual(None, db.get_most_recent_backup())
         self.assertEqual(None, db.get_oldest_backup())
-        self.assertEqual('sha256', db.get_checksum_algorithm())
+        self.assertEqual('sha256', db.get_checksum_algorithm_name())
 
     def test_create_database_in_existing_directory_fails(self):
         tree = FakeDirectory()

@@ -118,7 +118,7 @@ class Database(object):
             return int(self._main.get_single_setting('blocksize'))
 
     def _get_block_checksum_algorithm_name(self):
-        return self.get_checksum_algorithm()
+        return self.get_checksum_algorithm_name()
 
     def _get_block_checksum_algorithm(self):
         name = self._get_block_checksum_algorithm_name()
@@ -256,7 +256,7 @@ class Database(object):
         '''
         return BackupInfoBuilder(self, when)
 
-    def get_checksum_algorithm(self):
+    def get_checksum_algorithm_name(self):
         '''Return the name of the checksum algorithm used to identify file
         contents.
         '''
