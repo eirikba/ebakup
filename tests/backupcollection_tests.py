@@ -11,31 +11,15 @@ class FileData(object):
         self.content_type = None
         for k,v in kwargs.items():
             if k not in (
-                    'content', 'content_generator', 'content_params',
+                    'content', 'content_generator',
                     'mtime', 'mtime_ns', 'checksum'):
                 raise AssertionError('Unknown arg for FileData: ' + k)
-            if (k == 'content_generator' or k == 'content' or
-                k == 'content_params'):
+            if k == 'content_generator' or k == 'content':
                 self.content_type = k
                 assert not hasattr(self, 'content_generator')
                 assert not hasattr(self, 'content')
-                assert not hasattr(self, 'content_params')
             setattr(self, k, v)
-            if self.content_type == 'content_params':
-                self.generate_content_from_params()
             self.generate_missing_data()
-
-    def generate_content_from_params(self):
-        size = self.content_params[0]
-        seed = self.content_params[1]
-        if seed is None:
-            seed = str(size)
-        if isinstance(seed, str):
-            seed = seed.encode('utf-8')
-        assert isinstance(seed, bytes)
-        self.content = (seed * (size//len(seed) + 1))[:size]
-        assert len(self.content) == size
-        self.content_type = 'content'
 
     def generate_missing_data(self):
         if self.content_type == 'content':
@@ -369,13 +353,13 @@ class TestBasicBackup(unittest.TestCase):
         bc = backupcollection.BackupCollection.create(params)
 
         sourcetree._set_file(
-            ('home', 'me', 'file.txt'), content_params=(127, None))
+            ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')
         sourcetree._set_file(
-            ('otherfile',), content_params=(7029, None))
+            ('otherfile',), content=b'7029' * 1757 + b'7')
         sourcetree._set_file(
-            ('home','me','deep','data'), content_params=(5028, None))
+            ('home','me','deep','data'), content=b'5028' * 1257)
         sourcetree._set_file(
-            ('4',), content_params=(21516, None))
+            ('4',), content=b'21516' * 4303 + b'2')
 
         backup = bc.start_backup(
             datetime.datetime(2015, 2, 14, 19, 55, 32, 328629))
@@ -586,9 +570,9 @@ class TestBrokenUsage(unittest.TestCase):
         bc = backupcollection.BackupCollection.create(params)
 
         sourcetree._set_file(
-            ('home', 'me', 'file.txt'), content_params=(127, None))
+            ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')
         sourcetree._set_file(
-            ('otherfile',), content_params=(7029, None))
+            ('otherfile',), content=b'7029' * 1757 + b'7')
 
         backup = bc.start_backup(
             datetime.datetime(2015, 2, 14, 19, 55, 32, 328629))
