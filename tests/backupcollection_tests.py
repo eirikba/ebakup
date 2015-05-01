@@ -96,6 +96,13 @@ class FakeDirectory(object):
         self._files[tmppath] = FileData(content=b'')
         return tempfile
 
+    def make_cheap_copy(self, sourcepath, targetpath):
+        if sourcepath not in self._files:
+            raise FileNotFoundError('Source does not exist: ' + str(sourcepath))
+        self._verify_path_does_not_exist(targetpath)
+        self._ensure_parent_directory(targetpath)
+        self._files[targetpath] = self._files[sourcepath]
+
     def get_item(self, path):
         if path in self._files:
             return FakeFile(self, path)
@@ -551,6 +558,19 @@ class TestBasicBackup(unittest.TestCase):
         self.assertFalse(cs.restored)
         self.assertEqual(datetime.datetime(2015, 3, 16, 9, 52, 14), cs.first)
         self.assertEqual(datetime.datetime(2015, 3, 16, 9, 52, 14), cs.last)
+
+    def test_shadow_tree_created(self):
+        store = self.storetree
+        contentroot = ('path', 'to', 'store', 'content')
+        shadowroot = ('path', 'to', 'store', '2015', '02-14T19:55')
+        self.assertEqual(
+            store._files[contentroot + ('ba', '0f', 'e9fe63690ce68315439e5a089'
+                '86170b39937594c75fc4bbc32039db5ff0713be')],
+            store._files[shadowroot + ('homedir', 'file.txt')])
+        self.assertEqual(
+            store._files[contentroot + ('d1', '87', 'bda8636907240be66b50338fa'
+                'f862a4c3df3d7c4d30cef45a03f2ae5aa91365e')],
+            store._files[shadowroot + ('outside', 'store', 'deep', 'data')])
 
 
 class TestBrokenUsage(unittest.TestCase):

@@ -79,8 +79,14 @@ class BackupCollection(object):
         when the backup started in UTC. If None, the current time will
         be used.
         '''
-        builder = BackupBuilder(self._db, start)
+        builder = BackupBuilder(self, start)
         return builder
+
+    def _make_shadow_copy(self, path, content_id):
+        contentpath = self._make_path_from_content_id(content_id)
+        contentpath = self._path + ('content',) + contentpath
+        shadowpath = self._path + path
+        self._tree.make_cheap_copy(contentpath, shadowpath)
 
     def get_most_recent_backup(self):
         '''Return a BackupData object for the most recently created backup.
@@ -262,8 +268,15 @@ class ContentReader(object):
 class BackupBuilder(object):
     '''Allows building up a new backup.
     '''
-    def __init__(self, db, start_time):
-        self._db = db
+    def __init__(self, collection, start_time):
+        self._collection = collection
+        self._db = collection._db
+        self._start_time = start_time
+        self._shadow_root = (
+            str(start_time.year),
+            '{:02}-{:02}T{:02}:{:02}'.format(
+                start_time.month, start_time.day,
+                start_time.hour, start_time.minute))
         self._backup = self._db.start_backup(start_time)
 
     def __enter__(self):
@@ -278,6 +291,7 @@ class BackupBuilder(object):
         '''Add the file at 'path' to the backup, with the given attributes.
         '''
         self._backup.add_file(path, contentid, size, mtime, mtime_nsec)
+        self._collection._make_shadow_copy(self._shadow_root + path, contentid)
 
     def commit(self, end_time=None):
         '''Finish up the backup and publish it in the database.
