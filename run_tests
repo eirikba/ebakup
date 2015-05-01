@@ -7,6 +7,16 @@ import unittest
 
 
 expected_tests = set((
+    'backupcollection_tests.TestBasicBackup.test_add_duplicate_content',
+    'backupcollection_tests.TestBasicBackup.test_backup_end_time',
+    'backupcollection_tests.TestBasicBackup.test_backup_start_time',
+    'backupcollection_tests.TestBasicBackup.test_checksum_timeline',
+    'backupcollection_tests.TestBasicBackup.test_get_content_info',
+    'backupcollection_tests.TestBasicBackup.test_get_content_reader',
+    'backupcollection_tests.TestBasicBackup.test_get_file_info',
+    'backupcollection_tests.TestBasicBackup.test_list_directory',
+    'backupcollection_tests.TestBrokenUsage.test_add_two_files_with_same_path',
+    'backupcollection_tests.TestUtilities.test_make_path_from_content_id_in_new_collection',
     'database_tests.TestSimpleDatabase.test_get_out_of_range_backups',
     'database_tests.TestSimpleDatabase.test_read_simple_database',
     'database_tests.TestWriteDatabase.test_create_database_in_existing_directory_fails',

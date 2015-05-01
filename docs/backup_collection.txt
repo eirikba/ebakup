@@ -26,6 +26,10 @@ least:
 - <Year>: (e.g. "2015") A directory holding "backup trees". See the
   "backup trees" section for details.
 
+And may also contain:
+
+- "tmp": A directory for temporary files.
+
 
 Backup database
 ===============

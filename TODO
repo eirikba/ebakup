@@ -1,0 +1,17 @@
+BackupCollection._make_path_from_content_id() hardcodes the splitting points.
+
+Test: Not created
+
+Each path component (except the last) should have the same length as
+all other items in the same directory.
+
+
+---------------------------------------------------------------------------
+
+Many "problematic" cases not handled
+
+There are plenty of cases that aren't fully handled. In particular
+cases that shouldn't happen when everything is correct. Most of these
+can be found by searching for NotTestedError.
+
+---------------------------------------------------------------------------
