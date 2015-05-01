@@ -818,11 +818,11 @@ class BackupInfo(object):
         filedata = None
         for comp in path:
             if filedata is not None:
-                return False
+                return None
             if comp in dirdata.directories:
                 dirdata = dirdata.directories[comp]
             else:
                 if comp not in dirdata.files:
-                    return False
+                    return None
                 filedata = dirdata.files[comp]
         return filedata
