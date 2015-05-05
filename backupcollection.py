@@ -95,7 +95,10 @@ class BackupCollection(object):
 
         If there is no suitable backup, None is returned.
         '''
-        return BackupData(self, self._db.get_most_recent_backup())
+        info = self._db.get_most_recent_backup()
+        if info is None:
+            return None
+        return BackupData(self, info)
 
     def get_most_recent_backup_before(self, when):
         '''Return a BackupData object for the most recently created backup

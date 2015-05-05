@@ -593,6 +593,18 @@ class TestSingleStuff(unittest.TestCase):
         self.assertLessEqual(after_backup_started, backup2.get_end_time())
         self.assertLessEqual(backup2.get_end_time(), datetime.datetime.utcnow())
 
+    def test_get_most_recent_backup_when_no_backup_available(self):
+        storetree = FakeDirectory()
+        sourcetree = FakeDirectory()
+        db = FakeDatabases()
+        params = backupcollection.BackupCollectionParams(
+            storetree, ('path', 'to', 'store'))
+        params.set_database_opener(db.open)
+        params.set_database_creator(db.create)
+        bc = backupcollection.BackupCollection.create(params)
+        bc2 = backupcollection.BackupCollection(params)
+        self.assertEqual(None, bc2.get_most_recent_backup())
+
 class TestBrokenUsage(unittest.TestCase):
 
     def test_add_two_files_with_same_path(self):
