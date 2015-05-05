@@ -11,7 +11,7 @@ class BackupOperation(object):
     def set_logger(self, logger):
         self._logger = logger
 
-    def add_tree_to_back_up(self, tree, sourcepath, targetpath):
+    def add_tree_to_backup(self, tree, sourcepath, targetpath):
         '''Register that 'sourcepath' inside 'tree' should be copied to
         'targetpath' inside the backup.
         '''

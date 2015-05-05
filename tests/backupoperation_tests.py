@@ -159,7 +159,7 @@ class TestBasicBackup(unittest.TestCase):
             ('home', 'me', 'tmp'), ('boring', 'forgetme', 'stuff'))
         sourcetree._add_files(('home', 'me'), ('toplevel',))
         sourcetree._add_files(('home',), ('outside', 'and more'))
-        tree = bo.add_tree_to_back_up(sourcetree, ('home', 'me'), ('main',))
+        tree = bo.add_tree_to_backup(sourcetree, ('home', 'me'), ('main',))
         tree.ignore_subtree(('tmp',))
         tree.back_up_subtree(('tmp', 'stuff'))
         tree.back_up_static_subtree(('myfiles', 'static'))
@@ -239,7 +239,7 @@ class TestBasicBackup(unittest.TestCase):
         oldcontent = changed._get_content()
         changed._change()
         self.assertNotEqual(oldcontent, changed._get_content())
-        tree2 = bo.add_tree_to_back_up(sourcetree2, ('home', 'me'), ('main',))
+        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
         tree2.ignore_subtree(('tmp',))
         tree2.back_up_subtree(('tmp', 'stuff'))
         tree2.back_up_static_subtree(('myfiles', 'static'))
@@ -269,7 +269,7 @@ class TestBasicBackup(unittest.TestCase):
             ('home', 'me', 'myfiles', 'static', 'more', 'three')]._get_content()
         del sourcetree2._files[
             ('home', 'me', 'myfiles', 'static', 'more', 'three')]
-        tree2 = bo.add_tree_to_back_up(sourcetree2, ('home', 'me'), ('main',))
+        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
         tree2.ignore_subtree(('tmp',))
         tree2.back_up_subtree(('tmp', 'stuff'))
         tree2.back_up_static_subtree(('myfiles', 'static'))
@@ -300,7 +300,7 @@ class TestBasicBackup(unittest.TestCase):
                 ('home', 'me', 'myfiles', 'static', 'more', 'three')])
         del sourcetree2._files[
             ('home', 'me', 'myfiles', 'static', 'more', 'three')]
-        tree2 = bo.add_tree_to_back_up(sourcetree2, ('home', 'me'), ('main',))
+        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
         tree2.ignore_subtree(('tmp',))
         tree2.back_up_subtree(('tmp', 'stuff'))
         tree2.back_up_static_subtree(('myfiles', 'static'))
@@ -333,7 +333,7 @@ class TestBasicBackup(unittest.TestCase):
                 ('home', 'me', 'myfiles', 'static', 'more', 'three')])
         del sourcetree2._files[
             ('home', 'me', 'myfiles', 'static', 'more', 'three')]
-        tree2 = bo.add_tree_to_back_up(sourcetree2, ('home', 'me'), ('main',))
+        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
         tree2.ignore_subtree(('tmp',))
         tree2.back_up_subtree(('tmp', 'stuff'))
         tree2.back_up_static_subtree(('myfiles', 'static'))
@@ -371,7 +371,7 @@ class TestBasicBackup(unittest.TestCase):
         oldcontent = changed._get_content()
         changed._change()
         self.assertNotEqual(oldcontent, changed._get_content())
-        tree2 = bo.add_tree_to_back_up(sourcetree2, ('home', 'me'), ('main',))
+        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
         tree2.ignore_subtree(('tmp',))
         tree2.back_up_subtree(('tmp', 'stuff'))
         tree2.back_up_static_subtree(('myfiles', 'static'))
@@ -414,7 +414,7 @@ class TestBasicBackup(unittest.TestCase):
         oldcontent = changed._get_content()
         changed._override(content=b'changed')
         self.assertNotEqual(oldcontent, changed._get_content())
-        tree2 = bo.add_tree_to_back_up(sourcetree2, ('home', 'me'), ('main',))
+        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
         tree2.ignore_subtree(('tmp',))
         tree2.back_up_subtree(('tmp', 'stuff'))
         tree2.back_up_static_subtree(('myfiles', 'static'))
@@ -447,7 +447,7 @@ class TestBasicBackup(unittest.TestCase):
         changed._change()
         changed._override(content=original._get_content())
         self.assertNotEqual(oldcontent, changed._get_content())
-        tree2 = bo.add_tree_to_back_up(sourcetree2, ('home', 'me'), ('main',))
+        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
         tree2.ignore_subtree(('tmp',))
         tree2.back_up_subtree(('tmp', 'stuff'))
         tree2.back_up_static_subtree(('myfiles', 'static'))
@@ -494,7 +494,7 @@ class TestTwoBackups(unittest.TestCase):
             ('home', 'me', 'tmp'), ('boring', 'forgetme', 'stuff'))
         sourcetree._add_files(('home', 'me'), ('toplevel',))
         sourcetree._add_files(('home',), ('outside', 'and more'))
-        tree = bo.add_tree_to_back_up(sourcetree, ('home', 'me'), ('main',))
+        tree = bo.add_tree_to_backup(sourcetree, ('home', 'me'), ('main',))
         tree.ignore_subtree(('tmp',))
         tree.back_up_subtree(('tmp', 'stuff'))
         tree.back_up_static_subtree(('myfiles', 'static'))
@@ -509,7 +509,7 @@ class TestTwoBackups(unittest.TestCase):
         del sourcetree2._files[('home', 'me', 'myfiles', 'more data')]
         sourcetree2._add_files(('home', 'me', 'myfiles'), ('new file',))
         sourcetree2._add_files(('home', 'me', 'new dir'), ('new file',))
-        tree2 = bo.add_tree_to_back_up(sourcetree2, ('home', 'me'), ('main',))
+        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
         self.backuptree2 = tree2
         tree2.ignore_subtree(('tmp',))
         tree2.back_up_subtree(('tmp', 'stuff'))
