@@ -17,6 +17,7 @@ expected_tests = set((
     'backupcollection_tests.TestBasicBackup.test_list_directory',
     'backupcollection_tests.TestBasicBackup.test_shadow_tree_created',
     'backupcollection_tests.TestBrokenUsage.test_add_two_files_with_same_path',
+    'backupcollection_tests.TestSingleStuff.test_default_start_and_end_time',
     'backupcollection_tests.TestUtilities.test_make_path_from_content_id_in_new_collection',
     'backupoperation_tests.TestBasicBackup.test_correct_files_are_backed_up',
     'backupoperation_tests.TestBasicBackup.test_files_are_backed_up_with_correct_content',

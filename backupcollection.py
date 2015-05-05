@@ -79,6 +79,8 @@ class BackupCollection(object):
         when the backup started in UTC. If None, the current time will
         be used.
         '''
+        if start is None:
+            start = datetime.datetime.utcnow()
         builder = BackupBuilder(self, start)
         return builder
 
@@ -300,6 +302,8 @@ class BackupBuilder(object):
         when the backup was completed in UTC. If None, the current
         time will be used.
         '''
+        if end_time is None:
+            end_time = datetime.datetime.utcnow()
         self._backup.commit(end_time)
 
     def abort(self):

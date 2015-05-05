@@ -556,6 +556,42 @@ class TestBasicBackup(unittest.TestCase):
                 'f862a4c3df3d7c4d30cef45a03f2ae5aa91365e')],
             store._files[shadowroot + ('outside', 'store', 'deep', 'data')])
 
+class TestSingleStuff(unittest.TestCase):
+    def test_default_start_and_end_time(self):
+        storetree = FakeDirectory()
+        sourcetree = FakeDirectory()
+        db = FakeDatabases()
+        params = backupcollection.BackupCollectionParams(
+            storetree, ('path', 'to', 'store'))
+        params.set_database_opener(db.open)
+        params.set_database_creator(db.create)
+        bc = backupcollection.BackupCollection.create(params)
+
+        sourcetree._set_file(
+            ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')
+
+        before_backup = datetime.datetime.utcnow()
+        backup = bc.start_backup()
+        after_backup_started = datetime.datetime.utcnow()
+        with backup:
+            cid = bc.add_content(
+                sourcetree, ('home', 'me', 'file.txt'),
+                now=datetime.datetime(2015, 2, 14, 19, 56, 7))
+            backup.add_file(
+                ('homedir', 'file.txt'), cid, 127,
+                datetime.datetime(2014, 9, 11, 9, 3, 54), 759831036)
+            backup.commit()
+
+        params = backupcollection.BackupCollectionParams(
+            storetree, ('path', 'to', 'store'))
+        params.set_database_opener(db.open)
+        params.set_database_creator(db.create)
+        bc2 = backupcollection.BackupCollection(params)
+        backup2 = bc2.get_most_recent_backup()
+        self.assertLessEqual(before_backup, backup2.get_start_time())
+        self.assertLessEqual(backup2.get_start_time(), after_backup_started)
+        self.assertLessEqual(after_backup_started, backup2.get_end_time())
+        self.assertLessEqual(backup2.get_end_time(), datetime.datetime.utcnow())
 
 class TestBrokenUsage(unittest.TestCase):
 
