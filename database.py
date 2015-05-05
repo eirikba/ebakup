@@ -148,7 +148,8 @@ class Database(object):
 
     def _get_backup_year_list(self):
         years = []
-        for name in self._directory.iterate_item_names(self._path):
+        dirs, files = self._directory.get_directory_listing(self._path)
+        for name in dirs:
             try:
                 name_as_num = int(name)
                 years.append(name_as_num)
@@ -159,9 +160,10 @@ class Database(object):
 
     def _get_backup_paths_for_year(self, year):
         year_name = str(year)
-        names = [ (year_name, x)
-                  for x in self._directory.iterate_item_names(
-                          self._path + (year_name,)) ]
+        dirs, files = self._directory.get_directory_listing(
+            self._path + (year_name,))
+        assert not dirs
+        names = [ (year_name, x) for x in files ]
         names.sort()
         return names
 
