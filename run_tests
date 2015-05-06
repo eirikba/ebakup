@@ -120,6 +120,13 @@ expected_tests = set((
     'dbfile_tests.TestReadSimpleDBFile.test_read_first_block_beyond_end',
     'dbfile_tests.TestReadSimpleDBFile.test_read_last_block',
     'dbfile_tests.TestReadSimpleDBFile.test_read_second_block_beyond_end',
+    'system_backupoperation_tests.TestSimpleBackup.test_backed_up_files_have_correct_checksum',
+    'system_backupoperation_tests.TestSimpleBackup.test_backed_up_files_have_correct_content',
+    'system_backupoperation_tests.TestSimpleBackup.test_backed_up_files_have_correct_metadata',
+    'system_backupoperation_tests.TestSimpleBackup.test_correct_files_backed_up',
+    'system_backupoperation_tests.TestSimpleBackup.test_shadow_tree_is_linked_correctly',
+    'system_backupoperation_tests.TestSimpleBackup.test_single_backup_created',
+    'system_backupoperation_tests.TestSimpleBackup.test_start_end_times_sensible',
 ))
 expected_test_count = len(expected_tests)
 

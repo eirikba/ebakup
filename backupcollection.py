@@ -3,6 +3,7 @@
 import datetime
 
 import database
+import logger
 
 class BackupCollectionParams(object):
     def __init__(self, tree, path):
@@ -47,6 +48,7 @@ class BackupCollection(object):
         '''Return a BackupCollection object for the backup collection
         described by 'params'.
         '''
+        self._logger = logger.Logger()
         self._tree = params._tree
         self._path = params._path
         self._verify_sane_directory_structure()
@@ -68,6 +70,12 @@ class BackupCollection(object):
 
     def _open_database(self, dbfactory):
         self._db = dbfactory(self._tree, self._path + ('db',))
+
+    def get_logger(self):
+        '''Obtain the logger object for this collection. See logger.Logger for
+        the interface supported.
+        '''
+        return self._logger
 
     def start_backup(self, start=None):
         '''Starts a backup operation.
