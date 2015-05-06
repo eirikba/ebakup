@@ -50,9 +50,10 @@ class BackupOperation(object):
             if cid is None:
                 cid = collection.add_content(source.tree, sourcepath)
             sourcefile = source.tree.get_item(sourcepath)
+            mtime, mtime_ns = sourcefile.get_mtime()
             backup.add_file(
                 targetpath, cid, sourcefile.get_size(),
-                sourcefile.get_mtime(), sourcefile.get_mtime_ns())
+                mtime, mtime_ns)
             if how == 'static':
                 old_cid = self._get_old_cid_for_path(targetpath)
                 if old_cid is None:
@@ -69,9 +70,10 @@ class BackupOperation(object):
         if not oldinfo:
             return None
         sourcefile = tree.get_item(path)
+        mtime, mtime_ns = sourcefile.get_mtime()
         if (sourcefile.get_size() == oldinfo.size and
-                sourcefile.get_mtime() == oldinfo.mtime and
-                sourcefile.get_mtime_ns() == oldinfo.mtime_ns):
+                mtime == oldinfo.mtime and
+                mtime_ns == oldinfo.mtime_ns):
             return oldinfo.contentid
         return None
 

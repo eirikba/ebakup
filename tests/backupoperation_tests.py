@@ -133,11 +133,11 @@ class FakeFile(object):
         return self._fileid * 3 + 7
 
     def get_mtime(self):
-        return (datetime.datetime(2015, 2, 14) +
-                datetime.timedelta(seconds=self._fileid))
-
-    def get_mtime_ns(self):
-        return (999999960 + self._fileid * 7) % 1000000000
+        mtime = (datetime.datetime(2015, 2, 14) +
+                 datetime.timedelta(seconds=self._fileid))
+        nanosecond = (999999960 + self._fileid * 7) % 1000000000
+        mtime = mtime.replace(microsecond=nanosecond//1000)
+        return mtime, nanosecond
 
 class TestBasicBackup(unittest.TestCase):
     def setUp(self):
@@ -221,11 +221,12 @@ class TestBasicBackup(unittest.TestCase):
             self.assertEqual(
                 srcfile.get_size(), bkfile[1],
                 msg='Size mismatch for ' + str(totest))
+            mtime, mtime_ns = srcfile.get_mtime()
             self.assertEqual(
-                srcfile.get_mtime(), bkfile[2],
+                mtime, bkfile[2],
                 msg='mtime mismatch for ' + str(totest))
             self.assertEqual(
-                srcfile.get_mtime_ns(), bkfile[3],
+                mtime_ns, bkfile[3],
                 msg='mtime_ns mismatch for ' + str(totest))
         self.assertNoLoggedProblems()
 
@@ -624,11 +625,12 @@ class TestTwoBackups(unittest.TestCase):
             self.assertEqual(
                 srcfile.get_size(), bkfile[1],
                 msg='Size mismatch for ' + str(totest))
+            mtime, mtime_ns = srcfile.get_mtime()
             self.assertEqual(
-                srcfile.get_mtime(), bkfile[2],
+                mtime, bkfile[2],
                 msg='mtime mismatch for ' + str(totest))
             self.assertEqual(
-                srcfile.get_mtime_ns(), bkfile[3],
+                mtime_ns, bkfile[3],
                 msg='mtime_ns mismatch for ' + str(totest))
         self.assertNoLoggedProblems()
 
@@ -654,10 +656,11 @@ class TestTwoBackups(unittest.TestCase):
             self.assertEqual(
                 srcfile.get_size(), bkfile[1],
                 msg='Size mismatch for ' + str(totest))
+            mtime, mtime_ns = srcfile.get_mtime()
             self.assertEqual(
-                srcfile.get_mtime(), bkfile[2],
+                mtime, bkfile[2],
                 msg='mtime mismatch for ' + str(totest))
             self.assertEqual(
-                srcfile.get_mtime_ns(), bkfile[3],
+                mtime_ns, bkfile[3],
                 msg='mtime_ns mismatch for ' + str(totest))
         self.assertNoLoggedProblems()

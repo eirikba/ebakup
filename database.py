@@ -78,7 +78,7 @@ def _parse_mtime(data, done):
     return mtime, nsecs
 
 def _make_mtime_with_nsec(mtime, nsec):
-    assert mtime.microsecond == 0
+    assert mtime.microsecond == 0 or mtime.microsecond == nsec//1000
     if nsec < 0 or nsec >= 1000000000:
         raise ValueError('nsec out of range: ' + str(nsec))
     timestamp = int((mtime - datetime.datetime(1970, 1, 1)) /
@@ -562,7 +562,8 @@ class BackupInfoBuilder(object):
     def add_file(self, path, content_id, size, mtime, mtime_nsec):
         '''Add a file to the backup data object.
 
-        Note: mtime.microsecond will be ignored!
+        Note: mtime.microsecond will be ignored! (But should be either
+        0 or match mtime_nsec)
         '''
         dirid = 0
         for i in range(1, len(path)):
