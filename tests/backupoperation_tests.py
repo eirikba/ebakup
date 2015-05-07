@@ -12,10 +12,6 @@ class FakeBackupCollection(object):
         self._backups = []
         self._content = {} # { content: content_id }
         self._content_add_count = {} # { content: count }
-        self._logger = logger.Logger()
-
-    def get_logger(self):
-        return self._logger
 
     def start_backup(self):
         return FakeBackupBuilder(self)
@@ -143,8 +139,9 @@ class TestBasicBackup(unittest.TestCase):
     def setUp(self):
         bc = FakeBackupCollection()
         self.backupcollection = bc
-        self.logger = bc.get_logger()
+        self.logger = logger.Logger()
         bo = backupoperation.BackupOperation(bc)
+        bo.set_logger(self.logger)
         self.backupoperation = bo
         sourcetree = FakeTree()
         self.sourcetree = sourcetree
@@ -232,6 +229,7 @@ class TestBasicBackup(unittest.TestCase):
 
     def test_changed_static_data_causes_error_to_be_reported(self):
         bo = backupoperation.BackupOperation(self.backupcollection)
+        bo.set_logger(self.logger)
         sourcetree2 = FakeTree()
         sourcetree2._copy_tree(self.sourcetree)
         # Change one static file
@@ -263,6 +261,7 @@ class TestBasicBackup(unittest.TestCase):
 
     def test_removed_static_data_causes_error_to_be_reported(self):
         bo = backupoperation.BackupOperation(self.backupcollection)
+        bo.set_logger(self.logger)
         sourcetree2 = FakeTree()
         sourcetree2._copy_tree(self.sourcetree)
         # Change one static file
@@ -291,6 +290,7 @@ class TestBasicBackup(unittest.TestCase):
 
     def test_moved_static_data_causes_no_error_to_be_reported(self):
         bo = backupoperation.BackupOperation(self.backupcollection)
+        bo.set_logger(self.logger)
         sourcetree2 = FakeTree()
         sourcetree2._copy_tree(self.sourcetree)
         # Change one static file
@@ -324,6 +324,7 @@ class TestBasicBackup(unittest.TestCase):
 
     def test_move_static_data_to_nonstatic_causes_error_to_be_reported(self):
         bo = backupoperation.BackupOperation(self.backupcollection)
+        bo.set_logger(self.logger)
         sourcetree2 = FakeTree()
         sourcetree2._copy_tree(self.sourcetree)
         # Change one static file
@@ -365,6 +366,7 @@ class TestBasicBackup(unittest.TestCase):
             old_contents.append(content)
             self.assertEqual(1, count)
         bo = backupoperation.BackupOperation(self.backupcollection)
+        bo.set_logger(self.logger)
         sourcetree2 = FakeTree()
         sourcetree2._copy_tree(self.sourcetree)
         # Change one file
@@ -407,6 +409,7 @@ class TestBasicBackup(unittest.TestCase):
             old_contents.append(content)
             self.assertEqual(1, count)
         bo = backupoperation.BackupOperation(self.backupcollection)
+        bo.set_logger(self.logger)
         sourcetree2 = FakeTree()
         sourcetree2._copy_tree(self.sourcetree)
         # Intentionally break the assumption that unchanged mtime and
@@ -439,6 +442,7 @@ class TestBasicBackup(unittest.TestCase):
             old_contents.append(content)
             self.assertEqual(1, count)
         bo = backupoperation.BackupOperation(self.backupcollection)
+        bo.set_logger(self.logger)
         sourcetree2 = FakeTree()
         sourcetree2._copy_tree(self.sourcetree)
         # And change one file, and let its content be the same as another
@@ -479,8 +483,9 @@ class TestTwoBackups(unittest.TestCase):
     def setUp(self):
         bc = FakeBackupCollection()
         self.backupcollection = bc
-        self.logger = bc.get_logger()
+        self.logger = logger.Logger()
         bo = backupoperation.BackupOperation(bc)
+        bo.set_logger(self.logger)
         self.backupoperation = bo
         sourcetree = FakeTree()
         self.sourcetree = sourcetree
@@ -503,6 +508,7 @@ class TestTwoBackups(unittest.TestCase):
         bo.execute_backup()
 
         bo = backupoperation.BackupOperation(bc)
+        bo.set_logger(self.logger)
         self.backupoperation2 = bo
         sourcetree2 = FakeTree()
         self.sourcetree2 = sourcetree2

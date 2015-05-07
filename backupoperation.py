@@ -2,11 +2,13 @@
 
 import collections
 
+import logger
+
 class BackupOperation(object):
     def __init__(self, backupcollection):
         self._backupcollection = backupcollection
         self._sources = []
-        self._logger = backupcollection.get_logger()
+        self._logger = logger.global_logger
 
     def set_logger(self, logger):
         self._logger = logger

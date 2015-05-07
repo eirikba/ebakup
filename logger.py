@@ -30,6 +30,8 @@ class Logger(object):
         '''
         self.raw_log.append(LogItem(severity, what, which, comment))
 
+global_logger = Logger()
+
 class LogItem(object):
     def __init__(self, severity, what, which, comment):
         self.when = datetime.datetime.utcnow()
