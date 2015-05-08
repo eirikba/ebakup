@@ -321,11 +321,11 @@ class TestUtilities(unittest.TestCase):
         storetree = FakeDirectory()
         sourcetree = FakeDirectory()
         db = FakeDatabases()
-        params = backupcollection.BackupCollectionParams(
+        bcfactory = backupcollection.BackupCollectionFactory(
             storetree, ('path', 'to', 'store'))
-        params.set_database_opener(db.open)
-        params.set_database_creator(db.create)
-        bc = backupcollection.BackupCollection.create(params)
+        bcfactory.set_database_opener(db.open)
+        bcfactory.set_database_creator(db.create)
+        bc = bcfactory.create_collection()
         mkpath = bc._make_path_from_content_id
 
         self.assertEqual(('00', '01', '0203'), mkpath(b'\x00\x01\x02\x03'))
@@ -346,11 +346,11 @@ class TestBasicBackup(unittest.TestCase):
         self.sourcetree = sourcetree
         db = FakeDatabases()
         self.db = db
-        params = backupcollection.BackupCollectionParams(
+        bcfactory = backupcollection.BackupCollectionFactory(
             storetree, ('path', 'to', 'store'))
-        params.set_database_opener(db.open)
-        params.set_database_creator(db.create)
-        bc = backupcollection.BackupCollection.create(params)
+        bcfactory.set_database_opener(db.open)
+        bcfactory.set_database_creator(db.create)
+        bc = bcfactory.create_collection()
 
         sourcetree._set_file(
             ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')
@@ -391,11 +391,11 @@ class TestBasicBackup(unittest.TestCase):
                 datetime.datetime(2014, 10, 17, 15, 33, 2), 781606397)
             backup.commit(datetime.datetime(2015, 2, 14, 19, 55, 54, 954321))
 
-        params = backupcollection.BackupCollectionParams(
+        bcfactory = backupcollection.BackupCollectionFactory(
             storetree, ('path', 'to', 'store'))
-        params.set_database_opener(db.open)
-        params.set_database_creator(db.create)
-        self.backupcollection = backupcollection.BackupCollection(params)
+        bcfactory.set_database_opener(db.open)
+        bcfactory.set_database_creator(db.create)
+        self.backupcollection = bcfactory.open_collection()
 
     def test_backup_start_time(self):
         backup = self.backupcollection.get_most_recent_backup()
@@ -478,11 +478,11 @@ class TestBasicBackup(unittest.TestCase):
         self.assertEqual(self.cid1, content_id)
 
     def test_checksum_timeline(self):
-        params = backupcollection.BackupCollectionParams(
+        bcfactory = backupcollection.BackupCollectionFactory(
             self.storetree, ('path', 'to', 'store'))
-        params.set_database_opener(self.db.open)
-        params.set_database_creator(self.db.create)
-        bc = backupcollection.BackupCollection(params)
+        bcfactory.set_database_opener(self.db.open)
+        bcfactory.set_database_creator(self.db.create)
+        bc = bcfactory.open_collection()
         bc.update_content_checksum(
             self.cid1, datetime.datetime(2015, 2, 15, 8, 4, 32), self.checksum1)
         bc.update_content_checksum(
@@ -561,11 +561,11 @@ class TestSingleStuff(unittest.TestCase):
         storetree = FakeDirectory()
         sourcetree = FakeDirectory()
         db = FakeDatabases()
-        params = backupcollection.BackupCollectionParams(
+        bcfactory = backupcollection.BackupCollectionFactory(
             storetree, ('path', 'to', 'store'))
-        params.set_database_opener(db.open)
-        params.set_database_creator(db.create)
-        bc = backupcollection.BackupCollection.create(params)
+        bcfactory.set_database_opener(db.open)
+        bcfactory.set_database_creator(db.create)
+        bc = bcfactory.create_collection()
 
         sourcetree._set_file(
             ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')
@@ -582,11 +582,11 @@ class TestSingleStuff(unittest.TestCase):
                 datetime.datetime(2014, 9, 11, 9, 3, 54), 759831036)
             backup.commit()
 
-        params = backupcollection.BackupCollectionParams(
+        bcfactory = backupcollection.BackupCollectionFactory(
             storetree, ('path', 'to', 'store'))
-        params.set_database_opener(db.open)
-        params.set_database_creator(db.create)
-        bc2 = backupcollection.BackupCollection(params)
+        bcfactory.set_database_opener(db.open)
+        bcfactory.set_database_creator(db.create)
+        bc2 = bcfactory.open_collection()
         backup2 = bc2.get_most_recent_backup()
         self.assertLessEqual(before_backup, backup2.get_start_time())
         self.assertLessEqual(backup2.get_start_time(), after_backup_started)
@@ -597,12 +597,12 @@ class TestSingleStuff(unittest.TestCase):
         storetree = FakeDirectory()
         sourcetree = FakeDirectory()
         db = FakeDatabases()
-        params = backupcollection.BackupCollectionParams(
+        bcfactory = backupcollection.BackupCollectionFactory(
             storetree, ('path', 'to', 'store'))
-        params.set_database_opener(db.open)
-        params.set_database_creator(db.create)
-        bc = backupcollection.BackupCollection.create(params)
-        bc2 = backupcollection.BackupCollection(params)
+        bcfactory.set_database_opener(db.open)
+        bcfactory.set_database_creator(db.create)
+        bc = bcfactory.create_collection()
+        bc2 = bcfactory.open_collection()
         self.assertEqual(None, bc2.get_most_recent_backup())
 
 class TestBrokenUsage(unittest.TestCase):
@@ -610,12 +610,12 @@ class TestBrokenUsage(unittest.TestCase):
     def test_add_two_files_with_same_path(self):
         storetree = FakeDirectory()
         sourcetree = FakeDirectory()
-        params = backupcollection.BackupCollectionParams(
+        bcfactory = backupcollection.BackupCollectionFactory(
             storetree, ('path', 'to', 'store'))
         db = FakeDatabases()
-        params.set_database_opener(db.open)
-        params.set_database_creator(db.create)
-        bc = backupcollection.BackupCollection.create(params)
+        bcfactory.set_database_opener(db.open)
+        bcfactory.set_database_creator(db.create)
+        bc = bcfactory.create_collection()
 
         sourcetree._set_file(
             ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')

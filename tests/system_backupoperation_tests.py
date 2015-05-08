@@ -13,9 +13,9 @@ class TestSimpleBackup(unittest.TestCase):
     def setUp(self):
         storetree = fake_filesys.FakeDirectory()
         storetree._allow_full_access_to_subtree(('path', 'to', 'backup'))
-        params = backupcollection.BackupCollectionParams(
+        bcfactory = backupcollection.BackupCollectionFactory(
             storetree, ('path', 'to', 'backup'))
-        collection = backupcollection.BackupCollection.create(params)
+        collection = bcfactory.create_collection()
         sourcetree = fake_filesys.FakeDirectory()
         basepath = ('home', 'me')
         sourcetree._make_files(
@@ -45,13 +45,13 @@ class TestSimpleBackup(unittest.TestCase):
         self.sourcetree = sourcetree
         self.basepath = basepath
         self.backuptree = backuptree
-        self.collection_params = params
+        self.collection_factory = bcfactory
         self.collection = collection
         self.operation = operation
         self.before_backup = datetime.datetime.utcnow()
         operation.execute_backup()
         self.after_backup = datetime.datetime.utcnow()
-        self.collection2 = backupcollection.BackupCollection(params)
+        self.collection2 = bcfactory.open_collection()
 
     def test_single_backup_created(self):
         backup = self.collection2.get_most_recent_backup()

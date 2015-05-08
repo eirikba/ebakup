@@ -5,7 +5,7 @@ import datetime
 import database
 import logger
 
-class BackupCollectionParams(object):
+class BackupCollectionFactory(object):
     def __init__(self, tree, path):
         self._tree = tree
         self._path = path
@@ -17,6 +17,24 @@ class BackupCollectionParams(object):
 
     def set_database_opener(self, dbopener):
         self._dbopener = dbopener
+
+    def create_collection(self):
+        '''Create a new backup collection as described by this object and
+        return a BackupCollection for accessing it.
+        '''
+        # Explicitly create the top-level directory to ensure failure
+        # if it already exists.
+        self._tree.create_directory(self._path)
+        self._tree.create_directory(self._path + ('content',))
+        db = self._dbcreator(self._tree, self._path + ('db',))
+        return BackupCollection(self)
+
+    def open_collection(self):
+        '''Return a BackupCollection object for the backup collection
+        described by this object.
+        '''
+        return BackupCollection(self)
+
 
 hexits = '0123456789abcdef'
 def hexify(data):
@@ -31,18 +49,6 @@ def hexify(data):
 class BackupCollection(object):
     '''Provides access to a backup collection.
     '''
-
-    @staticmethod
-    def create(params):
-        '''Create a new backup collection as described by 'params' and return
-        a BackupCollection for accessing it.
-        '''
-        # Explicitly create the top-level directory to ensure failure
-        # if it already exists.
-        params._tree.create_directory(params._path)
-        params._tree.create_directory(params._path + ('content',))
-        db = params._dbcreator(params._tree, params._path + ('db',))
-        return BackupCollection(params)
 
     def __init__(self, params):
         '''Return a BackupCollection object for the backup collection
