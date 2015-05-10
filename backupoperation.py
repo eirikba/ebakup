@@ -8,9 +8,10 @@ class BackupOperation(object):
     def __init__(self, backupcollection):
         self._backupcollection = backupcollection
         self._sources = []
-        self._logger = logger.global_logger
+        self._logger = logger.Logger()
 
     def set_logger(self, logger):
+        self._logger.replay_log(logger)
         self._logger = logger
 
     def add_tree_to_backup(self, tree, sourcepath, targetpath):

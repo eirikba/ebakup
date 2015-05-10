@@ -30,7 +30,8 @@ class Logger(object):
         '''
         self.raw_log.append(LogItem(severity, what, which, comment))
 
-global_logger = Logger()
+    def replay_log(self, receiver):
+        receiver.raw_log += self.raw_log
 
 class LogItem(object):
     def __init__(self, severity, what, which, comment):

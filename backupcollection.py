@@ -54,11 +54,15 @@ class BackupCollection(object):
         '''Return a BackupCollection object for the backup collection
         described by 'params'.
         '''
-        self._logger = logger.global_logger
+        self._logger = logger.Logger()
         self._tree = params._tree
         self._path = params._path
         self._verify_sane_directory_structure()
         self._open_database(params._dbopener)
+
+    def set_logger(self, logger):
+        self._logger.replay_log(logger)
+        self._logger = logger
 
     def _verify_sane_directory_structure(self):
         if not self._tree.does_path_exist(self._path):
