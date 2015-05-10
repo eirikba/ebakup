@@ -114,21 +114,14 @@ class TestSimpleConfig(unittest.TestCase):
         self.assertEqual(
             'dynamic', source.tree.get_handler_for_path(('Picturess',)))
 
-    def test_backup_home_source_subtree_handlers(self):
+    def test_backup_home_source_subtree_handler_iterator(self):
         backup = self.config.get_backup_by_name('home')
         source = backup.sources[0]
-        self.assertFalse(source.tree.is_whole_subtree_ignored(()))
-        self.assertTrue(source.tree.does_subtree_contain_static_items(()))
-        self.assertFalse(source.tree.is_whole_subtree_ignored(('tmp',)))
-        self.assertTrue(source.tree.does_subtree_contain_static_items(('tmp',)))
-        self.assertTrue(source.tree.is_whole_subtree_ignored(('tmp', 'other')))
-        self.assertFalse(
-            source.tree.does_subtree_contain_static_items(('tmp', 'other')))
-        self.assertFalse(
-            source.tree.is_whole_subtree_ignored(('Pictures', 'mine')))
-        self.assertTrue(
-            source.tree.does_subtree_contain_static_items(('Pictures', 'mine')))
-
+        expected = (
+            (('tmp',), 'ignore'),
+            (('tmp', 'Q.pdf'), 'static'),
+            (('Pictures',), 'static'))
+        self.assertCountEqual(expected, source.iterate_path_handlers())
 
 class TestVarious(unittest.TestCase):
 

@@ -40,7 +40,7 @@ expected_tests = set((
     'config_tests.TestSimpleConfig.test_backup_home_collection',
     'config_tests.TestSimpleConfig.test_backup_home_source',
     'config_tests.TestSimpleConfig.test_backup_home_source_item_handlers',
-    'config_tests.TestSimpleConfig.test_backup_home_source_subtree_handlers',
+    'config_tests.TestSimpleConfig.test_backup_home_source_subtree_handler_iterator',
     'config_tests.TestVarious.test_read_non_existing_file',
     'config_tests.TestVarious.test_read_two_simple_files',
     'database_tests.TestSimpleDatabase.test_get_out_of_range_backups',

@@ -168,6 +168,9 @@ class CfgSource(object):
     def parse_exit_block(self, key, args, item):
         pass
 
+    def iterate_path_handlers(self):
+        yield from self.tree.iterate_path_handlers()
+
 class CfgTree(object):
     def __init__(self):
         self.children = {}
@@ -199,6 +202,12 @@ class CfgTree(object):
             tree = tree.children[comp]
         return tree
 
+    def iterate_path_handlers(self, path=()):
+        if self.handler:
+            yield path, self.handler
+        for pathcomp, subtree in self.children.items():
+            yield from subtree.iterate_path_handlers(path + (pathcomp,))
+
     def get_handler_for_path(self, path):
         tree = self
         handler = self.handler
@@ -212,53 +221,3 @@ class CfgTree(object):
             return 'dynamic'
         else:
             return handler
-
-    def is_whole_subtree_ignored(self, path):
-        '''Return True if there is no chance that anything in the subtree
-        starting with 'path' (including 'path' itself) should possibly
-        be backed up, verified or handled in any way.
-        '''
-        tree = self
-        handler = self.handler
-        for comp in path:
-            tree = tree.children.get(comp)
-            if tree is None:
-                return handler == 'ignore'
-            if tree.handler is not None:
-                handler = tree.handler
-        if handler != 'ignore':
-            return False
-        checking = [tree]
-        while checking:
-            cand = checking.pop()
-            if cand.handler is not None and cand.handler != 'ignore':
-                return False
-            checking += [x for x in tree.children.values()]
-        return True
-
-    def does_subtree_contain_static_items(self, path):
-        '''Return True if there is any chance that anything in the subtree
-        starting with 'path' (including 'path' itself) should possibly
-        be handled as 'static'.
-        '''
-        tree = self
-        handler = self.handler
-        for comp in path:
-            tree = tree.children.get(comp)
-            if tree is None:
-                return handler == 'static'
-            if tree.handler is not None:
-                handler = tree.handler
-        if handler == 'static':
-            return True
-        checking = [tree]
-        checked = set()
-        while checking:
-            cand = checking.pop()
-            if cand in checked:
-                raise AssertionError('WHAT!? (internal error: tree has loops)')
-            checked.add(cand)
-            if cand.handler is not None and cand.handler == 'static':
-                return True
-            checking += [x for x in cand.children.values()]
-        return False
