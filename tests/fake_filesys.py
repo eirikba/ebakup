@@ -4,7 +4,7 @@ import datetime
 
 class ForbiddenActionError(Exception): pass
 
-class FakeDirectory(object):
+class FakeFileSystem(object):
     def __init__(self):
         self._paths = {}
         self._access = {}

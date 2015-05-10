@@ -11,12 +11,12 @@ import fake_filesys
 
 class TestSimpleBackup(unittest.TestCase):
     def setUp(self):
-        storetree = fake_filesys.FakeDirectory()
+        storetree = fake_filesys.FakeFileSystem()
         storetree._allow_full_access_to_subtree(('path', 'to', 'backup'))
         bcfactory = backupcollection.BackupCollectionFactory(
             storetree, ('path', 'to', 'backup'))
         collection = bcfactory.create_collection()
-        sourcetree = fake_filesys.FakeDirectory()
+        sourcetree = fake_filesys.FakeFileSystem()
         basepath = ('home', 'me')
         sourcetree._make_files(
             basepath, ('.emacs', 'notes.txt'), fileid_first=0)
