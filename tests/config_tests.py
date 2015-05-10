@@ -17,6 +17,8 @@ class FakeTree(object):
         self._paths[path] = fd
 
     def get_item(self, path):
+        if path not in self._paths:
+            return None
         return FakeFile(self, path)
 
 class FakeFileData(object): pass
@@ -126,3 +128,37 @@ class TestSimpleConfig(unittest.TestCase):
             source.tree.is_whole_subtree_ignored(('Pictures', 'mine')))
         self.assertTrue(
             source.tree.does_subtree_contain_static_items(('Pictures', 'mine')))
+
+
+class TestVarious(unittest.TestCase):
+
+    def test_read_non_existing_file(self):
+        conf = config.Config()
+        tree = FakeTree()
+        conf.read_file(tree, ('path', 'to', 'config'))
+        self.assertEqual(0, len(conf.backups))
+
+    def test_read_two_simple_files(self):
+        conf = config.Config()
+        tree = FakeTree()
+        tree.set_file(
+            ('path', 'to', 'config'),
+            content=textwrap.dedent('''\
+                backup home
+                   collection local:/backup/mine
+                   source local:/home/me
+                       targetpath home
+                ''').encode('utf-8'))
+        tree.set_file(
+            ('path', 'to', 'other', 'config'),
+            content=textwrap.dedent('''\
+                backup other
+                   collection local:/backup/mine
+                   source local:/home/other
+                       targetpath other
+                ''').encode('utf-8'))
+        conf.read_file(tree, ('path', 'to', 'config'))
+        self.assertEqual(1, len(conf.backups))
+        conf.read_file(tree, ('path', 'to', 'other', 'config'))
+        self.assertEqual(2, len(conf.backups))
+        self.assertCountEqual(('home', 'other'), (x.name for x in conf.backups))

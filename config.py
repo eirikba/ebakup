@@ -23,6 +23,8 @@ class Config(object):
 
     def read_file(self, tree, path):
         f = tree.get_item(path)
+        if f is None:
+            return
         with f:
             data = f.get_data_slice(0, f.get_size())
         self._read_config_data(data.decode('utf-8'))
