@@ -370,6 +370,8 @@ class TestBasicBackup(unittest.TestCase):
             ('home','me','deep','data'), content=b'5028' * 1257)
         sourcetree._set_file(
             ('4',), content=b'21516' * 4303 + b'2')
+        sourcetree._set_file(
+            ('copy',), content=b'127' * 42 + b'1')
 
         backup = bc.start_backup(
             datetime.datetime(2015, 2, 14, 19, 55, 32, 328629))
@@ -399,6 +401,11 @@ class TestBasicBackup(unittest.TestCase):
             backup.add_file(
                 ('toplevel',), cid, 21516,
                 datetime.datetime(2014, 10, 17, 15, 33, 2), 781606397)
+            cid = bc.add_content(sourcetree, ('copy',))
+            self.cid5 = cid
+            backup.add_file(
+                ('homedir', 'copy'), cid, 127,
+                datetime.datetime(2014, 9, 22, 2, 11, 1), 797641421)
             backup.commit(datetime.datetime(2015, 2, 14, 19, 55, 54, 954321))
 
         bcfactory = backupcollection.BackupCollectionFactory(
@@ -426,7 +433,7 @@ class TestBasicBackup(unittest.TestCase):
         self.assertCountEqual(('toplevel',), files)
         dirs, files = backup.list_directory(('homedir',))
         self.assertCountEqual((), dirs)
-        self.assertCountEqual(('file.txt', 'other.txt'), files)
+        self.assertCountEqual(('file.txt', 'other.txt', 'copy'), files)
         dirs, files = backup.list_directory(('outside',))
         self.assertCountEqual(('store',), dirs)
         self.assertCountEqual((), files)
@@ -459,6 +466,7 @@ class TestBasicBackup(unittest.TestCase):
         self.assertEqual(datetime.datetime(2014, 9, 11, 9, 3, 54), info.mtime)
         self.assertEqual(759831036, info.mtime_nsec)
         self.assertEqual(self.checksum1, info.good_checksum)
+        self.assertEqual(self.cid1, self.cid5)
 
     def test_get_content_info(self):
         bc = self.backupcollection
@@ -565,6 +573,9 @@ class TestBasicBackup(unittest.TestCase):
             store._files[contentroot + ('d1', '87', 'bda8636907240be66b50338fa'
                 'f862a4c3df3d7c4d30cef45a03f2ae5aa91365e')],
             store._files[shadowroot + ('outside', 'store', 'deep', 'data')])
+        self.assertEqual(
+            store._files[shadowroot + ('homedir', 'file.txt')],
+            store._files[shadowroot + ('homedir', 'copy')])
 
 class TestSingleStuff(unittest.TestCase):
     def test_default_start_and_end_time(self):
