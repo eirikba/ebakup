@@ -87,7 +87,7 @@ class FakeDirectory(object):
         self._ensure_parent_directory(targetpath)
         self._files[targetpath] = self._files[sourcepath]
 
-    def get_item(self, path):
+    def get_item_at_path(self, path):
         if path in self._files:
             return FakeFile(self, path)
         if path in self._directories:

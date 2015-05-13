@@ -16,9 +16,9 @@ class FakeTree(object):
             fd.content = content
         self._paths[path] = fd
 
-    def get_item(self, path):
+    def get_item_at_path(self, path):
         if path not in self._paths:
-            return None
+            raise FileNotFoundError('No such file: ' + str(path))
         return FakeFile(self, path)
 
 class FakeFileData(object): pass

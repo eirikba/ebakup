@@ -144,7 +144,7 @@ class BackupCollection(object):
         '''
         if now is None:
             now = self._utcnow()
-        source = tree.get_item(path)
+        source = tree.get_item_at_path(path)
         if source is None:
             raise FileNotFoundError('No file found at: ' + str(path))
         target = self._tree.create_temporary_file(self._path + ('tmp',))
@@ -176,7 +176,7 @@ class BackupCollection(object):
         datalen = datafile.get_size()
         for cand in self._db.get_all_content_infos_with_checksum(checksum):
             candpath = self._make_path_from_content_id(cand.get_content_id())
-            with self._tree.get_item(
+            with self._tree.get_item_at_path(
                     self._path + ('content',) + candpath) as candfile:
                 if candfile.get_size() != datalen:
                     continue
@@ -263,7 +263,7 @@ class BackupCollection(object):
         '''
         path = self._make_path_from_content_id(content_id)
         return ContentReader(
-            self._tree.get_item(self._path + ('content',) + path))
+            self._tree.get_item_at_path(self._path + ('content',) + path))
 
 class ContentInfo(object):
     '''Provides information about a content item.

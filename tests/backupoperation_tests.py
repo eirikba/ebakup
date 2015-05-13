@@ -96,7 +96,7 @@ class FakeTree(object):
                     dirs.add(cand[pathlen])
         return tuple(dirs), tuple(files)
 
-    def get_item(self, path):
+    def get_item_at_path(self, path):
         if path not in self._files:
             raise AssertionError('Directories not supported')
         return self._files[path]

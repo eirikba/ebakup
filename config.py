@@ -22,8 +22,9 @@ class Config(object):
         self.backups = []
 
     def read_file(self, tree, path):
-        f = tree.get_item(path)
-        if f is None:
+        try:
+            f = tree.get_item_at_path(path)
+        except FileNotFoundError:
             return
         with f:
             data = f.get_data_slice(0, f.get_size())

@@ -110,7 +110,7 @@ class TestSimpleBackup(unittest.TestCase):
         bkfile = backup.get_file_info(bkpath)
         cid = bkfile.contentid
         content = self.collection2.get_content_reader(cid)
-        orig = tree.get_item(path)
+        orig = tree.get_item_at_path(path)
         self.assertEqual(orig.get_size(), content.get_size())
         origdata = orig.get_data_slice(0, orig.get_size())
         contentdata = content.get_data_slice(0, content.get_size())
@@ -130,7 +130,7 @@ class TestSimpleBackup(unittest.TestCase):
                 ('Pictures', 'Christmas', 'DSC_1889.JPG'),
                 ):
             bkfile = backup.get_file_info(path)
-            orig = source.get_item(basepath + path)
+            orig = source.get_item_at_path(basepath + path)
             mtime, mtime_ns = orig.get_mtime()
             self.assertEqual(
                 mtime, bkfile.mtime, msg='mtime differs: ' + str(path))
@@ -152,7 +152,7 @@ class TestSimpleBackup(unittest.TestCase):
                 ('Pictures', 'Christmas', 'DSC_1889.JPG'),
                 ):
             bkfile = backup.get_file_info(path)
-            orig = source.get_item(basepath + path)
+            orig = source.get_item_at_path(basepath + path)
             data = orig.get_data_slice(0, orig.get_size())
             checksum = hashlib.sha256(data).digest()
             self.assertEqual(

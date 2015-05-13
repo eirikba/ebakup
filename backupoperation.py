@@ -52,7 +52,7 @@ class BackupOperation(object):
                 source.tree, sourcepath, targetpath)
             if cid is None:
                 cid = collection.add_content(source.tree, sourcepath)
-            sourcefile = source.tree.get_item(sourcepath)
+            sourcefile = source.tree.get_item_at_path(sourcepath)
             mtime, mtime_ns = sourcefile.get_mtime()
             backup.add_file(
                 targetpath, cid, sourcefile.get_size(),
@@ -72,7 +72,7 @@ class BackupOperation(object):
         oldinfo = self.previous.get_file_info(targetpath)
         if not oldinfo:
             return None
-        sourcefile = tree.get_item(path)
+        sourcefile = tree.get_item_at_path(path)
         mtime, mtime_ns = sourcefile.get_mtime()
         if (sourcefile.get_size() == oldinfo.size and
                 mtime == oldinfo.mtime and

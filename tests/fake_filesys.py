@@ -68,14 +68,6 @@ class FakeFileSystem(object):
                     files.append(cand[-1])
         return tuple(dirs), tuple(files)
 
-    def get_item(self, path):
-        self._check_access(path, 'stat')
-        item = self._paths[path]
-        if item.is_directory:
-            raise NotImplementedError(
-                'Not supporting get_item() for directories')
-        return FakeFile(self, path, item)
-
     def create_directory(self, path):
         self._check_access(path, 'mkdir')
         if path in self._paths:
@@ -161,10 +153,11 @@ class FakeFileSystem(object):
     def get_item_at_path(self, path):
         self._check_access(path, 'stat')
         item = self._paths.get(path)
-        if not item:
+        if item is None:
             raise FileNotFoundError('No such file: ' + str(path))
         if item.is_directory:
-            raise NotImplementedError('Getting directories is not supported')
+            raise NotImplementedError(
+                'Not supporting get_item_at_path() for directories')
         return FakeFile(self, path, item)
 
     def _make_files(self, parent, names, fileid_first=None):
