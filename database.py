@@ -411,6 +411,8 @@ class ContentInfoFile(object):
             timestamp32,
             timestamp32))
         self._add_entry(entry)
+        self.contentdata[contentid] = ContentData(
+            contentid, checksum, (ContentChecksum(checksum, when, when, True),))
         return contentid
 
     def _add_entry(self, entry):

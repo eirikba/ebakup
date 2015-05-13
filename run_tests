@@ -49,6 +49,7 @@ expected_tests = set((
     'database_tests.TestWriteDatabase.test_create_database_over_existing_file_fails',
     'database_tests.TestWriteDatabase.test_create_empty_database',
     'database_tests.TestWriteDatabase.test_create_database_with_single_backup',
+    'database_tests.TestWriteDatabase.test_read_data_from_database_being_created',
     'database_tests.TestWriteDatabase.test_database_with_multiple_backups',
     'dbfile_tests.TestBrokenFiles.test_non_matching_checksum_of_data_block',
     'dbfile_tests.TestBrokenFiles.test_non_matching_checksum_of_settings_block',

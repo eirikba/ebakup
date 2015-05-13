@@ -509,6 +509,34 @@ class TestWriteDatabase(unittest.TestCase):
             b'02' + b'0' * 30, contentinfo.get_last_known_checksum())
         self.assertEqual(None, backup.get_file_info(('home', 'me')))
 
+    def test_read_data_from_database_being_created(self):
+        tree = FakeDirectory()
+        db = self.create_empty_database(tree, ('path', 'to', 'db'))
+        self.allow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+        backup = db.start_backup(datetime.datetime(2015, 4, 14, 21, 36, 12))
+        with backup:
+            tree._allow_modification(('path', 'to', 'db', 'content'))
+            cid = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
+            backup.add_file(
+                ('home', 'me', 'important', 'stuff.txt'),
+                cid, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
+            cid = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 38), b'02' + b'0' * 30)
+            backup.add_file(
+                ('home', 'me', 'important', 'other.txt'),
+                cid, 2323, datetime.datetime(2014, 5, 5, 19, 23, 2), 0)
+            contentinfos = db.get_all_content_infos_with_checksum(
+                b'02' + b'0' * 30)
+            self.assertNotEqual(None, contentinfos)
+            self.assertEqual(1, len(contentinfos))
+            self.assertEqual(cid, contentinfos[0].get_content_id())
+            tree._disallow_modification(('path', 'to', 'db', 'content'))
+            backup.commit(datetime.datetime(2015, 4, 14, 21, 36, 41))
+        self.disallow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+
     def test_database_with_multiple_backups(self):
         tree = FakeDirectory()
         db = self.create_empty_database(tree, ('path', 'to', 'db'))
