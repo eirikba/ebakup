@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import datetime
+import io
 
 class ForbiddenActionError(Exception): pass
 
@@ -91,7 +92,9 @@ class FakeFileSystem(object):
         self._make_directory(path[:-1])
         fileitem = FileItem.make_empty(self)
         self._paths[path] = fileitem
-        return FakeFile(self, path, fileitem)
+        f = FakeFile(self, path, fileitem)
+        f._writable = True
+        return f
 
     def create_temporary_file(self, path):
         self._check_access(path + ('tmpfile',), 'create')
@@ -160,6 +163,11 @@ class FakeFileSystem(object):
                 'Not supporting get_item_at_path() for directories')
         return FakeFile(self, path, item)
 
+    def get_modifiable_item_at_path(self, path):
+        f = self.get_item_at_path(path)
+        f._writable = True
+        return f
+
     def _make_files(self, parent, names, fileid_first=None):
         self._make_directory(parent)
         fileid = fileid_first
@@ -180,6 +188,7 @@ class FakeFile(object):
         self._path = path
         self._item = item
         self._lock = 0 # 0: none, 1: read, 2: write
+        self._writable = False
 
     def __enter__(self):
         return self
@@ -188,6 +197,8 @@ class FakeFile(object):
         self.close()
 
     def lock_for_writing(self):
+        if not self._writable:
+            raise io.UnsupportedOperationError('write lock')
         self._tree._check_access(self._path, 'write')
         assert self._lock == 0
         assert self._item.lock == 0
@@ -215,6 +226,8 @@ class FakeFile(object):
         return self._item.data[start:end]
 
     def write_data_slice(self, start, data):
+        if not self._writable:
+            raise io.UnsupportedOperationError('write')
         self._tree._check_access(self._path, 'write')
         # While it is allowed to start a write beyond the end of the
         # current data, I think it would be a bug if it actually
@@ -240,6 +253,7 @@ class FakeFile(object):
 class FakeTempFile(FakeFile):
     def __init__(self, tree, path, item):
         FakeFile.__init__(self, tree, path, item)
+        self._writable = True
         self._rename_path = None
 
     def rename_without_overwrite_on_close(self, tree, path):

@@ -3,6 +3,7 @@
 import dbfile
 
 import hashlib
+import io
 import unittest
 
 class FileData(object):
@@ -132,6 +133,11 @@ class FakeDirectory(object):
                 raise AssertionError('directories not supported yet')
         raise FileNotFoundError('No such file: ' + repr(path))
 
+    def get_modifiable_item_at_path(self, path):
+        f = self.get_item_at_path(path)
+        f._writable = True
+        return f
+
     def get_directory_listing(self, path=()):
         if path in self._files:
             raise NotADirectoryError('Not a directory')
@@ -163,7 +169,9 @@ class FakeDirectory(object):
                 raise IsADirectoryError('Is a directory: ' + str(path))
         fd = FileData(self, b'')
         self._files[path] = fd
-        return FakeFile(path, fd)
+        f = FakeFile(path, fd)
+        f._writable = True
+        return f
 
     def rename_and_overwrite(self, sourcepath, targetpath):
         if not self._is_overwrite_file_allowed(targetpath):
@@ -184,6 +192,7 @@ class FakeFile(object):
         self._path = path
         self._data = data
         self._locked = 0 # 0: unlocked, 1: read locked, True: write locked
+        self._writable = False
 
     def lock_for_reading(self):
         if self._locked == 1:
@@ -194,6 +203,8 @@ class FakeFile(object):
         self._data.locked += 1
 
     def lock_for_writing(self):
+        if not self._writable:
+            raise io.UnsupportedOperation('write lock')
         if self._locked != 0:
             raise AssertionError('Deadlock!')
         if self._data.locked != 0:
@@ -215,6 +226,8 @@ class FakeFile(object):
         return self._data.content[start:end]
 
     def write_data_slice(self, start, data):
+        if not self._writable:
+            raise io.UnsupportedOperation('write')
         lockproxy = self._data.tree._get_lock_proxy(self._path)
         if lockproxy is None and  self._locked is not True:
             raise AssertionError('Write to unlocked file')

@@ -2,6 +2,7 @@
 
 import datetime
 import hashlib
+import io
 import unittest
 
 import backupcollection
@@ -94,6 +95,11 @@ class FakeDirectory(object):
             raise NotImplementedError('Fake directories not implemented')
         return None
 
+    def get_modifiable_item_at_path(self, path):
+        f = self.get_item_at_path(path)
+        f.writable = True
+        return f
+
     def rename_without_overwrite(self, sourcepath, targetpath):
         if sourcepath not in self._files:
             raise FileNotFoundError('Source does not exist: ' + str(sourcepath))
@@ -107,6 +113,7 @@ class FakeFile(object):
     def __init__(self, tree, path):
         self._tree = tree
         self._path = path
+        self._writable = False
 
     def __enter__(self):
         return self
@@ -126,6 +133,8 @@ class FakeFile(object):
         return self._tree._files[self._path].content[start:end]
 
     def write_data_slice(self, start, data):
+        if not self._writable:
+            raise io.UnsupportedOperation('write')
         fd = self._tree._files[self._path]
         assert start >= 0
         assert start <= len(fd.content)
@@ -136,6 +145,7 @@ class FakeFile(object):
 class FakeTempFile(FakeFile):
     def __init__(self, tree, path):
         FakeFile.__init__(self, tree, path)
+        self._writable = True
         self._rename_path = None
 
     def rename_without_overwrite_on_close(self, tree, path):

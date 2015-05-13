@@ -213,8 +213,9 @@ class DBFile(object):
         if self._read_file or self._write_file:
             raise AssertionError('DBFile already open')
         assert self._target_file is None
-        self._read_file = self._directory.get_item_at_path(self._path)
-        self._write_file = self._read_file
+        self._write_file = self._directory.get_modifiable_item_at_path(
+            self._path)
+        self._read_file = self._write_file
         self._write_file.lock_for_writing()
         try:
             self._prepare_read_file()
@@ -242,7 +243,8 @@ class DBFile(object):
         if self._read_file or self._write_file:
             raise AssertionError('DBFile already open')
         assert self._target_file is None
-        self._read_file = self._directory.get_item_at_path(self._path)
+        self._read_file = self._directory.get_modifiable_item_at_path(
+            self._path)
         self._read_file.lock_for_writing()
         try:
             self._prepare_read_file()
