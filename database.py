@@ -393,7 +393,9 @@ class ContentInfoFile(object):
         timestamp = int((when - datetime.datetime(1970, 1, 1)) /
                         datetime.timedelta(seconds=1))
         timestamp32 = _make_uint32(timestamp)
-        current = set(self.get_all_content_infos_with_checksum(checksum))
+        current = set(
+            x.get_content_id() for x in
+            self.get_all_content_infos_with_checksum(checksum))
         contentid = checksum
         extra = b'\x00'
         while contentid in current:

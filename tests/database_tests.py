@@ -537,6 +537,30 @@ class TestWriteDatabase(unittest.TestCase):
         self.disallow_create_dbfile(
             tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
 
+    def test_add_data_with_same_checksum(self):
+        tree = FakeDirectory()
+        db = self.create_empty_database(tree, ('path', 'to', 'db'))
+        self.allow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+        backup = db.start_backup(datetime.datetime(2015, 4, 14, 21, 36, 12))
+        with backup:
+            tree._allow_modification(('path', 'to', 'db', 'content'))
+            cid1 = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
+            backup.add_file(
+                ('home', 'me', 'important', 'stuff.txt'),
+                cid1, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
+            cid2 = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 38), b'01' + b'0' * 30)
+            backup.add_file(
+                ('home', 'me', 'important', 'other.txt'),
+                cid2, 2323, datetime.datetime(2014, 5, 5, 19, 23, 2), 0)
+            self.assertNotEqual(cid1, cid2)
+            tree._disallow_modification(('path', 'to', 'db', 'content'))
+            backup.commit(datetime.datetime(2015, 4, 14, 21, 36, 41))
+        self.disallow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+
     def test_database_with_multiple_backups(self):
         tree = FakeDirectory()
         db = self.create_empty_database(tree, ('path', 'to', 'db'))
