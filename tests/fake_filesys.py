@@ -9,6 +9,10 @@ class FakeFileSystem(object):
         self._paths = {}
         self._access = {}
         self._treeaccess = {}
+        self._utcnow = datetime.datetime.utcnow
+
+    def _set_utcnow(self, utcnow):
+        self._utcnow = utcnow
 
     def _allow_full_access_to_subtree(self, path):
         self._treeaccess[path] = (
@@ -93,7 +97,7 @@ class FakeFileSystem(object):
         if path in self._paths:
             raise FileExistsError('File already exists: ' + str(path))
         self._make_directory(path[:-1])
-        fileitem = FileItem.make_empty()
+        fileitem = FileItem.make_empty(self)
         self._paths[path] = fileitem
         return FakeFile(self, path, fileitem)
 
@@ -104,7 +108,7 @@ class FakeFileSystem(object):
         while path + ('tmpfile' + str(counter),) in self._paths:
             counter += 1
         use_path = path + ('tmpfile' + str(counter),)
-        fileitem = FileItem.make_empty()
+        fileitem = FileItem.make_empty(self)
         self._paths[use_path] = fileitem
         return FakeTempFile(self, use_path, fileitem)
 
@@ -171,7 +175,7 @@ class FakeFileSystem(object):
             if path in self._paths:
                 raise FileExistsError('File already exists: ' + str(path))
             if fileid is not None:
-                item = FileItem.create_from_id(fileid)
+                item = FileItem.create_from_id(self, fileid)
                 self._paths[path] = item
                 fileid += 1
             else:
@@ -265,17 +269,17 @@ class FileItem(object):
         self.lock = 0 # 0: none, >0: number of read locks, True: write lock
 
     @staticmethod
-    def make_empty():
+    def make_empty(filesys):
         item = FileItem()
         item.data = b''
-        item.mtime = datetime.datetime.utcnow()
+        item.mtime = filesys._utcnow()
         us = item.mtime.microsecond
         item.mtime_ns =  us * 1000 + us // 1000
         assert item.mtime_ns < 1000000000
         return item
 
     @staticmethod
-    def create_from_id(fileid):
+    def create_from_id(filesys, fileid):
         item = FileItem()
         size = (fileid * fileid * 3889) % 6211
         data = str(fileid).encode('utf-8')

@@ -5,6 +5,10 @@ import datetime
 class Logger(object):
     def __init__(self):
         self.raw_log = []
+        self._utcnow = datetime.datetime.utcnow
+
+    def set_utcnow(self, utcnow):
+        self._utcnow = utcnow
 
     # Log severities.
     # DO NOT DEPEND ON NUMERICAL VALUES!
@@ -28,14 +32,15 @@ class Logger(object):
         providing further details about this specific event, intended
         for human consumption.
         '''
-        self.raw_log.append(LogItem(severity, what, which, comment))
+        self.raw_log.append(
+            LogItem(self._utcnow(), severity, what, which, comment))
 
     def replay_log(self, receiver):
         receiver.raw_log += self.raw_log
 
 class LogItem(object):
-    def __init__(self, severity, what, which, comment):
-        self.when = datetime.datetime.utcnow()
+    def __init__(self, when, severity, what, which, comment):
+        self.when = when
         self.severity = severity
         self.what = what
         self.which = which

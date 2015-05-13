@@ -59,10 +59,14 @@ class BackupCollection(object):
         self._path = params._path
         self._verify_sane_directory_structure()
         self._open_database(params._dbopener)
+        self._utcnow = datetime.datetime.utcnow
 
     def set_logger(self, logger):
         self._logger.replay_log(logger)
         self._logger = logger
+
+    def set_utcnow(self, utcnow):
+        self._utcnow = utcnow
 
     def _verify_sane_directory_structure(self):
         if not self._tree.does_path_exist(self._path):
@@ -92,7 +96,7 @@ class BackupCollection(object):
         be used.
         '''
         if start is None:
-            start = datetime.datetime.utcnow()
+            start = self._utcnow()
         builder = BackupBuilder(self, start)
         return builder
 
@@ -139,7 +143,7 @@ class BackupCollection(object):
         content id of the existing item is returned.
         '''
         if now is None:
-            now = datetime.datetime.utcnow()
+            now = self._utcnow()
         source = tree.get_item(path)
         if source is None:
             raise FileNotFoundError('No file found at: ' + str(path))
@@ -318,7 +322,7 @@ class BackupBuilder(object):
         time will be used.
         '''
         if end_time is None:
-            end_time = datetime.datetime.utcnow()
+            end_time = self._collection._utcnow()
         self._backup.commit(end_time)
 
     def abort(self):
