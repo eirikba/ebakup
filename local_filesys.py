@@ -23,10 +23,8 @@ class LocalFileSystem(object):
     def get_item_at_path(self, path):
         stringpath = path_to_stringpath(path)
         if not os.path.exists(stringpath):
-            raise NotTestedError()
             raise FileNotFoundError('No such file or directory: ' + stringpath)
         if os.path.isdir(stringpath):
-            raise NotTestedError()
             raise IsADirectoryError('Path is a directory: ' + stringpath)
         return LocalFile(stringpath)
 

@@ -6,12 +6,14 @@
 import datetime
 import hashlib
 import os
-import tests.settings
 import shutil
 import textwrap
 import unittest
 
 import cli
+import filesys
+import local_filesys
+import tests.settings
 
 root_path = os.path.abspath(os.path.join(os.getcwd(), 'DELETEME_testebakup'))
 
@@ -115,3 +117,38 @@ class TestBackup(unittest.TestCase):
                 path, os.path.join(shadowpath, 'home', 'subdir', 'copy')))
         self.assertFalse(
             os.path.exists(os.path.join(shadowpath, 'home', 'tmp')))
+
+@unittest.skipUnless(
+    tests.settings.run_live_tests,
+    'Live tests are disabled')
+class TestLocalFileSys(unittest.TestCase):
+    def setUp(self):
+        os.makedirs(root_path)
+
+    def tearDown(self):
+        shutil.rmtree(root_path)
+
+    def test_get_existing_item(self):
+        fs = filesys.get_file_system('local')
+        root = local_filesys.stringpath_to_path(root_path)
+        with open(os.path.join(root_path, 'exist'), 'xb') as f:
+            f.write(b'Yay!\n')
+        item = fs.get_item_at_path(root + ('exist',))
+        self.assertEqual(b'Yay!\n', item.get_data_slice(0, 100))
+
+    def test_get_non_existing_item(self):
+        fs = filesys.get_file_system('local')
+        root = local_filesys.stringpath_to_path(root_path)
+        self.assertRaisesRegex(
+            FileNotFoundError,
+            'file or directory.*DELETEME_testebakup.*noexist',
+            fs.get_item_at_path, root + ('noexist',))
+
+    def test_get_item_that_is_a_directory(self):
+        fs = filesys.get_file_system('local')
+        root = local_filesys.stringpath_to_path(root_path)
+        os.mkdir(os.path.join(root_path, 'subdir'))
+        self.assertRaisesRegex(
+            IsADirectoryError,
+            'is a directory.*DELETEME_testebakup.*subdir',
+            fs.get_item_at_path, root + ('subdir',))
