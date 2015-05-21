@@ -33,6 +33,17 @@ class FakeFileSystem(object):
         self._allow_access_for_subtree(path, 'read')
         self._allow_access_for_subtree(path, 'stat')
 
+    def _allow_access_for_path(self, path, access):
+        if path not in self._access:
+            self._access[path] = (access,)
+        elif access not in self._access[path]:
+            self._access[path] = self._access[path] + (access,)
+
+    def _allow_reading_path(self, path):
+        self._allow_access_for_path(path, 'listdir')
+        self._allow_access_for_path(path, 'read')
+        self._allow_access_for_path(path, 'stat')
+
     def _check_access(self, path, what):
         path_access = self._access.get(path)
         if path_access and what in path_access:
@@ -51,6 +62,9 @@ class FakeFileSystem(object):
         if file1 != file2:
             return False
         assert not file1.is_directory
+        return True
+
+    def is_accessible(self):
         return True
 
     def does_path_exist(self, path):
@@ -181,6 +195,28 @@ class FakeFileSystem(object):
                 fileid += 1
             else:
                 raise NotImplementedError('No supported file creation method')
+
+    def _add_file(self, path, content=None, mtime=None, mtime_ns=None):
+        if path in self._paths:
+            raise FileExistsError('File already exists: ' + str(path))
+        self._make_directory(path[:-1])
+        item = FileItem()
+        if content is not None:
+            assert isinstance(content, bytes)
+            item.data = content
+        if mtime is not None:
+            assert isinstance(mtime, datetime.datetime)
+            if mtime_ns is not None:
+                assert mtime.microsecond == mtime_ns // 1000
+            item.mtime = mtime
+        if mtime_ns is not None:
+            item.mtime_ns = mtime_ns
+        self._paths[path] = item
+
+    def get_config_paths_for(self, application):
+        return (
+            ('home', 'me', '.config', application),
+            ('etc', 'xdg', application))
 
 class FakeFile(object):
     def __init__(self, tree, path, item):

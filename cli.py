@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+
+import argparse
+import datetime
+import os
+import sys
+
+import backupcollection
+import backupoperation
+import database
+import filesys
+import logger
+
+from config import Config
+from task_backup import BackupTask
+
+class UnknownCommandError(Exception): pass
+
+def main(commandline=None, stdoutfile=None, factories=None):
+    args = parse_commandline(commandline, stdoutfile)
+    args.factories = create_factories(factories)
+    args.logger = logger.Logger()
+    tasks = make_tasks_from_args(args)
+    perform_tasks(tasks)
+
+class ArgumentParser(argparse.ArgumentParser):
+    _overridden_output_file = None
+    def _print_message(self, msg, outfile):
+        if self._overridden_output_file is not None:
+            outfile = self._overridden_output_file
+        argparse.ArgumentParser._print_message(self, msg, outfile)
+
+def parse_commandline(commandline=None, msgfile=None):
+    parser = ArgumentParser(
+        description='Manage backups')
+    if msgfile is not None:
+        parser._overridden_output_file = msgfile
+    parser.add_argument(
+        '--config', help='Config file to use instead of the default')
+    subparsers = parser.add_subparsers(dest='command')
+    backupparser = subparsers.add_parser(
+        'backup', help='Perform one or more backup operations')
+    backupparser.add_argument(
+        '--create', action='store_true',
+        help='Create the backup collection before starting the backup')
+    backupparser.add_argument('backups', nargs='+', help='Which backups to run')
+    if msgfile is not None:
+        backupparser._overridden_output_file = msgfile
+    if commandline is None:
+        args = parser.parse_args()
+    else:
+        args = parser.parse_args(commandline)
+    if args.command is None:
+        parser.print_usage()
+        sys.exit(1)
+    _fixup_arguments(args)
+    return args
+
+def _fixup_arguments(args):
+    if args.config is not None:
+        args.config = stringpath_to_path(args.config)
+
+def stringpath_to_path(stringpath):
+    assert os.path.join('home', '/') == '/'
+    fullpath = os.path.abspath(os.path.realpath(stringpath))
+    assert fullpath.startswith('/')
+    path = tuple(x for x in fullpath.split('/') if x)
+    assert fullpath == os.path.join('/', *path)
+    return path
+
+def create_factories(overrides):
+    factories = {
+        'filesystem': filesys.get_file_system,
+        'backupoperation': backupoperation.BackupOperation,
+        'backupcollection': backupcollection.BackupCollectionFactory,
+        'database.create': database.create_database,
+        'database.open': database.Database,
+        'utcnow': datetime.datetime.utcnow,
+    }
+    if overrides is None:
+        return factories
+    filtered = {}
+    for key, value in overrides.items():
+        if key == '*':
+            continue
+        assert key in factories
+        if value is None:
+            filtered[key] = factories[key]
+        else:
+            filtered[key] = value
+    if '*' in overrides:
+        if overrides['*'] is None:
+            for key,value in factories.items():
+                if key not in filtered:
+                    filtered[key] = value
+        else:
+            raise AssertionError('overrides["*"] has unexpected value')
+    return filtered
+
+def make_tasks_from_args(args):
+    localtree = args.factories['filesystem']('local')
+    config = Config()
+    if args.config:
+        config.read_file(localtree, args.config)
+    else:
+        confpaths = localtree.get_config_paths_for('ebakup')
+        for path in confpaths:
+            config.read_file(localtree, path + ('config',))
+    tasks = []
+    if args.command == 'backup':
+        task = BackupTask(config, args)
+        tasks.append(task)
+    else:
+        raise UnknownCommandError('Unknown command: ' + args.command)
+    return tasks
+
+def perform_tasks(tasks):
+    for task in tasks:
+        task.execute()

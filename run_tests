@@ -5,6 +5,7 @@ import argparse
 import re
 import unittest
 
+import tests.settings as test_settings
 
 expected_tests = set((
     'backupcollection_tests.TestBasicBackup.test_add_duplicate_content',
@@ -36,6 +37,8 @@ expected_tests = set((
     'backupoperation_tests.TestTwoBackups.test_files_are_backed_up_with_correct_content_2',
     'backupoperation_tests.TestTwoBackups.test_files_are_backed_up_with_correct_metadata_1',
     'backupoperation_tests.TestTwoBackups.test_files_are_backed_up_with_correct_metadata_2',
+    'cli_tests.TestSimpleStuff.test_commandline_config',
+    'cli_tests.TestSimpleStuff.test_empty_commandline',
     'config_tests.TestSimpleConfig.test_backup_home',
     'config_tests.TestSimpleConfig.test_backup_home_collection',
     'config_tests.TestSimpleConfig.test_backup_home_source',
@@ -129,6 +132,7 @@ expected_tests = set((
     'dbfile_tests.TestReadSimpleDBFile.test_read_first_block_beyond_end',
     'dbfile_tests.TestReadSimpleDBFile.test_read_last_block',
     'dbfile_tests.TestReadSimpleDBFile.test_read_second_block_beyond_end',
+    'system_cli_tests.TestFullSequenceOfOperations.test_everything',
     'system_backupoperation_tests.TestSimpleBackup.test_backed_up_files_have_correct_checksum',
     'system_backupoperation_tests.TestSimpleBackup.test_backed_up_files_have_correct_content',
     'system_backupoperation_tests.TestSimpleBackup.test_backed_up_files_have_correct_metadata',
@@ -136,6 +140,12 @@ expected_tests = set((
     'system_backupoperation_tests.TestSimpleBackup.test_shadow_tree_is_linked_correctly',
     'system_backupoperation_tests.TestSimpleBackup.test_single_backup_created',
     'system_backupoperation_tests.TestSimpleBackup.test_start_end_times_sensible',
+    'system_live_tests.TestBackup.test_all',
+    'task_backup_tests.TestSimpleBackup.test_backup_from_and_to_correct_path',
+    'task_backup_tests.TestSimpleBackup.test_backup_handlers',
+    'task_backup_tests.TestSimpleBackup.test_backup_performed',
+    'task_backup_tests.TestSimpleBackup.test_backup_performed_to_existing_collection',
+    'task_backup_tests.TestSimpleBackup.test_backup_to_collection_with_correct_path',
 ))
 expected_test_count = len(expected_tests)
 
@@ -225,6 +235,9 @@ def filter_tests(test):
 def parse_args():
     global args
     ap = argparse.ArgumentParser(description='Run tests')
+    ap.add_argument('--live', action='store_true',
+                    help='Also run live tests, i.e. tests that may modify '
+                    'the real file system')
     ap.add_argument('filter', nargs='?',
                     help='A regular expression. All tests whose names are '
                     'matched by the regular expression are included in the '
@@ -233,6 +246,8 @@ def parse_args():
 
 def main_texttestrunner():
     parse_args()
+    if args.live:
+        test_settings.enable_live_tests()
     tests = find_tests()
     test_names = make_test_name_list(tests)
     nameset = set(test_names)
