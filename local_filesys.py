@@ -11,6 +11,14 @@ def path_to_stringpath(path):
     assert stringpath.startswith('/' + path[0])
     return stringpath
 
+def stringpath_to_path(stringpath):
+    assert os.path.join('home', '/') == '/'
+    fullpath = os.path.abspath(os.path.realpath(stringpath))
+    assert fullpath.startswith('/')
+    path = tuple(x for x in fullpath.split('/') if x)
+    assert fullpath == os.path.join('/', *path)
+    return path
+
 class LocalFileSystem(object):
     def get_item_at_path(self, path):
         stringpath = path_to_stringpath(path)

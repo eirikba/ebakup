@@ -9,6 +9,7 @@ import backupcollection
 import backupoperation
 import database
 import filesys
+import local_filesys
 import logger
 
 from config import Config
@@ -58,15 +59,7 @@ def parse_commandline(commandline=None, msgfile=None):
 
 def _fixup_arguments(args):
     if args.config is not None:
-        args.config = stringpath_to_path(args.config)
-
-def stringpath_to_path(stringpath):
-    assert os.path.join('home', '/') == '/'
-    fullpath = os.path.abspath(os.path.realpath(stringpath))
-    assert fullpath.startswith('/')
-    path = tuple(x for x in fullpath.split('/') if x)
-    assert fullpath == os.path.join('/', *path)
-    return path
+        args.config = local_filesys.stringpath_to_path(args.config)
 
 def create_factories(overrides):
     factories = {
