@@ -37,6 +37,7 @@ expected_tests = set((
     'backupoperation_tests.TestTwoBackups.test_files_are_backed_up_with_correct_content_2',
     'backupoperation_tests.TestTwoBackups.test_files_are_backed_up_with_correct_metadata_1',
     'backupoperation_tests.TestTwoBackups.test_files_are_backed_up_with_correct_metadata_2',
+    'cli_tests.TestSimpleStuff.test_commandline_backup',
     'cli_tests.TestSimpleStuff.test_commandline_config',
     'cli_tests.TestSimpleStuff.test_empty_commandline',
     'config_tests.TestSimpleConfig.test_backup_home',

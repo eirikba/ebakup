@@ -15,6 +15,11 @@ class TestSimpleStuff(unittest.TestCase):
             SystemExit, '1', cli.parse_commandline, '', msgfile=stdout)
         self.assertRegex(stdout.getvalue(), '^usage:')
 
+    def test_commandline_backup(self):
+        args = self._parse_commandline(('backup', 'stuff'))
+        self.assertEqual('backup', args.command)
+        self.assertCountEqual(('stuff',), args.backups)
+
     def test_commandline_config(self):
         args = self._parse_commandline(
             ('--config', '/home/me/ebakup.config', 'backup', 'home'))
