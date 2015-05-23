@@ -5,23 +5,26 @@ import fcntl
 import os
 import tempfile
 
-def path_to_stringpath(path):
-    assert os.path.dirname('/') == '/'
-    stringpath = os.path.join('/', *path)
-    assert stringpath.startswith('/' + path[0])
-    return stringpath
-
-def stringpath_to_path(stringpath):
-    assert os.path.join('home', '/') == '/'
-    fullpath = os.path.abspath(os.path.realpath(stringpath))
-    assert fullpath.startswith('/')
-    path = tuple(x for x in fullpath.split('/') if x)
-    assert fullpath == os.path.join('/', *path)
-    return path
-
 class LocalFileSystem(object):
+    def path_to_string(self, path):
+        assert os.path.dirname('/') == '/'
+        stringpath = os.path.join('/', *path)
+        assert stringpath.startswith('/' + path[0])
+        return stringpath
+
+    def path_from_string(self, stringpath):
+        assert os.path.join('home', '/') == '/'
+        fullpath = os.path.abspath(os.path.realpath(stringpath))
+        assert fullpath.startswith('/')
+        path = tuple(x for x in fullpath.split('/') if x)
+        assert fullpath == os.path.join('/', *path)
+        return path
+
+    def path_to_full_string(self, path):
+        return 'local:' + self.path_to_string(path)
+
     def get_item_at_path(self, path):
-        stringpath = path_to_stringpath(path)
+        stringpath = self.path_to_string(path)
         if not os.path.exists(stringpath):
             raise FileNotFoundError('No such file or directory: ' + stringpath)
         if os.path.isdir(stringpath):
@@ -29,7 +32,7 @@ class LocalFileSystem(object):
         return LocalFile(stringpath)
 
     def get_modifiable_item_at_path(self, path):
-        stringpath = path_to_stringpath(path)
+        stringpath = self.path_to_string(path)
         if not os.path.exists(stringpath):
             raise NotTestedError()
             raise FileNotFoundError('No such file or directory: ' + stringpath)
@@ -42,10 +45,10 @@ class LocalFileSystem(object):
         return True
 
     def does_path_exist(self, path):
-        return os.path.exists(path_to_stringpath(path))
+        return os.path.exists(self.path_to_string(path))
 
     def get_directory_listing(self, path):
-        stringpath = path_to_stringpath(path)
+        stringpath = self.path_to_string(path)
         names = os.listdir(stringpath)
         dirs = []
         files = []
@@ -59,10 +62,10 @@ class LocalFileSystem(object):
         return dirs, files
 
     def create_directory(self, path):
-        os.makedirs(path_to_stringpath(path))
+        os.makedirs(self.path_to_string(path))
 
     def create_regular_file(self, path):
-        stringpath = path_to_stringpath(path)
+        stringpath = self.path_to_string(path)
         self._ensure_parent_directory_exists(stringpath)
         f = open(stringpath, 'xb')
         return LocalFile(stringpath, openfile=f, writable=True)
@@ -72,20 +75,20 @@ class LocalFileSystem(object):
         os.makedirs(parent, exist_ok=True)
 
     def create_temporary_file(self, path):
-        stringpath = path_to_stringpath(path)
+        stringpath = self.path_to_string(path)
         os.makedirs(stringpath, exist_ok=True)
         tmpfno, tmpname = tempfile.mkstemp(dir=stringpath)
         f = os.fdopen(tmpfno, 'w+b')
         return LocalTempFile(self, tmpname, openfile=f)
 
     def make_cheap_copy(self, source, target):
-        sourcestringpath = path_to_stringpath(source)
-        targetstringpath = path_to_stringpath(target)
+        sourcestringpath = self.path_to_string(source)
+        targetstringpath = self.path_to_string(target)
         self._ensure_parent_directory_exists(targetstringpath)
         os.link(sourcestringpath, targetstringpath)
 
     def rename_and_overwrite(self, source, target):
-        os.replace(path_to_stringpath(source), path_to_stringpath(target))
+        os.replace(self.path_to_string(source), self.path_to_string(target))
 
 class LocalFile(object):
     def __init__(self, stringpath, openfile=None, writable=False):
@@ -165,7 +168,7 @@ class LocalTempFile(LocalFile):
         LocalFile.close(self)
         # Should really check that self._stringpath is this file!
         if self._rename_path is not None:
-            targetstringpath = path_to_stringpath(self._rename_path)
+            targetstringpath = self._tree.path_to_string(self._rename_path)
             self._tree._ensure_parent_directory_exists(targetstringpath)
             checkfile = open(targetstringpath, 'xb')
             checkfile.close()

@@ -12,7 +12,6 @@ import unittest
 
 import cli
 import filesys
-import local_filesys
 import tests.settings
 
 root_path = os.path.abspath(os.path.join(os.getcwd(), 'DELETEME_testebakup'))
@@ -130,7 +129,7 @@ class TestLocalFileSys(unittest.TestCase):
 
     def test_get_existing_item(self):
         fs = filesys.get_file_system('local')
-        root = local_filesys.stringpath_to_path(root_path)
+        root = fs.path_from_string(root_path)
         with open(os.path.join(root_path, 'exist'), 'xb') as f:
             f.write(b'Yay!\n')
         item = fs.get_item_at_path(root + ('exist',))
@@ -138,7 +137,7 @@ class TestLocalFileSys(unittest.TestCase):
 
     def test_get_non_existing_item(self):
         fs = filesys.get_file_system('local')
-        root = local_filesys.stringpath_to_path(root_path)
+        root = fs.path_from_string(root_path)
         self.assertRaisesRegex(
             FileNotFoundError,
             'file or directory.*DELETEME_testebakup.*noexist',
@@ -146,7 +145,7 @@ class TestLocalFileSys(unittest.TestCase):
 
     def test_get_item_that_is_a_directory(self):
         fs = filesys.get_file_system('local')
-        root = local_filesys.stringpath_to_path(root_path)
+        root = fs.path_from_string(root_path)
         os.mkdir(os.path.join(root_path, 'subdir'))
         self.assertRaisesRegex(
             IsADirectoryError,
