@@ -135,6 +135,22 @@ class FakeFile(object):
         mtime = mtime.replace(microsecond=nanosecond//1000)
         return mtime, nanosecond
 
+def add_backup_handlers(tree, ignore=None, dynamic=None, static=None):
+    root = tree.subtrees
+    for paths, handler in ( (ignore, 0), (dynamic, 1), (static, 2) ):
+        if paths is None:
+            continue
+        for path in paths:
+            tree = root
+            for comp in path:
+                tree = tree.make_subtree(comp)
+            if handler == 0:
+                tree.set_ignored()
+            elif handler == 1:
+                tree.set_backed_up()
+            elif handler == 2:
+                tree.set_backed_up_static()
+
 class TestBasicBackup(unittest.TestCase):
     def setUp(self):
         bc = FakeBackupCollection()
@@ -157,9 +173,11 @@ class TestBasicBackup(unittest.TestCase):
         sourcetree._add_files(('home', 'me'), ('toplevel',))
         sourcetree._add_files(('home',), ('outside', 'and more'))
         tree = bo.add_tree_to_backup(sourcetree, ('home', 'me'), ('main',))
-        tree.ignore_subtree(('tmp',))
-        tree.back_up_subtree(('tmp', 'stuff'))
-        tree.back_up_static_subtree(('myfiles', 'static'))
+        add_backup_handlers(
+            tree,
+            ignore=(('tmp',),),
+            dynamic=(('tmp', 'stuff'),),
+            static=(('myfiles', 'static'),))
         self.backuptree = tree
         bo.execute_backup()
 
@@ -239,9 +257,11 @@ class TestBasicBackup(unittest.TestCase):
         changed._change()
         self.assertNotEqual(oldcontent, changed._get_content())
         tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        tree2.ignore_subtree(('tmp',))
-        tree2.back_up_subtree(('tmp', 'stuff'))
-        tree2.back_up_static_subtree(('myfiles', 'static'))
+        add_backup_handlers(
+            tree2,
+            ignore=(('tmp',),),
+            dynamic=(('tmp', 'stuff'),),
+            static=(('myfiles', 'static'),))
         self.assertNoLoggedProblems()
         bo.execute_backup()
         self.assertLoggedError(
@@ -270,9 +290,11 @@ class TestBasicBackup(unittest.TestCase):
         del sourcetree2._files[
             ('home', 'me', 'myfiles', 'static', 'more', 'three')]
         tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        tree2.ignore_subtree(('tmp',))
-        tree2.back_up_subtree(('tmp', 'stuff'))
-        tree2.back_up_static_subtree(('myfiles', 'static'))
+        add_backup_handlers(
+            tree2,
+            ignore=(('tmp',),),
+            dynamic=(('tmp', 'stuff'),),
+            static=(('myfiles', 'static'),))
         self.assertNoLoggedProblems()
         bo.execute_backup()
         self.assertLoggedError(
@@ -302,9 +324,11 @@ class TestBasicBackup(unittest.TestCase):
         del sourcetree2._files[
             ('home', 'me', 'myfiles', 'static', 'more', 'three')]
         tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        tree2.ignore_subtree(('tmp',))
-        tree2.back_up_subtree(('tmp', 'stuff'))
-        tree2.back_up_static_subtree(('myfiles', 'static'))
+        add_backup_handlers(
+            tree2,
+            ignore=(('tmp',),),
+            dynamic=(('tmp', 'stuff'),),
+            static=(('myfiles', 'static'),))
         self.assertNoLoggedProblems()
         bo.execute_backup()
         self.assertNoLoggedProblems()
@@ -336,9 +360,11 @@ class TestBasicBackup(unittest.TestCase):
         del sourcetree2._files[
             ('home', 'me', 'myfiles', 'static', 'more', 'three')]
         tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        tree2.ignore_subtree(('tmp',))
-        tree2.back_up_subtree(('tmp', 'stuff'))
-        tree2.back_up_static_subtree(('myfiles', 'static'))
+        add_backup_handlers(
+            tree2,
+            ignore=(('tmp',),),
+            dynamic=(('tmp', 'stuff'),),
+            static=(('myfiles', 'static'),))
         self.assertNoLoggedProblems()
         bo.execute_backup()
         self.assertLoggedError(
@@ -375,9 +401,11 @@ class TestBasicBackup(unittest.TestCase):
         changed._change()
         self.assertNotEqual(oldcontent, changed._get_content())
         tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        tree2.ignore_subtree(('tmp',))
-        tree2.back_up_subtree(('tmp', 'stuff'))
-        tree2.back_up_static_subtree(('myfiles', 'static'))
+        add_backup_handlers(
+            tree2,
+            ignore=(('tmp',),),
+            dynamic=(('tmp', 'stuff'),),
+            static=(('myfiles', 'static'),))
         self.assertNoLoggedProblems()
         bo.execute_backup()
         self.assertNoLoggedProblems()
@@ -419,9 +447,11 @@ class TestBasicBackup(unittest.TestCase):
         changed._override(content=b'changed')
         self.assertNotEqual(oldcontent, changed._get_content())
         tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        tree2.ignore_subtree(('tmp',))
-        tree2.back_up_subtree(('tmp', 'stuff'))
-        tree2.back_up_static_subtree(('myfiles', 'static'))
+        add_backup_handlers(
+            tree2,
+            ignore=(('tmp',),),
+            dynamic=(('tmp', 'stuff'),),
+            static=(('myfiles', 'static'),))
         self.assertNoLoggedProblems()
         bo.execute_backup()
         self.assertNoLoggedProblems()
@@ -453,9 +483,11 @@ class TestBasicBackup(unittest.TestCase):
         changed._override(content=original._get_content())
         self.assertNotEqual(oldcontent, changed._get_content())
         tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        tree2.ignore_subtree(('tmp',))
-        tree2.back_up_subtree(('tmp', 'stuff'))
-        tree2.back_up_static_subtree(('myfiles', 'static'))
+        add_backup_handlers(
+            tree2,
+            ignore=(('tmp',),),
+            dynamic=(('tmp', 'stuff'),),
+            static=(('myfiles', 'static'),))
         self.assertNoLoggedProblems()
         bo.execute_backup()
         self.assertNoLoggedProblems()
@@ -501,9 +533,11 @@ class TestTwoBackups(unittest.TestCase):
         sourcetree._add_files(('home', 'me'), ('toplevel',))
         sourcetree._add_files(('home',), ('outside', 'and more'))
         tree = bo.add_tree_to_backup(sourcetree, ('home', 'me'), ('main',))
-        tree.ignore_subtree(('tmp',))
-        tree.back_up_subtree(('tmp', 'stuff'))
-        tree.back_up_static_subtree(('myfiles', 'static'))
+        add_backup_handlers(
+            tree,
+            ignore=(('tmp',),),
+            dynamic=(('tmp', 'stuff'),),
+            static=(('myfiles', 'static'),))
         self.backuptree = tree
         bo.execute_backup()
 
@@ -518,9 +552,11 @@ class TestTwoBackups(unittest.TestCase):
         sourcetree2._add_files(('home', 'me', 'new dir'), ('new file',))
         tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
         self.backuptree2 = tree2
-        tree2.ignore_subtree(('tmp',))
-        tree2.back_up_subtree(('tmp', 'stuff'))
-        tree2.back_up_static_subtree(('myfiles', 'static'))
+        add_backup_handlers(
+            tree2,
+            ignore=(('tmp',),),
+            dynamic=(('tmp', 'stuff'),),
+            static=(('myfiles', 'static'),))
         bo.execute_backup()
 
     def assertNoLoggedProblems(self):

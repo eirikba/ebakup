@@ -97,12 +97,30 @@ class FakeBackupOperation(object):
         assert not self._backup_done
         self._backup_done = True
 
+class FakeHandlerBuilder(object):
+    def __init__(self, bktree, path):
+        self.bktree = bktree
+        self.path = path
+
+    def make_subtree(self, component):
+        return FakeHandlerBuilder(self.bktree, self.path + (component,))
+
+    def set_ignored(self):
+        self.bktree._handlers.append((self.path, 'ignore'))
+
+    def set_backed_up(self):
+        self.bktree._handlers.append((self.path, 'dynamic'))
+
+    def set_backed_up_static(self):
+        self.bktree._handlers.append((self.path, 'static'))
+
 class FakeBackupTree(object):
     def __init__(self, tree, sourcepath, targetpath):
         self._tree = tree
         self._sourcepath = sourcepath
         self._targetpath = targetpath
         self._handlers = []
+        self.subtrees = FakeHandlerBuilder(self, ())
 
     def ignore_subtree(self, path):
         self._handlers.append((path, 'ignore'))

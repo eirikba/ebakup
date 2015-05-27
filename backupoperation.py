@@ -118,7 +118,117 @@ class BackupOperation(object):
                 return how
         return 'ignore'
 
-BackupSubtree = collections.namedtuple('BackupSubtree', ('path', 'how'))
+class BackupSubtree(object):
+    def __init__(self, parent, matchtype, component):
+        self.parent = parent
+        self.matchtype = matchtype
+        self.component = component
+        self.handler = None
+        self.children = []
+
+    def get_path(self):
+        if self.parent is None:
+            return ()
+        return self.parent.get_path() + ((self.matchtype, self.component),)
+
+    def matches_component(self, component):
+        if self.matchtype == 'plain':
+            return self.component == component
+        assert self.matchtype == 'glob'
+        return _glob_is_match(self.component, component)
+
+    def set_ignored(self):
+        '''Mark this subtree as ignored. Nothing in this subtree will be
+        backed up. (Unless a more specific setting says otherwise.)
+        '''
+        self._set_handler('ignore')
+
+    def set_backed_up(self):
+        '''Mark this subtree as "dynamic". The content of this subtree will be
+        backed up in the normal way. (Unless a more specific setting
+        says otherwise.)
+        '''
+        self._set_handler('dynamic')
+
+    def set_backed_up_static(self):
+        '''Mark this subtree as "static". The content of this subtree will be
+        backed up and any changes to any content will be flagged as
+        errors. (Unless a more specific setting says otherwise.)
+        '''
+        self._set_handler('static')
+
+    def _set_handler(self, handler):
+        assert handler in ('ignore', 'static', 'dynamic')
+        if self.handler is not None:
+            raise NotTestedError(
+                'Ambiguous handling introduced for ' + str(self.get_path()))
+        self.handler = handler
+
+    def get_handler_for_path(self, path):
+        handler, tree = self._get_handler_and_tree_for_path(path)
+        return handler
+
+    def make_subtree(self, component):
+        assert isinstance(component, (str, bytes))
+        return self._make_subtree_of_type('plain', component)
+
+    def make_subtree_for_glob(self, glob):
+        assert isinstance(glob, (str, bytes))
+        _glob_check_valid(glob)
+        return self._make_subtree_of_type('glob', glob)
+
+    def _make_subtree_of_type(self, matchtype, component):
+        subtree = BackupSubtree(self, matchtype, component)
+        for child in self.children:
+            if child._is_same_as(subtree):
+                return child
+            if child._has_common_matches_with(subtree):
+                raise NotTestedError(
+                    'Ambiguous path created: ' + str(self.get_path()) + ' + ' +
+                    str((matchtype, component)))
+        self.children.append(subtree)
+        return subtree
+
+    def _is_same_as(self, other):
+        return (other.matchtype == self.matchtype and
+                other.component == self.component)
+
+    def _has_common_matches_with(self, other):
+        if self.matchtype == 'plain' and other.matchtype == 'plain':
+            return self.component == other.component
+        if self.matchtype == 'plain':
+            return other.matches_component(self.component)
+        if other.matchtype == 'plain':
+            return self.matches_component(other.component)
+        assert self.matchtype == 'glob'
+        assert other.matchtype == 'glob'
+        return _glob_have_common_matches(self.component, other.component)
+
+    def may_path_have_statics(self, path):
+        handler, tree = self._get_handler_and_tree_for_path(path)
+        if tree is not None:
+            return tree._is_any_contained_item_static()
+        return handler == 'static'
+
+    def _get_handler_and_tree_for_path(self, path):
+        if path == ():
+            return self.handler, self
+        for child in self.children:
+            if child.matches_component(path[0]):
+                handler, tree = child._get_handler_and_tree_for_path(path[1:])
+                if handler is None:
+                    handler = self.handler
+                return handler, tree
+        return self.handler, None
+
+    def _is_any_contained_item_static(self):
+        if self.handler == 'static':
+            return True
+        for child in self.children:
+            if child._is_any_contained_item_static():
+                return True
+        return False
+
 
 class BackupSource(object):
     '''Describes a source tree for a backup operation. Use
@@ -127,67 +237,31 @@ class BackupSource(object):
     Subtrees can be set to be handled differently. The current
     possibilities are:
 
-    - ignore_subtree(): Nothing in the subtree starting at 'path' will
-      be backed up.
+    - ignored: Nothing in the subtree starting at 'path' will be
+      backed up.
 
-    - back_up_subtree(): The subtree starting at 'path' will be backed
-      up in the standard way.
+    - backed up: The subtree starting at 'path' will be backed up in
+      the standard way.
 
-    - back_up_static_subtree(): The subtree starting at 'path' will be
-      backed up in the standard way, but any changes to any files will
-      cause errors to be reported.
+    - backed up static: The subtree starting at 'path' will be backed
+      up in the standard way, but any changes to any files will cause
+      errors to be reported. If a file is deleted, it is considered an
+      error, unless a file is created with the same content at the
+      same time. In which case the file is considered "moved".
 
     For each potential file, the most specific setting will take
     effect. So e.g., setting ('path',) as "ignore" and ('path', 'to')
-    as 'back_up' would mean that ('path', 'to', 'file.txt') would be
+    as 'dynamic' would mean that ('path', 'to', 'file.txt') would be
     backed up in the standard way.
 
-    All files not otherwise set up is treated like back_up_subtree().
+    All files not otherwise set up is treated as 'backed up'.
+
     '''
     def __init__(self, tree, sourcepath, targetpath):
         self.tree = tree
         self.sourcepath = sourcepath
         self.targetpath = targetpath
-        self._subtrees = []
-
-    def ignore_subtree(self, path):
-        '''No files inside 'path', including 'path' itself will be backed up.
-        '''
-        assert isinstance(path, tuple)
-        for current in self._subtrees:
-            if current.path == path:
-                raise NotTestedError(
-                    'Ambiguous handling introduced for ' + str(path))
-        self._subtrees.append(BackupSubtree(path, 'ignore'))
-
-    def back_up_subtree(self, path):
-        '''The files inside 'path' (including 'path' itself) will be backed up
-        in the usual way.
-        '''
-        assert isinstance(path, tuple)
-        for current in self._subtrees:
-            if current.path == path:
-                raise NotTestedError(
-                    'Ambiguous handling introduced for ' + str(path))
-        self._subtrees.append(BackupSubtree(path, 'dynamic'))
-
-    def back_up_static_subtree(self, path):
-        '''The files inside 'path' (including 'path' itself) will be backed up
-        in the usual way. In addition, these files are expected not to
-        change. So if a file does change, an error will reported.
-
-        Adding new files is ok and "moving" files is also fine.
-        However, if a file is removed, an error will be reported.
-
-        A file is considered "moved" if it is removed and another file
-        with the exact same content is added at the same time.
-        '''
-        assert isinstance(path, tuple)
-        for current in self._subtrees:
-            if current.path == path:
-                raise NotTestedError(
-                    'Ambiguous handling introduced for ' + str(path))
-        self._subtrees.append(BackupSubtree(path, 'static'))
+        self.subtrees = BackupSubtree(None, None, None)
 
     def iterate_source_files(self, subtree=()):
         dirs, files = self.tree.get_directory_listing(self.sourcepath + subtree)
@@ -200,37 +274,25 @@ class BackupSource(object):
             yield from self.iterate_source_files(subtree + (d,))
 
     def _how_should_path_be_handled(self, path):
-        pathlen = len(path)
-        bestlen = -1
-        bestrule = None
-        for rule in self._subtrees:
-            rulepathlen = len(rule.path)
-            if (rulepathlen <= pathlen and
-                    rulepathlen > bestlen and
-                    path[:rulepathlen] == rule.path):
-                bestrule = rule
-                bestlen = rulepathlen
-        if bestrule is None:
+        handler = self.subtrees.get_handler_for_path(path)
+        if handler is None:
             return 'dynamic'
-        return bestrule.how
+        return handler
 
     def may_target_path_have_statics(self, path):
+        relpath = self._convert_target_path_to_source_path(path)
+        if relpath is None:
+            return False
+        return self.subtrees.may_path_have_statics(relpath)
+
+    def _convert_target_path_to_source_path(self, path):
         rootlen = len(self.targetpath)
         if path[:rootlen] != self.targetpath:
-            return False
-        relpath = path[rootlen:]
-        relpathlen = len(relpath)
-        for rule in self._subtrees:
-            if rule.how == 'static' and rule.path[:relpathlen] == relpath:
-                return True
-        how = self._how_should_path_be_handled(relpath)
-        if how == 'static':
-            return True
-        return False
+            return None
+        return path[rootlen:]
 
     def how_should_target_path_be_handled(self, path):
-        rootlen = len(self.targetpath)
-        if path[:rootlen] != self.targetpath:
+        relpath = self._convert_target_path_to_source_path(path)
+        if relpath is None:
             return 'ignore'
-        relpath = path[rootlen:]
         return self._how_should_path_be_handled(relpath)

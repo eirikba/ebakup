@@ -55,12 +55,15 @@ class BackupTask(object):
             bktree = operation.add_tree_to_backup(
                 source, sourcedata.path, sourcedata.targetpath)
             for path, handler in sourcedata.iterate_path_handlers():
+                tree = bktree.subtrees
+                for comp in path:
+                    tree = tree.make_subtree(comp)
                 if handler == 'ignore':
-                    bktree.ignore_subtree(path)
+                    tree.set_ignored()
                 elif handler == 'dynamic':
-                    bktree.back_up_subtree(path)
+                    tree.set_backed_up()
                 elif handler == 'static':
-                    bktree.back_up_static_subtree(path)
+                    tree.set_backed_up_static()
                 else:
                     raise AssertionError(
                         'Unknown handler in configuration: ' + handler)

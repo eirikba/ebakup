@@ -37,10 +37,15 @@ class TestSimpleBackup(unittest.TestCase):
         sourcetree._allow_reading_subtree(basepath)
         operation = backupoperation.BackupOperation(collection)
         backuptree = operation.add_tree_to_backup(sourcetree, basepath, ())
-        backuptree.ignore_subtree(('tmp',))
-        backuptree.ignore_subtree(('.cache',))
-        backuptree.back_up_subtree(('tmp', 'Q.pdf'))
-        backuptree.back_up_static_subtree(('Pictures',))
+        bkroot = backuptree.subtrees
+        treetmp = bkroot.make_subtree('tmp')
+        treetmp.set_ignored()
+        treecache = bkroot.make_subtree('.cache')
+        treecache.set_ignored()
+        treetmpq = treetmp.make_subtree('Q.pdf')
+        treetmpq.set_backed_up()
+        treepicts = bkroot.make_subtree('Pictures')
+        treepicts.set_backed_up_static()
         self.storetree = storetree
         self.sourcetree = sourcetree
         self.basepath = basepath
