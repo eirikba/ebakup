@@ -90,38 +90,112 @@ class TestSimpleConfig(unittest.TestCase):
     def test_backup_home_source_item_handlers(self):
         backup = self.config.get_backup_by_name('home')
         source = backup.sources[0]
-        self.assertEqual('dynamic', source.tree.get_handler_for_path(()))
+        self.assertEqual('dynamic', source.get_handler_for_path(()))
         self.assertEqual(
-            'dynamic', source.tree.get_handler_for_path(('random', 'path')))
-        self.assertEqual('ignore', source.tree.get_handler_for_path(('tmp',)))
+            'dynamic', source.get_handler_for_path(('random', 'path')))
+        self.assertEqual('ignore', source.get_handler_for_path(('tmp',)))
         self.assertEqual(
-            'static', source.tree.get_handler_for_path(('tmp', 'Q.pdf')))
+            'static', source.get_handler_for_path(('tmp', 'Q.pdf')))
         self.assertEqual(
-            'ignore', source.tree.get_handler_for_path(('tmp', 'R.pdf')))
-        self.assertEqual(
-            'static',
-            source.tree.get_handler_for_path(('tmp', 'Q.pdf', 'other')))
+            'ignore', source.get_handler_for_path(('tmp', 'R.pdf')))
         self.assertEqual(
             'static',
-            source.tree.get_handler_for_path(
+            source.get_handler_for_path(('tmp', 'Q.pdf', 'other')))
+        self.assertEqual(
+            'static',
+            source.get_handler_for_path(
                 ('Pictures', 'funny', 'strange man.jpg')))
         self.assertEqual(
-            'static', source.tree.get_handler_for_path(('Pictures', 'mine')))
+            'static', source.get_handler_for_path(('Pictures', 'mine')))
         self.assertEqual(
-            'static', source.tree.get_handler_for_path(('Pictures',)))
+            'static', source.get_handler_for_path(('Pictures',)))
         self.assertEqual(
-            'dynamic', source.tree.get_handler_for_path(('Picture',)))
+            'dynamic', source.get_handler_for_path(('Picture',)))
         self.assertEqual(
-            'dynamic', source.tree.get_handler_for_path(('Picturess',)))
+            'dynamic', source.get_handler_for_path(('Picturess',)))
 
     def test_backup_home_source_subtree_handler_iterator(self):
         backup = self.config.get_backup_by_name('home')
         source = backup.sources[0]
+        tree = source.subtree_handlers
         expected = (
-            (('tmp',), 'ignore'),
-            (('tmp', 'Q.pdf'), 'static'),
-            (('Pictures',), 'static'))
-        self.assertCountEqual(expected, source.iterate_path_handlers())
+            (('plain', 'tmp', 'ignore'),
+            (('plain', 'Pictures', 'static'))))
+        self.assertCountEqual(
+            expected,
+            [(x.matchtype, x.matchdata, x.handler) for x in tree.children])
+        for child in tree.children:
+            if child.matchdata == 'tmp':
+                self.assertEqual(
+                    [('plain', 'Q.pdf', 'static')],
+                    [(x.matchtype, x.matchdata, x.handler)
+                     for x in child.children])
+
+class TestFullConfig(unittest.TestCase):
+
+    def setUp(self):
+        conf = config.Config()
+        self.config = conf
+        tree = FakeTree()
+        self.tree = tree
+        tree.set_file(
+            ('path', 'to', 'config'),
+            content=textwrap.dedent('''\
+                backup main
+                   collection local:/backup/mine
+                   source local:/home/me
+                       targetpath bkmain
+                       path tmp
+                           ignore
+                           path Q.pdf
+                               static
+                       path My Pictures
+                           static
+                           path modified
+                             dynamic
+                       paths .cache work/testfiles
+                          ignore
+            ''').encode('utf-8'))
+        conf.read_file(tree, ('path', 'to', 'config'))
+
+    def test_backup_main_exists(self):
+        backup = self.config.get_backup_by_name('main')
+        self.assertNotEqual(None, backup)
+        self.assertEqual('main', backup.name)
+
+    def test_path_handlers(self):
+        backup = self.config.get_backup_by_name('main')
+        source = backup.sources[0]
+        tree = source.subtree_handlers
+        self.assertEqual(None, tree.matchtype)
+        self.assertCountEqual(
+            (('plain', 'tmp', 'ignore'),
+             ('plain', 'My Pictures', 'static'),
+             ('plain', '.cache', 'ignore'),
+             ('plain', 'work', None)),
+            [(x.matchtype, x.matchdata, x.handler) for x in tree.children])
+        for x in tree.children:
+            if x.matchdata == 'tmp':
+                tree_tmp = x
+            elif x.matchdata == 'My Pictures':
+                tree_pict = x
+            elif x.matchdata == 'work':
+                tree_work = x
+            else:
+                self.assertEqual(
+                    0, len(x.children), msg='top-level: ' + x.matchdata)
+        self.assertEqual(
+            [('plain', 'Q.pdf', 'static')],
+            [(x.matchtype, x.matchdata, x.handler) for x in tree_tmp.children])
+        self.assertEqual(0, len(tree_tmp.children[0].children))
+        self.assertEqual(
+            [('plain', 'modified', 'dynamic')],
+            [(x.matchtype, x.matchdata, x.handler) for x in tree_pict.children])
+        self.assertEqual(0, len(tree_pict.children[0].children))
+        self.assertEqual(
+            [('plain', 'testfiles', 'ignore')],
+            [(x.matchtype, x.matchdata, x.handler) for x in tree_work.children])
+        self.assertEqual(0, len(tree_work.children[0].children))
 
 class TestVarious(unittest.TestCase):
 

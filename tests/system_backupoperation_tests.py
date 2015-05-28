@@ -9,6 +9,14 @@ import backupcollection
 import backupoperation
 import fake_filesys
 
+from config_subtree import CfgSubtree
+
+def make_cfgsubtree(spec):
+    root = CfgSubtree(None, None)
+    for item in spec:
+        root._add_child_path(item[0], item[1], handler=item[2])
+    return root
+
 class TestSimpleBackup(unittest.TestCase):
     def setUp(self):
         storetree = fake_filesys.FakeFileSystem()
@@ -37,15 +45,12 @@ class TestSimpleBackup(unittest.TestCase):
         sourcetree._allow_reading_subtree(basepath)
         operation = backupoperation.BackupOperation(collection)
         backuptree = operation.add_tree_to_backup(sourcetree, basepath, ())
-        bkroot = backuptree.subtrees
-        treetmp = bkroot.make_subtree('tmp')
-        treetmp.set_ignored()
-        treecache = bkroot.make_subtree('.cache')
-        treecache.set_ignored()
-        treetmpq = treetmp.make_subtree('Q.pdf')
-        treetmpq.set_backed_up()
-        treepicts = bkroot.make_subtree('Pictures')
-        treepicts.set_backed_up_static()
+        bkroot = make_cfgsubtree(
+            (('plain', ('tmp',), 'ignore'),
+             ('plain', ('tmp', 'Q.pdf'), 'dynamic'),
+             ('plain', ('.cache',), 'ignore'),
+             ('plain', ('Pictures',), 'static')))
+        backuptree.set_backup_handlers(bkroot)
         self.storetree = storetree
         self.sourcetree = sourcetree
         self.basepath = basepath

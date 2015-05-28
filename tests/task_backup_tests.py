@@ -21,7 +21,7 @@ class FakeBackupConfig(object):
         coll = FakeCollectionData('local', ('data', 'backup'))
         self.collections.append(coll)
         source = FakeBackupSource('local', ('home', 'me'), ())
-        source._handlers = [
+        source.subtree_handlers = [
             (('tmp',), 'ignore'),
             (('photos','mine'), 'static'),
             (('photos','mine','edited'), 'dynamic'),
@@ -33,11 +33,7 @@ class FakeBackupSource(object):
         self.accessor = access
         self.path = path
         self.targetpath = targetpath
-        self._handlers = []
-
-    def iterate_path_handlers(self):
-        for handler in self._handlers:
-            yield handler
+        self.subtree_handlers = None
 
 class FakeTree(object):
     def __init__(self, accessor):
@@ -119,17 +115,10 @@ class FakeBackupTree(object):
         self._tree = tree
         self._sourcepath = sourcepath
         self._targetpath = targetpath
-        self._handlers = []
-        self.subtrees = FakeHandlerBuilder(self, ())
+        self._handlers = None
 
-    def ignore_subtree(self, path):
-        self._handlers.append((path, 'ignore'))
-
-    def back_up_static_subtree(self, path):
-        self._handlers.append((path, 'static'))
-
-    def back_up_subtree(self, path):
-        self._handlers.append((path, 'dynamic'))
+    def set_backup_handlers(self, handlers):
+        self._handlers = handlers
 
 class FakeArgs(object):
     def __init__(self, config):

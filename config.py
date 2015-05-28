@@ -2,6 +2,8 @@
 
 import re
 
+from config_subtree import CfgSubtree
+
 class InvalidDataError(Exception): pass
 
 def parse_full_path(fullpath):
@@ -136,6 +138,7 @@ class CfgBackup(object):
         if key == 'collection':
             self.collections.append(item)
         if key == 'source':
+            item.config_is_fully_parsed_so_finalize_data()
             self.sources.append(item)
 
 class CfgCollection(object):
@@ -151,7 +154,8 @@ class CfgSource(object):
         self.accessor = accessor
         self.path = path
         self.targetpath = None
-        self.tree = CfgTree()
+        self.tree = CfgTree(None, None)
+        # self.subtree_handlers set by ..._finalize_data()
 
     def parse_enter_block(self, key, args):
         if key == 'targetpath':
@@ -162,19 +166,28 @@ class CfgSource(object):
                     str(self.targetpath) + ' and ' + str(path))
             self.targetpath = path
             return True
-        if key == 'path':
-            path = parse_relative_path(args)
-            return self.tree.get_or_create_path_info(path)
+        if key in ('path', 'paths'):
+            return self.tree.parse_pathmatch(key, args)
 
     def parse_exit_block(self, key, args, item):
         pass
 
-    def iterate_path_handlers(self):
-        yield from self.tree.iterate_path_handlers()
+    def config_is_fully_parsed_so_finalize_data(self):
+        self.subtree_handlers = CfgSubtree(None, None)
+        self.subtree_handlers.build_children_from_cfgtree(self.tree)
+        self.tree = None
+
+    def get_handler_for_path(self, path):
+        handler = self.subtree_handlers.get_handler_for_path(path)
+        if handler is None:
+            return 'dynamic'
+        return handler
 
 class CfgTree(object):
-    def __init__(self):
-        self.children = {}
+    def __init__(self, matchtype, matchdata):
+        self.matchtype = matchtype
+        self.matchdata = matchdata
+        self.children = []
         self.handler = None
 
     def parse_enter_block(self, key, args):
@@ -188,37 +201,27 @@ class CfgTree(object):
                     'path handler set twice: ' + self.handler + ' and ' + key)
             self.handler = key
             return True
-        if key == 'path':
-            path = parse_relative_path(args)
-            return self.get_or_create_path_info(path)
+        if key in ('path', 'paths'):
+            return self.parse_pathmatch(key, args)
 
     def parse_exit_block(self, key, args, item):
         pass
 
-    def get_or_create_path_info(self, path):
-        tree = self
-        for comp in path:
-            if comp not in tree.children:
-                tree.children[comp] = CfgTree()
-            tree = tree.children[comp]
-        return tree
-
-    def iterate_path_handlers(self, path=()):
-        if self.handler:
-            yield path, self.handler
-        for pathcomp, subtree in self.children.items():
-            yield from subtree.iterate_path_handlers(path + (pathcomp,))
-
-    def get_handler_for_path(self, path):
-        tree = self
-        handler = self.handler
-        for comp in path:
-            tree = tree.children.get(comp)
-            if tree is None:
-                break
-            if tree.handler is not None:
-                handler = tree.handler
-        if handler is None:
-            return 'dynamic'
+    def parse_pathmatch(self, key, args):
+        if key.endswith('s'):
+            elems = args.split()
         else:
-            return handler
+            elems = (args,)
+        paths = []
+        for elem in elems:
+            paths.append(parse_relative_path(elem))
+        if key == 'path':
+            tree = CfgTree('plain', paths[0])
+            self.children.append(tree)
+            return tree
+        elif key == 'paths':
+            tree = CfgTree('plain multi', paths)
+            self.children.append(tree)
+            return tree
+        else:
+            raise AssertionError('Unexpected key: ' + key)

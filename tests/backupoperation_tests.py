@@ -7,6 +7,8 @@ import unittest
 
 import backupoperation
 
+from config_subtree import CfgSubtree
+
 class FakeBackupCollection(object):
     def __init__(self):
         self._backups = []
@@ -150,6 +152,16 @@ def add_backup_handlers(tree, ignore=None, dynamic=None, static=None):
                 tree.set_backed_up()
             elif handler == 2:
                 tree.set_backed_up_static()
+
+def add_backup_handlers(tree, ignore=None, dynamic=None, static=None):
+    root = CfgSubtree(None, None)
+    for paths, handler in (
+            (ignore, 'ignore'), (dynamic, 'dynamic'), (static, 'static') ):
+        if paths is None:
+            continue
+        for path in paths:
+            root._add_child_path('plain', path, handler=handler)
+    tree.set_backup_handlers(root)
 
 class TestBasicBackup(unittest.TestCase):
     def setUp(self):

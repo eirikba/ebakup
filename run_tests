@@ -40,6 +40,8 @@ expected_tests = set((
     'cli_tests.TestSimpleStuff.test_commandline_backup',
     'cli_tests.TestSimpleStuff.test_commandline_config',
     'cli_tests.TestSimpleStuff.test_empty_commandline',
+    'config_tests.TestFullConfig.test_backup_main_exists',
+    'config_tests.TestFullConfig.test_path_handlers',
     'config_tests.TestSimpleConfig.test_backup_home',
     'config_tests.TestSimpleConfig.test_backup_home_collection',
     'config_tests.TestSimpleConfig.test_backup_home_source',
