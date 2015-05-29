@@ -164,13 +164,18 @@ class BackupSource(object):
             if how != 'ignore':
                 yield self.sourcepath + path, self.targetpath + path, how
         for d in dirs:
-            yield from self.iterate_source_files(subtree + (d,))
+            dpath = subtree + (d,)
+            if not self._is_whole_subtree_ignored(dpath):
+                yield from self.iterate_source_files(dpath)
 
     def _how_should_path_be_handled(self, path):
         handler = self.subtrees.get_handler_for_path(path)
         if handler is None:
             return 'dynamic'
         return handler
+
+    def _is_whole_subtree_ignored(self, path):
+        return self.subtrees.is_whole_subtree_ignored(path)
 
     def may_target_path_have_statics(self, path):
         relpath = self._convert_target_path_to_source_path(path)

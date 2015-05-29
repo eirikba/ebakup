@@ -28,6 +28,7 @@ expected_tests = set((
     'backupoperation_tests.TestBasicBackup.test_changed_static_data_causes_error_to_be_reported',
     'backupoperation_tests.TestBasicBackup.test_file_with_identical_content_gets_same_content_id',
     'backupoperation_tests.TestBasicBackup.test_files_with_unchanged_mtime_and_size_are_assumed_same',
+    'backupoperation_tests.TestBasicBackup.test_ignored_subtrees_are_not_traversed',
     'backupoperation_tests.TestBasicBackup.test_move_static_data_to_nonstatic_causes_error_to_be_reported',
     'backupoperation_tests.TestBasicBackup.test_moved_static_data_causes_no_error_to_be_reported',
     'backupoperation_tests.TestBasicBackup.test_removed_static_data_causes_error_to_be_reported',

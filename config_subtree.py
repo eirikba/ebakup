@@ -70,6 +70,22 @@ class CfgSubtree(object):
                 return handler
         return self.handler
 
+    def is_whole_subtree_ignored(self, path, parent_is_ignored=False):
+        if not path:
+            for child in self.children:
+                if not child.is_whole_subtree_ignored(()):
+                    return False
+            if self.handler == 'ignore':
+                return True
+            return parent_is_ignored
+        if self.handler is not None:
+            parent_is_ignored = self.handler == 'ignore'
+        for child in self.children:
+            if child.matches_component(path[0]):
+                return child.is_whole_subtree_ignored(
+                    path[1:], parent_is_ignored)
+        return parent_is_ignored
+
     def may_path_have_statics(self, path, parent_is_static=False):
         if not path:
             if self.handler == 'static':

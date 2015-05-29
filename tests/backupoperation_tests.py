@@ -76,6 +76,7 @@ filenum = 0
 class FakeTree(object):
     def __init__(self):
         self._files = {}
+        self._listed_directories = set()
 
     def _copy_tree(self, other):
         self._files.update(other._files)
@@ -87,6 +88,7 @@ class FakeTree(object):
             filenum += 1
 
     def get_directory_listing(self, path):
+        self._listed_directories.add(path)
         pathlen = len(path)
         dirs = set()
         files = set()
@@ -182,6 +184,8 @@ class TestBasicBackup(unittest.TestCase):
         sourcetree._add_files(('home', 'other'), ('more', 'notmine'))
         sourcetree._add_files(
             ('home', 'me', 'tmp'), ('boring', 'forgetme', 'stuff'))
+        sourcetree._add_files(
+            ('home', 'me', 'tmp', 'subdir'), ('neither', 'nor'))
         sourcetree._add_files(('home', 'me'), ('toplevel',))
         sourcetree._add_files(('home',), ('outside', 'and more'))
         tree = bo.add_tree_to_backup(sourcetree, ('home', 'me'), ('main',))
@@ -256,6 +260,12 @@ class TestBasicBackup(unittest.TestCase):
                 mtime_ns, bkfile[3],
                 msg='mtime_ns mismatch for ' + str(totest))
         self.assertNoLoggedProblems()
+
+    def test_ignored_subtrees_are_not_traversed(self):
+        sourcetree = self.sourcetree
+        self.assertIn(('home', 'me', 'tmp'), sourcetree._listed_directories)
+        self.assertNotIn(
+            ('home', 'me', 'tmp', 'subdir'), sourcetree._listed_directories)
 
     def test_changed_static_data_causes_error_to_be_reported(self):
         bo = backupoperation.BackupOperation(self.backupcollection)
