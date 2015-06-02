@@ -155,7 +155,11 @@ class TestFullConfig(unittest.TestCase):
                              dynamic
                        paths .cache work/testfiles
                           ignore
-            ''').encode('utf-8'))
+                       path-glob One glo*ed path
+                           static
+                       path-globs multiple ind*al comp*nts
+                           static
+                ''').encode('utf-8'))
         conf.read_file(tree, ('path', 'to', 'config'))
 
     def test_backup_main_exists(self):
@@ -172,7 +176,11 @@ class TestFullConfig(unittest.TestCase):
             (('plain', 'tmp', 'ignore'),
              ('plain', 'My Pictures', 'static'),
              ('plain', '.cache', 'ignore'),
-             ('plain', 'work', None)),
+             ('plain', 'work', None),
+             ('glob', 'One glo*ed path', 'static'),
+             ('glob', 'multiple', 'static'),
+             ('glob', 'ind*al', 'static'),
+             ('glob', 'comp*nts', 'static')),
             [(x.matchtype, x.matchdata, x.handler) for x in tree.children])
         for x in tree.children:
             if x.matchdata == 'tmp':

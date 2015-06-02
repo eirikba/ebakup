@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import glob_utils
+
 class CfgSubtree(object):
     def __init__(self, matchtype, matchdata):
         self.matchtype = matchtype
@@ -17,6 +19,15 @@ class CfgSubtree(object):
                 for path in child.matchdata:
                     newchild = self._add_child_path(
                         'plain', path, handler=child.handler)
+                    newchild.build_children_from_cfgtree(child)
+            elif child.matchtype == 'glob':
+                newchild = self._add_child_path(
+                    'glob', child.matchdata, handler=child.handler)
+                newchild.build_children_from_cfgtree(child)
+            elif child.matchtype == 'glob multi':
+                for path in child.matchdata:
+                    newchild = self._add_child_path(
+                        'glob', path, handler=child.handler)
                     newchild.build_children_from_cfgtree(child)
             else:
                 raise AssertionError('Unexpected matchtype: ' + child.matchtype)
@@ -49,6 +60,13 @@ class CfgSubtree(object):
     def has_overlapping_matches_with(self, other):
         if self.matchtype == 'plain' and other.matchtype == 'plain':
             return self.matchdata == other.matchdata
+        elif self.matchtype == 'glob' and other.matchtype == 'plain':
+            return self.matches_component(other.matchdata)
+        elif other.matchtype == 'glob' and self.matchtype == 'plain':
+            return other.matches_component(self.matchdata)
+        elif self.matchtype == 'glob' and other.matchtype == 'glob':
+            return glob_utils.do_globs_have_common_matches(
+                self.matchdata, other.matchdata)
         else:
             raise AssertionError(
                 'Unexpected match types: ' + self.matchtype + ' - ' +
@@ -57,6 +75,8 @@ class CfgSubtree(object):
     def matches_component(self, component):
         if self.matchtype == 'plain':
             return self.matchdata == component
+        if self.matchtype == 'glob':
+            return glob_utils.does_glob_match(self.matchdata, component)
         raise AssertionError('Unhandled match type: ' + self.matchtype)
 
     def get_handler_for_path(self, path):

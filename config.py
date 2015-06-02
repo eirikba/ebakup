@@ -166,7 +166,7 @@ class CfgSource(object):
                     str(self.targetpath) + ' and ' + str(path))
             self.targetpath = path
             return True
-        if key in ('path', 'paths'):
+        if key in ('path', 'paths', 'path-glob', 'path-globs'):
             return self.tree.parse_pathmatch(key, args)
 
     def parse_exit_block(self, key, args, item):
@@ -201,7 +201,7 @@ class CfgTree(object):
                     'path handler set twice: ' + self.handler + ' and ' + key)
             self.handler = key
             return True
-        if key in ('path', 'paths'):
+        if key in ('path', 'paths', 'path-glob', 'path-globs'):
             return self.parse_pathmatch(key, args)
 
     def parse_exit_block(self, key, args, item):
@@ -221,6 +221,14 @@ class CfgTree(object):
             return tree
         elif key == 'paths':
             tree = CfgTree('plain multi', paths)
+            self.children.append(tree)
+            return tree
+        elif key == 'path-glob':
+            tree = CfgTree('glob', paths[0])
+            self.children.append(tree)
+            return tree
+        elif key == 'path-globs':
+            tree = CfgTree('glob multi', paths)
             self.children.append(tree)
             return tree
         else:
