@@ -220,3 +220,59 @@ class TestSimpleGlobs(unittest.TestCase):
         self.assertFalse(globs.does_glob_match('ab[-]cd', 'ab[-]cd'))
         self.assertTrue(globs.does_glob_match('ab[]]cd', 'ab]cd'))
         self.assertFalse(globs.does_glob_match('ab[]]cd', 'ab[]]cd'))
+
+    def test_has_common_matches(self):
+        tests = (
+            ('abcd', 'abcd'),
+            ('a[f-k]bcd', 'a[i-m]bcd'),
+            ('a[f-k]bcd', 'a[!i-m]bcd'),
+            ('a[!f-k]bcd', 'a[i-m]bcd'),
+            ('a[!f-k]bcd', 'a[a-r]bcd'),
+            ('a[!f-k]bcd', 'a[!i-m]bcd'),
+            ('a?cd', 'abcd'),
+            ('?bcd', 'abcd'),
+            ('abc?', 'abcd'),
+            ('ab*cd', 'abcd'),
+            ('ab*cd', 'abmnocd'),
+            ('ab*k*cd', 'abkcd'),
+            ('ab*kcd', 'abkcd'),
+            ('ab*k*k*cd', 'abkmkcd'),
+            ('a*bcd', 'abc*d'),
+            ('ab*cd', 'ab*cd'),
+            ('ab*cd*efg', 'ab*e*g'),
+            ('ab*cd*', 'ab*ef*'),
+            ('abcd*', 'ab*ef'),
+            ('*abcd*', 'gh*ef'),
+            ('*abcd*ef', 'gh*ef'),
+            ('a*[!b]*cd', 'ab*cd'),
+            ('ab*kcd', 'abkmkcd'),
+            )
+        for test in tests:
+            self.assertTrue(
+                globs.do_globs_have_common_matches(test[0], test[1]),
+                msg=str(test))
+            self.assertTrue(
+                globs.do_globs_have_common_matches(test[1], test[0]),
+                msg=str((test[1],test[0])))
+
+    def test_does_not_have_common_matches(self):
+        tests = (
+            ('a[bc]d', 'abcd'),
+            ('a[!b]*cd', 'ab*cd'),
+            ('ab?cd', 'abcd'),
+            ('ab???cd', 'ab??cd'),
+            ('a[f-k]bcd', 'a[m-r]bcd'),
+            ('a[f-k]bcd', 'a[!a-r]bcd'),
+            ('ab*cd', 'ab*ef'),
+            ('*abcd*ef', 'gh*mn'),
+            ('ab*kcd', 'abcd'),
+            ('ab*k*cd', 'abcd'),
+            ('ab*k*k*cd', 'abkcd'),
+        )
+        for test in tests:
+            self.assertFalse(
+                globs.do_globs_have_common_matches(test[0], test[1]),
+                msg=str(test))
+            self.assertFalse(
+                globs.do_globs_have_common_matches(test[1], test[0]),
+                msg=str((test[1],test[0])))
