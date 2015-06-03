@@ -153,14 +153,14 @@ class CfgSource(object):
     def __init__(self, accessor, path):
         self.accessor = accessor
         self.path = path
-        self.targetpath = None
+        self.targetpath = ()
         self.tree = CfgTree(None, None)
         # self.subtree_handlers set by ..._finalize_data()
 
     def parse_enter_block(self, key, args):
         if key == 'targetpath':
             path = parse_relative_path(args)
-            if self.targetpath is not None:
+            if self.targetpath is not ():
                 raise InvalidDataError(
                     'Tried to set targetpath twice for the same source: ' +
                     str(self.targetpath) + ' and ' + str(path))
