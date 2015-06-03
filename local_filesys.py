@@ -90,6 +90,19 @@ class LocalFileSystem(object):
     def rename_and_overwrite(self, source, target):
         os.replace(self.path_to_string(source), self.path_to_string(target))
 
+    def get_config_paths_for(self, application):
+        paths = []
+        confhome = os.environ.get('XDG_CONFIG_HOME')
+        if confhome is None:
+            confhome = os.environ.get('HOME')
+            if confhome is not None:
+                confhome = os.path.join(confhome, '.config')
+        if confhome is not None:
+            paths.append(os.path.join(confhome, application))
+        confdirs = os.environ.get('XDG_CONFIG_DIRS', '/etc/xdg')
+        paths += [ os.path.join(x, application) for x in confdirs.split(':') ]
+        return tuple(self.path_from_string(x) for x in paths)
+
 class LocalFile(object):
     def __init__(self, stringpath, openfile=None, writable=False):
         self._stringpath = stringpath
