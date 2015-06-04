@@ -36,6 +36,11 @@ class FakeFileSystem(object):
         self._allow_access_for_subtree(path, 'read')
         self._allow_access_for_subtree(path, 'stat')
 
+    def _disallow_reading_subtree(self, path):
+        self._allow_access_for_subtree(path, 'no-listdir')
+        self._allow_access_for_subtree(path, 'no-read')
+        self._allow_access_for_subtree(path, 'no-stat')
+
     def _allow_access_for_path(self, path, access):
         if path not in self._access:
             self._access[path] = (access,)

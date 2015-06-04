@@ -161,6 +161,7 @@ expected_tests = set((
     'system_live_tests.TestLocalFileSys.test_get_existing_item',
     'system_live_tests.TestLocalFileSys.test_get_item_that_is_a_directory',
     'system_live_tests.TestLocalFileSys.test_get_non_existing_item',
+    'system_tests.TestFullSequence.test_all',
     'task_backup_tests.TestSimpleBackup.test_backup_from_and_to_correct_path',
     'task_backup_tests.TestSimpleBackup.test_backup_handlers',
     'task_backup_tests.TestSimpleBackup.test_backup_performed',
