@@ -54,7 +54,7 @@ class LocalFileSystem(object):
         dirs = []
         files = []
         for name in names:
-            st = os.stat(os.path.join(stringpath, name))
+            st = os.lstat(os.path.join(stringpath, name))
             if stat.S_ISLNK(st.st_mode):
                 # Ignoring symlinks is probably OK, but not optimal
                 pass
