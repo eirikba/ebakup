@@ -3,6 +3,7 @@
 import datetime
 import fcntl
 import os
+import stat
 import tempfile
 
 class LocalFileSystem(object):
@@ -53,14 +54,18 @@ class LocalFileSystem(object):
         dirs = []
         files = []
         for name in names:
-            itempath = os.path.join(stringpath, name)
-            if os.path.islink(itempath):
+            st = os.stat(os.path.join(stringpath, name))
+            if stat.S_ISLNK(st.st_mode):
                 # Ignoring symlinks is probably OK, but not optimal
                 pass
-            elif os.path.isdir(itempath):
+            elif stat.S_ISDIR(st.st_mode):
                 dirs.append(name)
-            elif os.path.isfile(itempath):
+            elif stat.S_ISREG(st.st_mode):
                 files.append(name)
+            elif stat.S_ISSOCK(st.st_mode) or stat.S_ISFIFO(st.st_mode):
+                # Ignore other special files.
+                # Currently assuming no device files appears.
+                pass
             else:
                 raise AssertionError('Neither file nor directory: ' + name)
         return dirs, files
