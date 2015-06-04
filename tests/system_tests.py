@@ -83,10 +83,16 @@ class TestFullSequence(unittest.TestCase):
     def make_initial_source_tree(self, fs):
         fs._make_files(
             ('home', 'me', 'tmp'), ('t.txt', 'info', 'experiment.py'),
-            fileid_first=0)
+            filetype='noinfo')
+        fs._make_files(('home', 'me'), ('tmp-data.txt',), filetype='noinfo')
         fs._make_files(
-            ('home', 'me'), ('tmp-data.txt',),
-            fileid_first=10)
+            ('home', 'me', '.cache', 'squiqqle'),
+            ('aaaaaaaa', 'aaaaaaab', 'aaaaaaac', 'aaaaaaad'),
+            filetype='noinfo')
+        fs._make_files(
+            ('home', 'me', 'mount-fileserver'),
+            ('movie.mpg', 'movie2.avi'),
+            filetype='noinfo')
         fs._add_file(
             ('home', 'me', 'notes.txt'),
             content=b'Some quick notes\n',
@@ -102,14 +108,6 @@ class TestFullSequence(unittest.TestCase):
             content=b'A different photo',
             mtime=datetime.datetime(1994, 4, 5, 2, 36, 23),
             mtime_ns=34763519)
-        fs._make_files(
-            ('home', 'me', '.cache', 'squiqqle'),
-            ('aaaaaaaa', 'aaaaaaab', 'aaaaaaac', 'aaaaaaad'),
-            fileid_first=30)
-        fs._make_files(
-            ('home', 'me', 'mount-fileserver'),
-            ('movie.mpg', 'movie2.avi'),
-            fileid_first=40)
 
     def get_initial_config_file_content(self):
         return textwrap.dedent('''\

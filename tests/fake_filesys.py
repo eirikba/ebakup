@@ -208,7 +208,7 @@ class FakeFileSystem(object):
         f._writable = True
         return f
 
-    def _make_files(self, parent, names, fileid_first=None):
+    def _make_files(self, parent, names, fileid_first=None, filetype=None):
         self._make_directory(parent)
         fileid = fileid_first
         for name in names:
@@ -216,9 +216,12 @@ class FakeFileSystem(object):
             if path in self._paths:
                 raise FileExistsError('File already exists: ' + str(path))
             if fileid is not None:
+                assert filetype is None
                 item = FileItem.create_from_id(self, fileid)
                 self._paths[path] = item
                 fileid += 1
+            elif filetype == 'noinfo':
+                self._paths[path] = FileItem()
             else:
                 raise NotImplementedError('No supported file creation method')
 
