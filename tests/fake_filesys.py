@@ -10,7 +10,10 @@ class FakeFileSystem(object):
         self._paths = {}
         self._access = {}
         self._treeaccess = {}
-        self._utcnow = datetime.datetime.utcnow
+        self._utcnow = self._fallback_utcnow
+
+    def _fallback_utcnow(self):
+        return datetime.datetime(2015, 3, 3)
 
     def _set_utcnow(self, utcnow):
         self._utcnow = utcnow
@@ -336,7 +339,7 @@ class FileItem(object):
         item = FileItem()
         item.data = data
         item.mtime = (
-            datetime.datetime(2014, 2, 1) +
+            filesys._utcnow() -
             datetime.timedelta((size * size) % 6211))
         item.mtime_ns = (
             item.mtime.microsecond * 1000 + (fileid * size * 311) % 1000)
