@@ -1,3 +1,7 @@
+Do not descend ignored subdirectories:
+
+Status: FIXED
+
 backupoperation.BackupSource.iterate_source_files() should not descend
 into subtrees that are completely ignored. (Keep in mind that even if
 the directory itself is ignored, there may be elements deeper in the
