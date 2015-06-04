@@ -382,9 +382,8 @@ class ContentInfoFile(object):
         that have the "good" checksum 'checksum'.
         '''
         infos = []
-        for item in self.contentdata.values():
-            if item.checksum == checksum:
-                infos.append(ContentInfo(self._db, item))
+        for cid in self.contentdata.get_contentids_for_checksum(checksum):
+            infos.append(ContentInfo(self._db, self.contentdata[cid]))
         return infos
 
     def add_content_item(self, when, checksum):
@@ -458,11 +457,17 @@ class ContentInfoFile(object):
 class ContentInfoDict(object):
     def __init__(self):
         self._infos = {}
+        self._checksums = {}
 
     def __getitem__(self, key):
         return self._infos[key]
 
     def __setitem__(self, key, value):
+        cksum = value.checksum
+        if cksum not in self._checksums:
+            self._checksums[cksum] = [ key ]
+        else:
+            self._checksums[cksum].append(key)
         self._infos[key] = value
 
     def __contains__(self, key):
@@ -470,6 +475,9 @@ class ContentInfoDict(object):
 
     def get(self, key, default=None):
         return self._infos.get(key, default)
+
+    def get_contentids_for_checksum(self, cksum):
+        return self._checksums.get(cksum, ())
 
     def values(self):
         return self._infos.values()
