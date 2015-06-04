@@ -214,6 +214,30 @@ class TestFullSequence(unittest.TestCase):
         dirs, files = bkup.list_directory(('My Pictures',))
         self.assertCountEqual((), dirs)
         self.assertCountEqual(('DSC_1886.JPG', 'DSC_1903.JPG'), files)
+        info = bkup.get_file_info(('notes.txt',))
+        self.assertEqual(
+            datetime.datetime(1994, 11, 28, 16, 48, 56), info.mtime)
+        self.assertEqual(394323854, info.mtime_nsec)
+        self.assertEqual(17, info.size)
+        self.assertEqual(
+            b"?27\x9f\xe4\x10\x8e\x99'\x98\x90\xfa"
+            b"\xf4J\x83lj\xd86\xad3\x1e\xa2v\xd0\xa4\xb7\x85\x847\t\x1a",
+            info.good_checksum)
+        info = bkup.get_file_info(('My Pictures', 'DSC_1903.JPG'))
+        self.assertEqual(datetime.datetime(1994, 4, 5, 2, 36, 23), info.mtime)
+        self.assertEqual(34763519, info.mtime_nsec)
+        self.assertEqual(17, info.size)
+        self.assertEqual(
+            b'8M\x1c\xd1\xec\xf7\xcb\xd6\xdf\xbd\x82\x89'
+            b'J\xf0\x92+\xc1\x13X\x9d\x14\xd0lF^\xb1E\x92*\xe0\r\xd7',
+            info.good_checksum)
+        cid = info.contentid
+        reader = coll.get_content_reader(cid)
+        self.assertEqual(17, reader.get_size())
+        self.assertEqual(b'A different photo', reader.get_data_slice(0,100))
+        self.assertEqual(b'A different photo', reader.get_data_slice(0,17))
+        self.assertEqual(b'A different pho', reader.get_data_slice(0,15))
+        self.assertEqual(b'feren', reader.get_data_slice(5,10))
 
     def _check_info_after_initial_backup(self):
         out = io.StringIO()
