@@ -197,7 +197,12 @@ class TestFullSequence(unittest.TestCase):
             None,
             coll.get_oldest_backup_after(
                 datetime.datetime(1995, 1, 1, 0, 0, 20)))
-
+        dirs, files = bkup.list_directory(())
+        self.assertCountEqual(('.config', 'My Pictures'), dirs)
+        self.assertCountEqual(('notes.txt',), files)
+        dirs, files = bkup.list_directory(('My Pictures',))
+        self.assertCountEqual((), dirs)
+        self.assertCountEqual(('DSC_1886.JPG', 'DSC_1903.JPG'), files)
 
     def _check_info_after_initial_backup(self):
         out = io.StringIO()
