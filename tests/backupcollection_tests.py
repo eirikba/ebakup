@@ -198,6 +198,25 @@ class FakeDatabase(object):
             return None
         return self._backups[-1]
 
+    def get_oldest_backup(self):
+        if not self._backups:
+            return None
+        return self._backups[0]
+
+    def get_most_recent_backup_before(self, when):
+        prev = None
+        for backup in self._backups:
+            if backup._start_time >= when:
+                return prev
+            prev = backup
+        return prev
+
+    def get_oldest_backup_after(self, when):
+        for backup in self._backups:
+            if backup._start_time > when:
+                return backup
+        return None
+
     def add_content_item(self, when, checksum):
         content_id_base = checksum[:4] + b'ci' + checksum[4:]
         content_id = content_id_base
@@ -414,6 +433,20 @@ class TestBasicBackup(unittest.TestCase):
         bcfactory.set_database_creator(db.create)
         self.backupcollection = bcfactory.open_collection()
 
+    def test_backup_sequence(self):
+        backup = self.backupcollection.get_most_recent_backup()
+        self.assertNotEqual(None, backup)
+        oldest = self.backupcollection.get_oldest_backup()
+        self.assertEqual(backup.get_start_time(), oldest.get_start_time())
+        self.assertEqual(
+            None,
+            self.backupcollection.get_most_recent_backup_before(
+                backup.get_start_time()))
+        self.assertEqual(
+            None,
+            self.backupcollection.get_oldest_backup_after(
+                backup.get_start_time()))
+
     def test_backup_start_time(self):
         backup = self.backupcollection.get_most_recent_backup()
         self.assertEqual(
@@ -576,6 +609,145 @@ class TestBasicBackup(unittest.TestCase):
         self.assertEqual(
             store._files[shadowroot + ('homedir', 'file.txt')],
             store._files[shadowroot + ('homedir', 'copy')])
+
+class TestTwoBackups(unittest.TestCase):
+    def setUp(self):
+        storetree = FakeDirectory()
+        self.storetree = storetree
+        sourcetree = FakeDirectory()
+        self.sourcetree = sourcetree
+        db = FakeDatabases()
+        self.db = db
+        bcfactory = backupcollection.BackupCollectionFactory(
+            storetree, ('path', 'to', 'store'))
+        bcfactory.set_database_opener(db.open)
+        bcfactory.set_database_creator(db.create)
+        bc = bcfactory.create_collection()
+
+        sourcetree._set_file(
+            ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')
+        sourcetree._set_file(
+            ('otherfile',), content=b'7029' * 1757 + b'7')
+        sourcetree._set_file(
+            ('home','me','deep','data'), content=b'5028' * 1257)
+        sourcetree._set_file(
+            ('4',), content=b'21516' * 4303 + b'2')
+        sourcetree._set_file(
+            ('copy',), content=b'127' * 42 + b'1')
+
+        backup = bc.start_backup(
+            datetime.datetime(2015, 2, 14, 19, 55, 32, 328629))
+        with backup:
+            cid = bc.add_content(
+                sourcetree, ('home', 'me', 'file.txt'),
+                now=datetime.datetime(2015, 2, 14, 19, 56, 7))
+            self.cid1 = cid
+            self.checksum1 = sourcetree._get_checksum(
+                ('home', 'me', 'file.txt'))
+            backup.add_file(
+                ('homedir', 'file.txt'), cid, 127,
+                datetime.datetime(2014, 9, 11, 9, 3, 54), 759831036)
+            cid = bc.add_content(sourcetree, ('otherfile',))
+            self.cid2 = cid
+            self.checksum2 = sourcetree._get_checksum(('otherfile',))
+            backup.add_file(
+                ('homedir', 'other.txt'), cid, 7029,
+                datetime.datetime(2015, 2, 1, 22, 43, 34), 51746409)
+            cid = bc.add_content(sourcetree, ('home', 'me', 'deep', 'data'))
+            self.cid3 = cid
+            backup.add_file(
+                ('outside', 'store', 'deep', 'data'), cid, 5028,
+                datetime.datetime(2014, 4, 21, 8, 29, 46), 826447)
+            cid = bc.add_content(sourcetree, ('4',))
+            self.cid4 = cid
+            backup.add_file(
+                ('toplevel',), cid, 21516,
+                datetime.datetime(2014, 10, 17, 15, 33, 2), 781606397)
+            cid = bc.add_content(sourcetree, ('copy',))
+            self.cid5 = cid
+            backup.add_file(
+                ('homedir', 'copy'), cid, 127,
+                datetime.datetime(2014, 9, 22, 2, 11, 1), 797641421)
+            backup.commit(datetime.datetime(2015, 2, 14, 19, 55, 54, 954321))
+
+        sourcetree._set_file(
+            ('home', 'me', 'newfile.txt'), content=b'New file!\n')
+        sourcetree._set_file(('copy',), content=b'Changed!\n')
+
+        backup = bc.start_backup(
+            datetime.datetime(2015, 4, 20, 17, 0, 22, 737955))
+        with backup:
+            cid = bc.add_content(
+                sourcetree, ('home', 'me', 'file.txt'),
+                now=datetime.datetime(2015, 4, 20, 17, 0, 24))
+            self.cid1b = cid
+            self.checksum1 = sourcetree._get_checksum(
+                ('home', 'me', 'file.txt'))
+            backup.add_file(
+                ('homedir', 'file.txt'), cid, 127,
+                datetime.datetime(2014, 9, 11, 9, 3, 54), 759831036)
+            cid = bc.add_content(sourcetree, ('otherfile',))
+            self.cid2b = cid
+            self.checksum2 = sourcetree._get_checksum(('otherfile',))
+            backup.add_file(
+                ('homedir', 'other.txt'), cid, 7029,
+                datetime.datetime(2015, 2, 1, 22, 43, 34), 51746409)
+            cid = bc.add_content(sourcetree, ('home', 'me', 'deep', 'data'))
+            self.cid3b = cid
+            backup.add_file(
+                ('outside', 'store', 'deep', 'data'), cid, 5028,
+                datetime.datetime(2014, 4, 21, 8, 29, 46), 826447)
+            cid = bc.add_content(sourcetree, ('4',))
+            self.cid4b = cid
+            backup.add_file(
+                ('toplevel',), cid, 21516,
+                datetime.datetime(2014, 10, 17, 15, 33, 2), 781606397)
+            cid = bc.add_content(sourcetree, ('copy',))
+            self.cid5b = cid
+            backup.add_file(
+                ('homedir', 'copy'), cid, 9,
+                datetime.datetime(2015, 3, 13, 5, 21, 52), 918249193)
+            cid = bc.add_content(
+                sourcetree, ('home', 'me', 'newfile.txt'),
+                now=datetime.datetime(2015, 4, 20, 17, 0, 27))
+            self.cid6b = cid
+            self.checksum1 = sourcetree._get_checksum(
+                ('home', 'me', 'newfile.txt'))
+            backup.add_file(
+                ('homedir', 'newfile.txt'), cid, 10,
+                datetime.datetime(2015, 3, 25, 6, 1, 4), 819205112)
+            backup.commit(datetime.datetime(2015, 4, 20, 17, 0, 30, 954887))
+
+        bcfactory = backupcollection.BackupCollectionFactory(
+            storetree, ('path', 'to', 'store'))
+        bcfactory.set_database_opener(db.open)
+        bcfactory.set_database_creator(db.create)
+        self.backupcollection = bcfactory.open_collection()
+
+    def test_backup_sequence(self):
+        backup = self.backupcollection.get_most_recent_backup()
+        self.assertNotEqual(None, backup)
+        self.assertEqual(
+            datetime.datetime(2015, 4, 20, 17, 0, 22, 737955),
+            backup.get_start_time())
+        oldest = self.backupcollection.get_oldest_backup()
+        self.assertEqual(
+            datetime.datetime(2015, 2, 14, 19, 55, 32, 328629),
+            oldest.get_start_time())
+        recent2 = self.backupcollection.get_most_recent_backup_before(
+            backup.get_start_time())
+        old2 = self.backupcollection.get_oldest_backup_after(
+            oldest.get_start_time())
+        self.assertEqual(backup.get_start_time(), old2.get_start_time())
+        self.assertEqual(oldest.get_start_time(), recent2.get_start_time())
+        self.assertEqual(
+            None,
+            self.backupcollection.get_most_recent_backup_before(
+                recent2.get_start_time()))
+        self.assertEqual(
+            None,
+            self.backupcollection.get_oldest_backup_after(
+                old2.get_start_time()))
 
 class TestSingleStuff(unittest.TestCase):
     def test_default_start_and_end_time(self):

@@ -122,12 +122,20 @@ class BackupCollection(object):
 
         If there is no suitable backup, None is returned.
         '''
+        info = self._db.get_most_recent_backup_before(when)
+        if info is None:
+            return None
+        return BackupData(self, info)
 
     def get_oldest_backup(self):
         '''Return a BackupData object for the most recently created backup.
 
         If there is no suitable backup, None is returned.
         '''
+        info = self._db.get_oldest_backup()
+        if info is None:
+            return None
+        return BackupData(self, info)
 
     def get_oldest_backup_after(self, when):
         '''Return a BackupData object for the most recently created backup
@@ -135,6 +143,10 @@ class BackupCollection(object):
 
         If there is no suitable backup, None is returned.
         '''
+        info = self._db.get_oldest_backup_after(when)
+        if info is None:
+            return None
+        return BackupData(self, info)
 
     def add_content(self, tree, path, now=None):
         '''Add the content at 'path' in 'tree' to the content store and return
