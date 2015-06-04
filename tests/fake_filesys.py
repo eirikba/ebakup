@@ -47,15 +47,30 @@ class FakeFileSystem(object):
         self._allow_access_for_path(path, 'read')
         self._allow_access_for_path(path, 'stat')
 
-    def _check_access(self, path, what):
+    def _is_access_allowed(self, path, what):
         path_access = self._access.get(path)
-        if path_access and what in path_access:
-            return
+        if path_access:
+            if 'no-' + what in path_access:
+                return False
+            if what in path_access:
+                return True
+        best = -1
+        allowed = False
         for tree in self._treeaccess:
-            if path[:len(tree)] == tree and what in self._treeaccess[tree]:
-                return
-        raise ForbiddenActionError(
-            'No ' + str(what) + ' access allowed for ' + str(path))
+            if len(tree) < best:
+                continue
+            if path[:len(tree)] == tree:
+                best = len(tree)
+                if 'no-' + what in self._treeaccess[tree]:
+                    allowed = False
+                if what in self._treeaccess[tree]:
+                    allowed = True
+        return allowed
+
+    def _check_access(self, path, what):
+        if not self._is_access_allowed(path, what):
+            raise ForbiddenActionError(
+                'No ' + str(what) + ' access allowed for ' + str(path))
 
     def _is_cheap_copy(self, path1, path2):
         file1 = self._paths.get(path1)
