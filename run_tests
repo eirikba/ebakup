@@ -62,6 +62,7 @@ expected_tests = set((
     'database_tests.TestWriteDatabase.test_read_data_from_database_being_created',
     'database_tests.TestWriteDatabase.test_add_data_with_same_checksum',
     'database_tests.TestWriteDatabase.test_database_with_multiple_backups',
+    'database_tests.TestWriteDatabase.test_new_database_with_a_few_files_has_small_data_files',
     'dbfile_tests.TestBrokenFiles.test_non_matching_checksum_of_data_block',
     'dbfile_tests.TestBrokenFiles.test_non_matching_checksum_of_settings_block',
     'dbfile_tests.TestInspectUnopenedSimpleDBFile.test_get_block_count',

@@ -440,6 +440,7 @@ class ContentInfoFile(object):
         done = 0
         while done < len(block) and block[done] != 0:
             if block[done] == 0xdd:
+                done += 1
                 cidlen, done = _parse_varuint(block, done)
                 cklen, done = _parse_varuint(block, done)
                 done += max(cidlen, cklen) + 8
@@ -450,6 +451,7 @@ class ContentInfoFile(object):
                     done += 9
             else:
                 raise NotTestedError('Unknown data entry')
+        assert done <= len(block)
         assert block[done:] == b'\x00' * (len(block) - done)
         return block[:done]
 
