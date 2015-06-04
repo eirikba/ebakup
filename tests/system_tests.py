@@ -85,11 +85,23 @@ class TestFullSequence(unittest.TestCase):
             ('home', 'me', 'tmp'), ('t.txt', 'info', 'experiment.py'),
             fileid_first=0)
         fs._make_files(
-            ('home', 'me'), ('tmp-data.txt', 'notes.txt'),
+            ('home', 'me'), ('tmp-data.txt',),
             fileid_first=10)
-        fs._make_files(
-            ('home', 'me', 'My Pictures'), ('DSC_1886.JPG', 'DSC_1903.JPG'),
-            fileid_first=20)
+        fs._add_file(
+            ('home', 'me', 'notes.txt'),
+            content=b'Some quick notes\n',
+            mtime=datetime.datetime(1994, 11, 28, 16, 48, 56),
+            mtime_ns=394323854)
+        fs._add_file(
+            ('home', 'me', 'My Pictures', 'DSC_1886.JPG'),
+            content=b'A photo!',
+            mtime=datetime.datetime(1994, 1, 17, 0, 12, 0),
+            mtime_ns=748391204)
+        fs._add_file(
+            ('home', 'me', 'My Pictures', 'DSC_1903.JPG'),
+            content=b'A different photo',
+            mtime=datetime.datetime(1994, 4, 5, 2, 36, 23),
+            mtime_ns=34763519)
         fs._make_files(
             ('home', 'me', '.cache', 'squiqqle'),
             ('aaaaaaaa', 'aaaaaaab', 'aaaaaaac', 'aaaaaaad'),
@@ -160,21 +172,22 @@ class TestFullSequence(unittest.TestCase):
             fs._paths[('backups', 'home', '1995', '01-01T00:00', 'notes.txt')],
             fs._paths[
                 ('backups', 'home', 'content',
-                 '97', '39', '321d6fc391193438e2a7ccd13'
-                 'ac22755da8cdaf5f12be2f3701e39d16919')])
+                 '3f', '32', '379fe4108e99279890faf4'
+                 '4a836c6ad836ad331ea276d0a4b7858437091a')])
         contentfiles = tuple(
             x[3:] for x in fs._paths if x[:3] == ('backups', 'home', 'content'))
         expected = set()
         expected.add(())
         for cid in (
-            '9739321d6fc391193438e2a7ccd13ac22755da8cdaf5f12be2f3701e39d16919',
-            '4642c7a122a9f1fd4f3af4e1e962373daa0163a9e2e35a245b5708af6ba38b26',
-            'adfb2d7bb19efaa5b74e6ab968d650f9a1f1bad26e39fd2ea0523c428d4b1f3b',
+            '3f32379fe4108e99279890faf44a836c6ad836ad331ea276d0a4b7858437091a',
+            '9a56e724abdbeafb3c206603f085d887323695e4cbfabedbb25597d5d43012e0',
+            '384d1cd1ecf7cbd6dfbd82894af0922bc113589d14d06c465eb145922ae00dd7',
             '9261f035a0e43e30550a73086daef1fb0bed7f6f7ee5f01b8c4862ae91c0de95',
             ):
             expected.add((cid[:2],))
             expected.add((cid[:2],cid[2:4]))
             expected.add((cid[:2],cid[2:4],cid[4:]))
+        self.maxDiff = None
         self.assertCountEqual(expected, contentfiles)
 
     def _check_db_after_initial_backup(self):
