@@ -133,6 +133,7 @@ class FakeFileSystem(object):
         target = self._paths.get(targetpath)
         if target is not None and target.is_directory:
             raise IsADirectory('Target is a directory: ' + str(targetpath))
+        self._make_directory(targetpath[:-1])
         self._paths[targetpath] = source
         del self._paths[sourcepath]
 
@@ -149,6 +150,7 @@ class FakeFileSystem(object):
             if target.is_directory:
                 raise IsADirectory('Target is a directory: ' + str(targetpath))
             raise FileExistsError('Target exists: ' + str(targetpath))
+        self._make_directory(targetpath[:-1])
         self._paths[targetpath] = source
         del self._paths[sourcepath]
 
@@ -165,6 +167,7 @@ class FakeFileSystem(object):
             if target.is_directory:
                 raise IsADirectory('Target is a directory: ' + str(targetpath))
             raise FileExistsError('Target exists: ' + str(targetpath))
+        self._make_directory(targetpath[:-1])
         self._paths[targetpath] = source
 
     def get_item_at_path(self, path):
