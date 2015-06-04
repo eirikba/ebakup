@@ -233,6 +233,8 @@ class FakeFileSystem(object):
         if mtime is not None:
             assert isinstance(mtime, datetime.datetime)
             if mtime_ns is not None:
+                if mtime.microsecond == 0:
+                    mtime = mtime.replace(microsecond=mtime_ns//1000)
                 assert mtime.microsecond == mtime_ns // 1000
             item.mtime = mtime
             if mtime_ns is None:
