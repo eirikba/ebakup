@@ -241,7 +241,7 @@ class FakeFileSystem(object):
                 assert mtime.microsecond == mtime_ns // 1000
             item.mtime = mtime
             if mtime_ns is None:
-                mtime_ns = 0
+                mtime_ns = mtime.microsecond * 1000
         if mtime_ns is not None:
             item.mtime_ns = mtime_ns
         self._paths[path] = item
