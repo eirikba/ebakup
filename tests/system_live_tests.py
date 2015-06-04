@@ -5,7 +5,9 @@
 
 import datetime
 import hashlib
+import io
 import os
+import re
 import shutil
 import textwrap
 import unittest
@@ -37,6 +39,7 @@ class TestBackup(unittest.TestCase):
         self._make_source_tree()
         self._make_config()
         factories = { '*': None, 'utcnow': self.utcnow }
+        self.factories = factories
         self.advance_utcnow(seconds=123)
         cli.main(
             ('--config', os.path.join(root_path, 'ebakup.config'),
@@ -44,6 +47,8 @@ class TestBackup(unittest.TestCase):
             factories=factories)
         self.advance_utcnow(seconds=160)
         self._check_first_backup_on_disk()
+        self.advance_utcnow(seconds=400)
+        self._check_first_backup_info()
         self.advance_utcnow(seconds=4000)
 
     def _make_source_tree(self):
@@ -116,6 +121,25 @@ class TestBackup(unittest.TestCase):
                 path, os.path.join(shadowpath, 'home', 'subdir', 'copy')))
         self.assertFalse(
             os.path.exists(os.path.join(shadowpath, 'home', 'tmp')))
+
+    def _check_first_backup_info(self):
+        out = io.StringIO()
+        cli.main(
+            ('--config', os.path.join(root_path, 'ebakup.config'),
+             'info'),
+            factories=self.factories, stdoutfile=out)
+        info = out.getvalue()
+        self.assertNotIn('local:/path/to/testbakup/', info)
+        match = re.search('local:/[^\n]*/DELETEME_testebakup/', info)
+        basepath = match.group(0)
+        info = info.replace(basepath, 'local:/path/to/testbakup/')
+        self.assertEqual(textwrap.dedent('''\
+            Backup definitions:
+              backup home
+                collection local:/path/to/testbakup/backup
+                source local:/path/to/testbakup/sources
+            '''),
+        info)
 
 @unittest.skipUnless(
     tests.settings.run_live_tests,

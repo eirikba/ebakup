@@ -6,9 +6,16 @@ class Logger(object):
     def __init__(self):
         self.raw_log = []
         self._utcnow = datetime.datetime.utcnow
+        self._outfile = None
 
     def set_utcnow(self, utcnow):
         self._utcnow = utcnow
+
+    def set_outfile(self, outfile):
+        '''The file object where direct output is sent. Defaults to standard
+        output.
+        '''
+        self._outfile = outfile
 
     # Log severities.
     # DO NOT DEPEND ON NUMERICAL VALUES!
@@ -37,6 +44,14 @@ class Logger(object):
 
     def replay_log(self, receiver):
         receiver.raw_log += self.raw_log
+
+    def print(self, msg):
+        '''Display 'msg' to the user.
+        '''
+        if self._outfile is None:
+            print(msg)
+        else:
+            print(msg, file=self._outfile)
 
 class LogItem(object):
     def __init__(self, when, severity, what, which, comment):

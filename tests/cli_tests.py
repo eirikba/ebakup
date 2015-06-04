@@ -25,6 +25,10 @@ class TestSimpleStuff(unittest.TestCase):
             ('--config', '/home/me/ebakup.config', 'backup', 'home'))
         self.assertEqual(('home', 'me', 'ebakup.config'), args.config)
 
+    def test_commandline_info(self):
+        args = self._parse_commandline(('info',))
+        self.assertEqual('info', args.command)
+
     def _parse_commandline(self, cmdline):
         stdout = io.StringIO()
         try:

@@ -42,6 +42,7 @@ expected_tests = set((
     'backupoperation_tests.TestTwoBackups.test_files_are_backed_up_with_correct_metadata_2',
     'cli_tests.TestSimpleStuff.test_commandline_backup',
     'cli_tests.TestSimpleStuff.test_commandline_config',
+    'cli_tests.TestSimpleStuff.test_commandline_info',
     'cli_tests.TestSimpleStuff.test_empty_commandline',
     'config_tests.TestFullConfig.test_backup_main_exists',
     'config_tests.TestFullConfig.test_path_handlers',
@@ -165,6 +166,10 @@ expected_tests = set((
     'task_backup_tests.TestSimpleBackup.test_backup_performed',
     'task_backup_tests.TestSimpleBackup.test_backup_performed_to_existing_collection',
     'task_backup_tests.TestSimpleBackup.test_backup_to_collection_with_correct_path',
+    'task_info_tests.TestInfoForEmptyConfig.test_output',
+    'task_info_tests.TestInfoForFullConfig.test_backup_mine_is_correct',
+    'task_info_tests.TestInfoForFullConfig.test_configured_backups_are_listed',
+    'task_info_tests.TestInfoForFullConfig.test_toplevel_blocks',
 ))
 expected_test_count = len(expected_tests)
 

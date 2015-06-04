@@ -56,6 +56,9 @@ class Config(object):
             if backup.name == name:
                 return backup
 
+    def get_all_backup_names(self):
+        return tuple(x.name for x in self.backups)
+
 class ConfigData(object):
     def __init__(self, data):
         self.data = data

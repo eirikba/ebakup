@@ -13,6 +13,7 @@ import logger
 
 from config import Config
 from task_backup import BackupTask
+from task_info import InfoTask
 
 class UnknownCommandError(Exception): pass
 
@@ -20,6 +21,8 @@ def main(commandline=None, stdoutfile=None, factories=None):
     args = parse_commandline(commandline, stdoutfile)
     args.factories = create_factories(factories)
     args.logger = logger.Logger()
+    if stdoutfile is not None:
+        args.logger.set_outfile(stdoutfile)
     tasks = make_tasks_from_args(args)
     perform_tasks(tasks)
 
@@ -44,8 +47,11 @@ def parse_commandline(commandline=None, msgfile=None):
         '--create', action='store_true',
         help='Create the backup collection before starting the backup')
     backupparser.add_argument('backups', nargs='+', help='Which backups to run')
+    infoparser = subparsers.add_parser(
+        'info', help='Display information about the state of the backups')
     if msgfile is not None:
         backupparser._overridden_output_file = msgfile
+        infoparser._overridden_output_file = msgfile
     if commandline is None:
         args = parser.parse_args()
     else:
@@ -102,6 +108,9 @@ def make_tasks_from_args(args):
     tasks = []
     if args.command == 'backup':
         task = BackupTask(config, args)
+        tasks.append(task)
+    elif args.command == 'info':
+        task = InfoTask(config, args)
         tasks.append(task)
     else:
         raise UnknownCommandError('Unknown command: ' + args.command)
