@@ -53,9 +53,13 @@ class LocalFileSystem(object):
         dirs = []
         files = []
         for name in names:
-            if os.path.isdir(os.path.join(stringpath, name)):
+            itempath = os.path.join(stringpath, name)
+            if os.path.islink(itempath):
+                # Ignoring symlinks is probably OK, but not optimal
+                pass
+            elif os.path.isdir(itempath):
                 dirs.append(name)
-            elif os.path.isfile(os.path.join(stringpath, name)):
+            elif os.path.isfile(itempath):
                 files.append(name)
             else:
                 raise AssertionError('Neither file nor directory: ' + name)
