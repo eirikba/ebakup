@@ -316,7 +316,7 @@ class ContentInfoFile(object):
         self._read_file()
 
     def _read_file(self):
-        self.contentdata = {}
+        self.contentdata = ContentInfoDict()
         with self._dbfile.open_for_reading():
             if self._dbfile.get_magic() != b'ebakup content data':
                 raise NotTestedError(
@@ -455,6 +455,24 @@ class ContentInfoFile(object):
         assert block[done:] == b'\x00' * (len(block) - done)
         return block[:done]
 
+class ContentInfoDict(object):
+    def __init__(self):
+        self._infos = {}
+
+    def __getitem__(self, key):
+        return self._infos[key]
+
+    def __setitem__(self, key, value):
+        self._infos[key] = value
+
+    def __contains__(self, key):
+        return key in self._infos
+
+    def get(self, key, default=None):
+        return self._infos.get(key, default)
+
+    def values(self):
+        return self._infos.values()
 
 class ContentInfo(object):
     def __init__(self, db, data):
