@@ -1,3 +1,53 @@
+Other performance ideas?
+
+Maybe using multiple threads to read data? This would eliminate the
+wait between read commands and could also provide the scheduler with
+more options to read more efficiently. (When backing up lots of small
+files that already have duplicates in the content store, it seems
+there are read() calls that are by far the most expensive ones,
+leaving the program running almost entirely in iowait.)
+
+---------------------------------------------------------------------------
+
+Handle failed backups
+
+If a backup does not complete correctly, there will/may be some cruft
+left behind. Particularly after other improvements (such as "buffer
+database changes").
+
+- Temporary files that haven't been deleted.
+  - Temporary add-to-content-store file
+  - Backup database ".new" file
+  - Half-done shadow tree
+- Files in the content store that aren't listed in the content db
+- Shadow trees that are missing their backup database
+
+---------------------------------------------------------------------------
+
+Avoid writing "small" duplicate files to disk needlessly
+
+Currently the code writes every file to a temporary file before
+checking whether the file already exists. I should have a moderately
+large buffer (100MiB?) and any file smaller than that should just be
+read into that buffer so I can check whether it already exists in the
+content store before writing.
+
+Actually, reading twice may be better than writing during the first
+read, as the second read is likely to be filled from the OS's disk
+cache.
+
+---------------------------------------------------------------------------
+
+Buffer database changes
+
+Instead of writing every change to the database as they are made, I
+could buffer up a bunch of changes and write them together. Probably
+the best solution here would be to have some in-memory storage of the
+data not yet written, and then have a background thread that wakes up
+every 5 minutes and writes any buffered data to disk.
+
+---------------------------------------------------------------------------
+
 Handle special files
 
 Symlinks are currently ignored. That's probably not optimal. Maybe
