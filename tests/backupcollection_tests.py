@@ -223,6 +223,7 @@ class FakeDatabase(object):
         altcount = 0
         while content_id in self._content:
             content_id = content_id_base + str(altcount).encode('utf8')
+            altcount += 1
         self._content[content_id] = FakeContentInfo(content_id, when, checksum)
         return content_id
 
