@@ -165,25 +165,61 @@ class BackupCollection(object):
         size = source.get_size()
         done = 0
         written = 0
-        read_size = 1024 * 1024 * 10
+        read_size = 1024 * 1024 * 100
+        data = b''
         with target:
             with source:
                 while done < size:
                     data = source.get_data_slice(done, done + read_size)
                     done += len(data)
                     checksummer.update(data)
-                    written = target.write_data_slice(written, data)
+                    if done < size:
+                        written = target.write_data_slice(written, data)
             checksum = checksummer.digest()
-            content_id = self._find_duplicate_content(target, checksum)
+            assert len(data) == done or written == size
+            assert written == 0 or written == size
+            if len(data) == done:
+                content_id = self._find_duplicate_content_of_data(
+                    data, checksum)
+            elif written == size:
+                content_id = self._find_duplicate_content_of_file(
+                    target, checksum)
+            else:
+                raise AssertionError('Neither file nor data complete!')
             if content_id:
                 return content_id
+            if written == 0 and data:
+                written = target.write_data_slice(0, data)
+            assert written == size
             content_id = self._db.add_content_item(now, checksum)
             target_path = self._make_path_from_content_id(content_id)
             target.rename_without_overwrite_on_close(
                 self._tree, self._path + ('content',) + target_path)
         return content_id
 
-    def _find_duplicate_content(self, datafile, checksum):
+    def _find_duplicate_content_of_data(self, data, checksum):
+        read_size = 1024 * 1024 * 10
+        datalen = len(data)
+        for cand in self._db.get_all_content_infos_with_checksum(checksum):
+            candpath = self._make_path_from_content_id(cand.get_content_id())
+            with self._tree.get_item_at_path(
+                    self._path + ('content',) + candpath) as candfile:
+                if candfile.get_size() != datalen:
+                    continue
+                done = 0
+                ok = True
+                while done < datalen:
+                    dataslice = data[done:done+read_size]
+                    candslice = candfile.get_data_slice(done, done + read_size)
+                    done += len(dataslice)
+                    if dataslice != candslice:
+                        done = datalen
+                        ok = False
+                if ok:
+                    return cand.get_content_id()
+        return None
+
+    def _find_duplicate_content_of_file(self, datafile, checksum):
         read_size = 1024 * 1024 * 10
         datalen = datafile.get_size()
         for cand in self._db.get_all_content_infos_with_checksum(checksum):
