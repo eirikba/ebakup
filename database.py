@@ -94,15 +94,12 @@ def _make_mtime_with_nsec(mtime, nsec):
     return bytes(data)
 
 def _bytes_to_path_component(component):
-    try:
-        return component.decode('utf-8')
-    except UnicodeDecodeError:
-        return component
+    return component.decode('utf-8', errors='surrogateescape')
 
 def _path_component_to_bytes(component):
     if isinstance(component, bytes):
         return component
-    return component.encode('utf-8')
+    return component.encode('utf-8', errors='surrogateescape')
 
 class Database(object):
     def __init__(self, directory, path):

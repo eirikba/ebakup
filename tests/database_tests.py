@@ -755,3 +755,52 @@ class TestWriteDatabase(unittest.TestCase):
         backup = db.get_oldest_backup_after(
             datetime.datetime(2066, 8, 30, 4, 30, 0))
         self.assertEqual(None, backup)
+
+    def test_invalid_utf8_in_file_names(self):
+        tree = FakeDirectory()
+        db = self.create_empty_database(tree, ('path', 'to', 'db'))
+        self.allow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+        backup = db.start_backup(datetime.datetime(2015, 4, 14, 21, 36, 12))
+        # This is how python decodes file names to strings
+        test_filename = b'INVUTF8:ab\xddcd'.decode(
+            'utf-8', errors='surrogateescape')
+        test_dirname = b'INVUTF8:vx\xeeyz'.decode(
+            'utf-8', errors='surrogateescape')
+        with backup:
+            tree._allow_modification(('path', 'to', 'db', 'content'))
+            cid = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
+            backup.add_file(
+                ('home', 'me', 'important', test_filename),
+                cid, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
+            cid = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 38), b'02' + b'0' * 30)
+            backup.add_file(
+                ('home', 'me', test_dirname, 'other.txt'),
+                cid, 2323, datetime.datetime(2014, 5, 5, 19, 23, 2), 0)
+            cid = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 39), b'03' + b'0' * 30)
+            backup.add_file(
+                ('toplevel',),
+                cid, 2323, datetime.datetime(2015, 4, 13, 13, 0, 0), 397261917)
+            tree._disallow_modification(('path', 'to', 'db', 'content'))
+            backup.commit(datetime.datetime(2015, 4, 14, 21, 36, 41))
+        self.disallow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+        self.assertIn(
+            b'\x0dINVUTF8:ab\xddcd\x20',
+            tree._files[('path', 'to', 'db', '2015', '04-14T21:36')].content)
+        self.assertIn(
+            b'\x0dINVUTF8:vx\xeeyz',
+            tree._files[('path', 'to', 'db', '2015', '04-14T21:36')].content)
+        bk = db.get_most_recent_backup()
+        self.assertCountEqual(
+            (test_filename,),
+            bk.get_directory_listing(('home', 'me', 'important'))[1])
+        self.assertCountEqual(
+            ('important', test_dirname),
+            bk.get_directory_listing(('home', 'me'))[0])
+        self.assertCountEqual(
+            ('other.txt',),
+            bk.get_directory_listing(('home', 'me', test_dirname))[1])
