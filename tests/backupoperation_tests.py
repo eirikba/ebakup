@@ -81,6 +81,10 @@ class FakeTree(object):
     def _copy_tree(self, other):
         self._files.update(other._files)
 
+    def _copy_tree_with_new_objects(self, other):
+        for path, item in other._files.items():
+            self._files[path] = FakeFile(item._fileid)
+
     def _add_files(self, folder, files):
         global filenum
         for name in files:
@@ -109,11 +113,16 @@ class FakeFile(object):
     def __init__(self, fileid):
         self._fileid = fileid
         self._overrides = {}
+        self._access = {}
+
+    def _register_access(self, what):
+        self._access[what] = self._access.get(what, 0) + 1
 
     def _get_content(self):
         '''Not really the actual content. Rather, a short bytes object that
         uniquely identifies the actual content of this file.
         '''
+        self._register_access('content')
         override = self._overrides.get('content')
         if override is not None:
             return override
@@ -130,9 +139,11 @@ class FakeFile(object):
         filenum += 1
 
     def get_size(self):
+        self._register_access('size')
         return self._fileid * 3 + 7
 
     def get_mtime(self):
+        self._register_access('mtime')
         mtime = (datetime.datetime(2015, 2, 14) +
                  datetime.timedelta(seconds=self._fileid))
         nanosecond = (999999960 + self._fileid * 7) % 1000000000
@@ -568,7 +579,7 @@ class TestTwoBackups(unittest.TestCase):
         self.backupoperation2 = bo
         sourcetree2 = FakeTree()
         self.sourcetree2 = sourcetree2
-        sourcetree2._copy_tree(sourcetree)
+        sourcetree2._copy_tree_with_new_objects(sourcetree)
         del sourcetree2._files[('home', 'me', 'myfiles', 'more data')]
         sourcetree2._add_files(('home', 'me', 'myfiles'), ('new file',))
         sourcetree2._add_files(('home', 'me', 'new dir'), ('new file',))
@@ -728,3 +739,21 @@ class TestTwoBackups(unittest.TestCase):
                 mtime_ns, bkfile[3],
                 msg='mtime_ns mismatch for ' + str(totest))
         self.assertNoLoggedProblems()
+
+    def test_second_backup_does_not_open_unchanged_files(self):
+        unchanged = (
+            ('home', 'me', 'myfiles', 'file.txt'),
+            ('home', 'me', 'myfiles', 'goodstuff'),
+            ('home', 'me', 'myfiles', 'static', 'one'),
+            ('home', 'me', 'myfiles', 'static', 'two'),
+            ('home', 'me', 'myfiles', 'static', 'more', 'three'),
+            ('home', 'me', 'myfiles', 'static', 'more', 'four'),
+            ('home', 'me', 'tmp', 'stuff'),
+            ('home', 'me', 'toplevel'),
+            )
+        changed = ('home', 'me', 'myfiles', 'new file')
+        f = self.sourcetree2.get_item_at_path(changed)
+        self.assertLess(0, f._access.get('content', 0))
+        for totest in unchanged:
+            f = self.sourcetree2.get_item_at_path(totest)
+            self.assertEqual(None, f._access.get('content'), msg=totest)
