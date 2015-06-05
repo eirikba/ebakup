@@ -53,7 +53,7 @@ class FakeBackupBuilder(object):
             content_id, size, mtime, mtime_ns)
 
 FakeBackupFileInfo = collections.namedtuple(
-    'FakeBackupFileInfo', ('contentid', 'size', 'mtime', 'mtime_ns'))
+    'FakeBackupFileInfo', ('contentid', 'size', 'mtime', 'mtime_nsec'))
 class FakeBackup(object):
     def __init__(self):
         self._files = {} # { path: FakeBackupFileInfo }

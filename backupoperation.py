@@ -76,7 +76,7 @@ class BackupOperation(object):
         mtime, mtime_ns = sourcefile.get_mtime()
         if (sourcefile.get_size() == oldinfo.size and
                 mtime == oldinfo.mtime and
-                mtime_ns == oldinfo.mtime_ns):
+                mtime_ns == oldinfo.mtime_nsec):
             return oldinfo.contentid
         return None
 
