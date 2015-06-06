@@ -5,7 +5,15 @@ wait between read commands and could also provide the scheduler with
 more options to read more efficiently. (When backing up lots of small
 files that already have duplicates in the content store, it seems
 there are read() calls that are by far the most expensive ones,
-leaving the program running almost entirely in iowait.)
+leaving the program running almost entirely in iowait.) A quick test
+application that only reads files without doing anything else seems to
+have around 2x speedup with this trick (when using around 10 threads).
+
+Try to read files in disk allocation order. Don't know how to figure
+that out, but sorting on inode order could be a good approximation.
+Same test application as above gave more than 10 times speedup with
+this trick (well, sorting on name in this case).
+
 
 ---------------------------------------------------------------------------
 
