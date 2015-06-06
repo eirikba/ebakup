@@ -87,7 +87,7 @@ Files
 <filename> = <namelength> octets
 <contentid> = <cidlength> octets
 <size> = continued high bit little endian unsigned integer
-<mtime> = <seconds> <nanoseconds>
+<mtime> = <year> <second> <nanosecond>
 
 Each of these entries describe one file that was backed
 up. <dirparent> indicates which directory the file lives in, again
@@ -99,26 +99,32 @@ file name using utf-8.
 storage. Also, due to the way content ids are constructed, it doubles
 as a checksum of the file's content.
 
-<mtime> consists of a seconds-after-epoch part and a nanoseconds
-part. The <seconds> is the standard unix time stamp. It is converted
-to a date and time by assuming that all minutes have 60 seconds, all
-hours have 60 minutes, all days have 24 hours and all months have the
-familiar number of days. Including the leap days as defined by the
-gregorian calendar (every 4 years except every 100 years but again
-every 400 years). And 0 is at midnight at the beginning of 1970-01-01
-UTC. <nanoseconds> is quite simply a number between 0 and 999999999
-inclusive.
+<mtime> consists of a year, a second-of-the-year part and a nanosecond
+part. The <second> value assumes that all minutes have 60 seconds, all
+hours have 60 minutes, and all days have 24 hours and all non-leap
+years have 365 days, and all leap years have 366 days. Leap years are
+those where <year> is divisible by 4, except when <year> is divisible
+by 100, but again when <year> is divisible by 400. So a leap year has
+exactly 31622400 seconds, and a non-leap year exactly 31536000
+seconds.
 
-<seconds> and <nanoseconds> together make up 8 octets. The first 4
-octets and the 2 high bits of the 5th octet is a little-endian
-unsigned integer giving <seconds> and the rest is a little-endian
-unsigned integer giving <nanoseconds>. Any time that is
-unrepresentable or unknown or otherwise problematic should be set as
-all 0 (i.e. 1970-01-01T00:00:00).
+Turning second-of-year into a month, day, hour, minute and second
+structure should then be obvious.
 
-This means that time stamps are limited to be between 1970 and 2514
-(if I didn't mess up the calculation), which should be sufficient for
-my limited use.
+<nanosecond> is just a value in the range 0-999999999, giving the
+nanosecond part of the time stamp.
+
+<year>, <second> and <nanosecond> together make up 9 octets. The
+first 2 octets make up the year as a little-endian unsigned integer
+(1-65535). the next 3 octets and the high bit of the sixth octet is a
+little-endian unsigned integer giving the second of the year. And the
+low 6 bits of the sixth octet and the last 3 octets is a little-endian
+unsigned integer giving the nanosecond. Any time that is
+unrepresentable or unknown or otherwise problematic should have all 9
+octets 0. The year can not be 0 except for this particular case.
+
+This should mean that time stamps are limited to be somewhere in the
+years from 1 to 65535, which should be sufficient for my limited use.
 
 When writing these values it is important to use the correct
 <mtime>. If there is doubt as to what the correct <mtime> value is for

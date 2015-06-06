@@ -31,16 +31,16 @@ class TestSimpleDatabase(unittest.TestCase):
             b'\x91\x09\x04file\x20'
             b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
             b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^'
-            b'\xaa\x3d\x42\x2e\xe7\x54\x30\x23\x7e\xb6'
+            b'\xaa\x3d\xdf\x07\x42\xa0\x42\x30\x23\x7e\xb6'
             # ^ size: 7850, mtime: 2015-02-20 12:53:22.76543
             b'\x91\x00\x04file\x20'
             b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
             b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde'
-            b'\x17\xa0\x02\xed\x51\x00\x00\x00\x00' +
+            b'\x17\xdd\x07\xa0\xdb\x0a\x80\x00\x00\x00' +
             # ^ size: 23, mtime: 2013-07-22 10:00:00.0
-            b'\x00' * 3951 +
-            b' ur3\xe3\xa7\xe9\xceW\xc5x\x871\xd67\xce\x1c\x96\x96'
-            b'\x0f\xb7,1\x9eOd\x7fg\xe7\x07X\xfe')
+            b'\x00' * 3949 +
+            b'H\x15XVH\x9aJ\x019\x0e\xe8\x93%\xa7\xa4A\xaf*'
+            b'\xdb\\oqU\x8eGHmxv\xc9\xdb\x15')
         d._add_file(
             ('db', 'content'),
             b'ebakup content data\n' +
@@ -279,14 +279,14 @@ class TestSimpleDatabase(unittest.TestCase):
                     b'\x91\x09\x04file\x20'
                     b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
                     b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^'
-                    b'\xaa\x3d\x42\x2e\xe7\x54\x30\x23\x7e\xb6' # size: 7850, mtime: 2015-02-20 12:53:22.76543
+                    b'\xaa\x3d\xdf\x07\x42\xa0\x42\x30\x23\x7e\xb6' # size: 7850, mtime: 2015-02-20 12:53:22.76543
                     b'\x91\x00\x04file\x20'
                     b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
                     b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde'
-                    b'\x17\xa0\x02\xed\x51\x00\x00\x00\x00' # size: 23, mtime: 2013-07-22 10:00:00.0
-                    + b'\x00' * 3951 +
-                    b' ur3\xe3\xa7\xe9\xceW\xc5x\x871\xd67\xce\x1c\x96\x96'
-                    b'\x0f\xb7,1\x9eOd\x7fg\xe7\x07X\xfe'
+                    b'\x17\xdd\x07\xa0\xdb\x0a\x80\x00\x00\x00' # size: 23, mtime: 2013-07-22 10:00:00.0
+                    + b'\x00' * 3949 +
+                    b'H\x15XVH\x9aJ\x019\x0e\xe8\x93%\xa7\xa4A\xaf*'
+                    b'\xdb\\oqU\x8eGHmxv\xc9\xdb\x15'
                     )
         d._add_file(('db', 'content'),
             b'ebakup content data\n' +
@@ -804,3 +804,149 @@ class TestWriteDatabase(unittest.TestCase):
         self.assertCountEqual(
             ('other.txt',),
             bk.get_directory_listing(('home', 'me', test_dirname))[1])
+
+    def test_various_timestamps_for_mtime(self):
+        tree = FakeDirectory()
+        db = self.create_empty_database(tree, ('path', 'to', 'db'))
+        self.allow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+        backup = db.start_backup(datetime.datetime(2015, 4, 14, 21, 36, 12))
+        with backup:
+            tree._allow_modification(('path', 'to', 'db', 'content'))
+            cid = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
+            tree._disallow_modification(('path', 'to', 'db', 'content'))
+            backup.add_file(
+                ('file1',),
+                cid, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
+            backup.add_file(
+                ('file2',),
+                cid, 111, datetime.datetime(2014, 1, 12, 11, 9, 15), 682246552)
+            backup.add_file(
+                ('file3',),
+                cid, 111, datetime.datetime(2014, 2, 28, 11, 9, 15), 0)
+            backup.add_file(
+                ('file4',),
+                cid, 111, datetime.datetime(2014, 3, 1, 11, 9, 15), 0)
+            backup.add_file(
+                ('file5',),
+                cid, 111, datetime.datetime(2012, 2, 28, 11, 9, 15), 0)
+            backup.add_file(
+                ('file6',),
+                cid, 111, datetime.datetime(2012, 2, 29, 11, 9, 15), 0)
+            backup.add_file(
+                ('file7',),
+                cid, 111, datetime.datetime(2012, 3, 1, 11, 9, 15), 0)
+            backup.commit(datetime.datetime(2015, 4, 14, 21, 36, 41))
+        self.disallow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+        self.assertIn(
+            b'\x05file1\x20' + cid + b'\x6f'
+            b'\xde\x07\xdb\x79\x4f\x80\x00\x00\x00',
+            tree._files[('path', 'to', 'db', '2015', '04-14T21:36')].content)
+        self.assertIn(
+            b'\x05file2\x20' + cid + b'\x6f'
+            b'\xde\x07\x5b\x1d\x0f\x18\x06\xa9\xa2',
+            tree._files[('path', 'to', 'db', '2015', '04-14T21:36')].content)
+        self.assertIn(
+            b'\x05file3\x20' + cid + b'\x6f'
+            b'\xde\x07\xdb\x13\x4d\x00\x00\x00\x00',
+            tree._files[('path', 'to', 'db', '2015', '04-14T21:36')].content)
+        self.assertIn(
+            b'\x05file4\x20' + cid + b'\x6f'
+            b'\xde\x07\x5b\x65\x4e\x00\x00\x00\x00',
+            tree._files[('path', 'to', 'db', '2015', '04-14T21:36')].content)
+        self.assertIn(
+            b'\x05file5\x20' + cid + b'\x6f'
+            b'\xdc\x07\xdb\x13\x4d\x00\x00\x00\x00',
+            tree._files[('path', 'to', 'db', '2015', '04-14T21:36')].content)
+        self.assertIn(
+            b'\x05file6\x20' + cid + b'\x6f'
+            b'\xdc\x07\x5b\x65\x4e\x00\x00\x00\x00',
+            tree._files[('path', 'to', 'db', '2015', '04-14T21:36')].content)
+        self.assertIn(
+            b'\x05file7\x20' + cid + b'\x6f'
+            b'\xdc\x07\xdb\xb6\x4f\x00\x00\x00\x00',
+            tree._files[('path', 'to', 'db', '2015', '04-14T21:36')].content)
+        bk = db.get_most_recent_backup()
+        self.assertEqual(
+            datetime.datetime(2015, 4, 14, 21, 36, 12), bk.get_start_time())
+        tests = (
+            (('file1',), datetime.datetime(2014, 9, 12, 11, 9, 15), 0),
+            (('file2',), datetime.datetime(2014, 1, 12, 11, 9, 15), 682246552),
+            (('file3',), datetime.datetime(2014, 2, 28, 11, 9, 15), 0),
+            (('file4',), datetime.datetime(2014, 3, 1, 11, 9, 15), 0),
+            (('file5',), datetime.datetime(2012, 2, 28, 11, 9, 15), 0),
+            (('file6',), datetime.datetime(2012, 2, 29, 11, 9, 15), 0),
+            (('file7',), datetime.datetime(2012, 3, 1, 11, 9, 15), 0),
+        )
+        for test in tests:
+            f = bk.get_file_info(test[0])
+            self.assertEqual(test[1], f.mtime)
+            self.assertEqual(test[2], f.mtime_nsec)
+
+class TestDBUtils(unittest.TestCase):
+    def test_mtime_to_db_codec(self):
+        encode = database._make_mtime_with_nsec
+        decode = lambda x: database._parse_mtime(x, 0)
+        pairs = (
+            (b'\x01\x00\x00\x00\x00\x00\x00\x00\x00',
+             datetime.datetime(1, 1, 1, 0, 0, 0), 0),
+            (b'\x01\x00\x01\x00\x00\x00\x00\x00\x00',
+             datetime.datetime(1, 1, 1, 0, 0, 1), 0),
+            (b'\x01\x00\x3c\x00\x00\x00\x00\x00\x00',
+             datetime.datetime(1, 1, 1, 0, 1, 0), 0),
+            (b'\x01\x00\x10\x0e\x00\x00\x00\x00\x00',
+             datetime.datetime(1, 1, 1, 1, 0, 0), 0),
+            (b'\x01\x00\x80\x51\x01\x00\x00\x00\x00',
+             datetime.datetime(1, 1, 2, 0, 0, 0), 0),
+            (b'\x01\x00\x00\x8d\x27\x00\x00\x00\x00',
+             datetime.datetime(1, 1, 31, 0, 0, 0), 0),
+            (b'\x01\x00\x80\xde\x28\x00\x00\x00\x00',
+             datetime.datetime(1, 2, 1, 0, 0, 0), 0),
+            (b'\x01\x00\x80\x25\x4b\x00\x00\x00\x00',
+             datetime.datetime(1, 2, 27, 0, 0, 0), 0),
+            (b'\x01\x00\x00\x77\x4c\x00\x00\x00\x00',
+             datetime.datetime(1, 2, 28, 0, 0, 0), 0),
+            (b'\x01\x00\x80\xc8\x4d\x00\x00\x00\x00',
+             datetime.datetime(1, 3, 1, 0, 0, 0), 0),
+            (b'\x01\x00\x00\x00\x00\x01\x00\x00\x00',
+             datetime.datetime(1, 1, 1, 0, 0, 0), 1),
+            (b'\x01\x00\x00\x00\x00\x3f\x00\x00\x00',
+             datetime.datetime(1, 1, 1, 0, 0, 0), 63),
+            (b'\x01\x00\x00\x00\x00\x00\x01\x00\x00',
+             datetime.datetime(1, 1, 1, 0, 0, 0), 64),
+            (b'\x01\x00\x00\x00\x00\x00\x20\x00\x00',
+             datetime.datetime(1, 1, 1, 0, 0, 0), 1<<11),
+            (b'\x01\x00\x00\x00\x00\x00\x80\x00\x00',
+             datetime.datetime(1, 1, 1, 0, 0, 0), 1<<13),
+            (b'\x01\x00\x00\x00\x00\x00\x00\x01\x00',
+             datetime.datetime(1, 1, 1, 0, 0, 0), 1<<14),
+            (b'\x01\x00\x00\x00\x00\x00\x00\x80\x00',
+             datetime.datetime(1, 1, 1, 0, 0, 0), 1<<21),
+            (b'\x01\x00\x00\x00\x00\x00\x00\x00\x01',
+             datetime.datetime(1, 1, 1, 0, 0, 0), 1<<22),
+            (b'\x01\x00\x00\x00\x00\x00\x00\x00\x40',
+             datetime.datetime(1, 1, 1, 0, 0, 0), 1<<28),
+            (b'\x01\x00\x00\x00\x00\x00\x00\x00\x80',
+             datetime.datetime(1, 1, 1, 0, 0, 0), 1<<29),
+        )
+        for pair in pairs:
+            self.assertEqual(pair[0], encode(pair[1], pair[2]))
+            self.assertEqual((pair[1], pair[2]), decode(pair[0]))
+        mtime = datetime.datetime(2015, 1, 1, 12, 42, 18)
+        nsec = 249778391
+        encoded = encode(mtime, nsec)
+        self.assertEqual((mtime, nsec), decode(encoded))
+        mtime = datetime.datetime(2012, 1, 1, 12, 42, 18)
+        nsec = 249778391
+        encoded = encode(mtime, nsec)
+        self.assertEqual((mtime, nsec), decode(encoded))
+        mtime = datetime.datetime(2015, 6, 6, 12, 42, 18)
+        nsec = 249778391
+        encoded = encode(mtime, nsec)
+        self.assertEqual((mtime, nsec), decode(encoded))
+        mtime = datetime.datetime(2012, 6, 6, 12, 42, 18)
+        nsec = 249778391
+        encoded = encode(mtime, nsec)
+        self.assertEqual((mtime, nsec), decode(encoded))
