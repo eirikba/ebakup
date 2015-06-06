@@ -1,3 +1,7 @@
+Handle files that change during backup
+
+---------------------------------------------------------------------------
+
 Other performance ideas?
 
 Maybe using multiple threads to read data? This would eliminate the
