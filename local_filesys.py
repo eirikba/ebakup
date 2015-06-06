@@ -61,13 +61,15 @@ class LocalFileSystem(object):
             elif stat.S_ISDIR(st.st_mode):
                 dirs.append(name)
             elif stat.S_ISREG(st.st_mode):
-                files.append(name)
+                files.append((st.st_ino, name))
             elif stat.S_ISSOCK(st.st_mode) or stat.S_ISFIFO(st.st_mode):
                 # Ignore other special files.
                 # Currently assuming no device files appears.
                 pass
             else:
                 raise AssertionError('Neither file nor directory: ' + name)
+        files.sort()
+        files = tuple(x[1] for x in files)
         return dirs, files
 
     def create_directory(self, path):
