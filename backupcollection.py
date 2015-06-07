@@ -173,7 +173,7 @@ class BackupCollection(object):
                     data = source.get_data_slice(done, done + read_size)
                     done += len(data)
                     checksummer.update(data)
-                    if done < size:
+                    if done < size or written > 0:
                         written = target.write_data_slice(written, data)
             checksum = checksummer.digest()
             assert len(data) == done or written == size
