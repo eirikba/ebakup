@@ -176,9 +176,9 @@ class BackupCollection(object):
                     if done < size or written > 0:
                         written = target.write_data_slice(written, data)
             checksum = checksummer.digest()
-            assert len(data) == done or written == size
+            assert len(data) == size or written == size
             assert written == 0 or written == size
-            if len(data) == done:
+            if len(data) == size:
                 content_id = self._find_duplicate_content_of_data(
                     data, checksum)
             elif written == size:
