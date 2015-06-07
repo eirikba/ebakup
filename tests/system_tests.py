@@ -79,6 +79,12 @@ class TestFullSequence(unittest.TestCase):
         self.assertEqual('', out.getvalue())
         self._check_result_of_initial_backup()
         self._check_info_after_initial_backup()
+        self.advance_utcnow(days=4, seconds=2000)
+        self._update_sources_before_second_backup()
+        self.advance_utcnow(seconds=600)
+        cli.main(('backup', 'home'), factories=self.factories, stdoutfile=out)
+        self.advance_utcnow(seconds=80)
+        self._check_result_of_second_backup(stdout=out.getvalue())
 
     def make_initial_source_tree(self, fs):
         fs._make_files(
@@ -246,3 +252,46 @@ class TestFullSequence(unittest.TestCase):
             'Backup definitions:\n  backup home\n'
             '    collection local:/backups/home\n    source local:/home/me\n',
             out.getvalue())
+
+    def _update_sources_before_second_backup(self):
+        fs = self.fs
+        # Invalid utf-8 in file name
+        invalid_unicode = b'invalid utf-8 \xbd <--'.decode(
+            'utf-8', errors='surrogateescape')
+        fs._add_file(
+            ('home', 'me', 'other', invalid_unicode),
+            content=b'File with invalid utf-8 in its file name',
+            mtime=datetime.datetime(1995, 1, 2, 7, 48, 24),
+            mtime_ns=769151409)
+        fs._add_file(
+            ('home', 'me', 'notes.txt'),
+            content=b'Some quick notes\nWith some extra stuff added\n',
+            mtime=datetime.datetime(1995, 1, 3, 11, 2, 28),
+            mtime_ns=149212583,
+            update=True)
+        fs._add_file(
+            ('home', 'me', 'rootnotes.txt'),
+            content=b'Notes made by root\n',
+            mtime=datetime.datetime(1995, 1, 2, 18, 22, 40),
+            mtime_ns=628691057,
+            perms='')
+        fs._add_directory(
+            ('home', 'me', 'rootdata'),
+            perms='')
+        fs._add_file(
+            ('home', 'me', 'unstable'),
+            content=b'initial content',
+            mtime=datetime.datetime(1995, 1, 4, 21, 49, 29),
+            mtime_ns=743283546)
+
+    def _check_result_of_second_backup(self, stdout):
+        self.assertEqual('', stdout)
+        coll = (
+            backupcollection
+            .BackupCollectionFactory(self.fs, ('backups', 'home'))
+            .open_collection())
+        bkup = coll.get_most_recent_backup()
+        self.assertEqual(
+            datetime.datetime(1995, 1, 5, 0, 44, 0), bkup.get_start_time())
+        self.assertEqual(
+            datetime.datetime(1995, 1, 5, 0, 44, 0), bkup.get_end_time())

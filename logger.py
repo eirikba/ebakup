@@ -42,6 +42,9 @@ class Logger(object):
         self.raw_log.append(
             LogItem(self._utcnow(), severity, what, which, comment))
 
+    def log_error(self, what, which, comment=''):
+        self.log(self.LOG_ERROR, what, which, comment)
+
     def replay_log(self, receiver):
         receiver.raw_log += self.raw_log
 

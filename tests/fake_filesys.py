@@ -76,6 +76,44 @@ class FakeFileSystem(object):
         if not self._is_access_allowed(path, what):
             raise ForbiddenActionError(
                 'No ' + str(what) + ' access allowed for ' + str(path))
+        self._check_permissions(path, what)
+
+    _permissions_for_access = {
+        'listdir': 'r',
+        'read': 'r',
+        'write': 'w',
+        'create': None,
+        'delete': None,
+        'stat': None,
+        }
+    def _check_permissions(self, path, what):
+        noexist = False
+        for i in range(1, len(path)):
+            if path[:i] not in self._paths:
+                noexist = True
+                continue
+            assert not noexist
+            if 'x' not in self._paths[path[:i]].perms:
+                raise PermissionError(
+                    'No traverse permission for ' + str(path[:i]) +
+                    ' when accessing ' + str(path))
+        if not noexist and what in ('create', 'delete'):
+            if 'w' not in self._paths[path[:-1]].perms:
+                raise PermissionError(
+                    'No write permission for ' + str(path[:-1]) +
+                    ' when performing a "' + what + '" operation on ' +
+                    str(path))
+        if path not in self._paths:
+            return
+        assert not noexist
+        needs = self._permissions_for_access[what]
+        if needs is None:
+            return
+        perms = self._paths[path].perms
+        for need in needs:
+            if need not in perms:
+                raise PermissionError(
+                    'No "' + need + '" permission for ' + str(path))
 
     def _is_cheap_copy(self, path1, path2):
         file1 = self._paths.get(path1)
@@ -225,9 +263,13 @@ class FakeFileSystem(object):
             else:
                 raise NotImplementedError('No supported file creation method')
 
-    def _add_file(self, path, content=None, mtime=None, mtime_ns=None):
-        if path in self._paths:
+    def _add_file(
+            self, path, content=None, mtime=None, mtime_ns=None,
+            perms=None, update=False):
+        if not update and path in self._paths:
             raise FileExistsError('File already exists: ' + str(path))
+        if update and path not in self._paths:
+            raise FileNotFoundError('File does not exists: ' + str(path))
         self._make_directory(path[:-1])
         item = FileItem()
         if content is not None:
@@ -245,7 +287,16 @@ class FakeFileSystem(object):
         if mtime_ns is not None:
             assert mtime is not None
             item.mtime_ns = mtime_ns
+        if perms is not None:
+            item.perms = perms
         self._paths[path] = item
+
+    def _add_directory(self, path, perms=None):
+        if path in self._paths:
+            raise FileExistsError('File already exists: ' + str(path))
+        self._make_directory(path)
+        if perms is not None:
+            self._paths[path].perms = perms
 
     def get_config_paths_for(self, application):
         return (
@@ -339,11 +390,13 @@ class FakeTempFile(FakeFile):
 class DirectoryItem(object):
     def __init__(self):
         self.is_directory = True
+        self.perms = 'rwx'
 
 class FileItem(object):
     def __init__(self):
         self.is_directory = False
         self.lock = 0 # 0: none, >0: number of read locks, True: write lock
+        self.perms = 'rwx'
 
     @staticmethod
     def make_empty(filesys):

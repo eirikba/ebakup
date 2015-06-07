@@ -10,6 +10,10 @@ class BackupOperation(object):
         self._sources = []
         self._logger = logger.Logger()
 
+    @property
+    def logger(self):
+        return self._logger
+
     def set_logger(self, logger):
         self._logger.replay_log(logger)
         self._logger = logger
@@ -26,7 +30,7 @@ class BackupOperation(object):
                 raise NotTestedError(
                     'backup target paths must be distinct (' +
                     str(current.targetpath) + ' vs ' + str(targetpath) + ')')
-        source = BackupSource(tree, sourcepath, targetpath)
+        source = BackupSource(tree, sourcepath, targetpath, backup=self)
         self._sources.append(source)
         return source
 
@@ -45,26 +49,29 @@ class BackupOperation(object):
             self._backupcollection.get_most_recent_backup())
 
     def _backup_single_source(self, source, backup):
-        collection = self._backupcollection
         for sourcepath, targetpath, how in source.iterate_source_files():
             assert how in ('static', 'dynamic')
             cid = self._get_cid_if_assumed_unchanged(
                 source.tree, sourcepath, targetpath)
-            if cid is None:
-                cid = collection.add_content(source.tree, sourcepath)
             sourcefile = source.tree.get_item_at_path(sourcepath)
+            size = sourcefile.get_size()
             mtime, mtime_ns = sourcefile.get_mtime()
-            backup.add_file(
-                targetpath, cid, sourcefile.get_size(),
-                mtime, mtime_ns)
-            if how == 'static':
-                old_cid = self._get_old_cid_for_path(targetpath)
-                if old_cid is None:
-                    self._added_static_content_ids.add(cid)
-                elif cid != old_cid:
-                    self._logger.log(
-                        self._logger.LOG_ERROR,
-                        'static file changed', targetpath)
+            if cid is None:
+                cid = self._try_add_content(source.tree, sourcepath)
+            if cid is None:
+                self._logger.log_error('File not backed up', sourcepath)
+            else:
+                backup.add_file(
+                    targetpath, cid, sourcefile.get_size(),
+                    mtime, mtime_ns)
+                if how == 'static':
+                    old_cid = self._get_old_cid_for_path(targetpath)
+                    if old_cid is None:
+                        self._added_static_content_ids.add(cid)
+                    elif cid != old_cid:
+                        self._logger.log(
+                            self._logger.LOG_ERROR,
+                            'static file changed', targetpath)
 
     def _get_cid_if_assumed_unchanged(self, tree, path, targetpath):
         if not self.previous:
@@ -78,6 +85,13 @@ class BackupOperation(object):
                 mtime == oldinfo.mtime and
                 mtime_ns == oldinfo.mtime_nsec):
             return oldinfo.contentid
+        return None
+
+    def _try_add_content(self, tree, path):
+        try:
+            return self._backupcollection.add_content(tree, path)
+        except PermissionError:
+            self._logger.log_error('Permission denied to source file', path)
         return None
 
     def _get_old_cid_for_path(self, path):
@@ -145,7 +159,8 @@ class BackupSource(object):
     All files not otherwise set up is treated as 'backed up'.
 
     '''
-    def __init__(self, tree, sourcepath, targetpath):
+    def __init__(self, tree, sourcepath, targetpath, backup=None):
+        self.backup = backup
         self.tree = tree
         self.sourcepath = sourcepath
         self.targetpath = targetpath
@@ -157,7 +172,15 @@ class BackupSource(object):
         self.subtrees = subtrees
 
     def iterate_source_files(self, subtree=()):
-        dirs, files = self.tree.get_directory_listing(self.sourcepath + subtree)
+        try:
+            dirs, files = self.tree.get_directory_listing(
+                self.sourcepath + subtree)
+        except PermissionError as e:
+            self.backup.logger.log_error(
+                'Failed to descend source directory',
+                self.sourcepath + subtree,
+                str(e))
+            return
         for f in files:
             path = subtree + (f,)
             how = self._how_should_path_be_handled(path)
