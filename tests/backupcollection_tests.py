@@ -16,6 +16,7 @@ class FileData(object):
                     'mtime', 'mtime_ns', 'checksum'):
                 raise AssertionError('Unknown arg for FileData: ' + k)
             if k == 'content_generator' or k == 'content':
+                assert self.content_type is None
                 self.content_type = k
                 assert not hasattr(self, 'content_generator')
                 assert not hasattr(self, 'content')
