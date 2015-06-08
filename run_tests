@@ -65,6 +65,7 @@ expected_tests = set((
     'database_tests.TestWriteDatabase.test_add_data_with_same_checksum',
     'database_tests.TestWriteDatabase.test_database_with_multiple_backups',
     'database_tests.TestWriteDatabase.test_invalid_utf8_in_file_names',
+    'database_tests.TestWriteDatabase.test_multioctet_utf8_characters_in_file_names',
     'database_tests.TestWriteDatabase.test_new_database_with_a_few_files_has_small_data_files',
     'database_tests.TestWriteDatabase.test_various_timestamps_for_mtime',
     'dbfile_tests.TestBrokenFiles.test_non_matching_checksum_of_data_block',

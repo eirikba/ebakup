@@ -804,6 +804,60 @@ class TestWriteDatabase(unittest.TestCase):
         self.assertCountEqual(
             ('other.txt',),
             bk.get_directory_listing(('home', 'me', test_dirname))[1])
+        fileinfo = bk.get_file_info(('home', 'me', 'important', test_filename))
+        self.assertEqual(b'01' + b'0' * 30, fileinfo.contentid)
+        fileinfo = bk.get_file_info(('home', 'me', test_dirname, 'other.txt'))
+        self.assertEqual(b'02' + b'0' * 30, fileinfo.contentid)
+
+    def test_multioctet_utf8_characters_in_file_names(self):
+        tree = FakeDirectory()
+        db = self.create_empty_database(tree, ('path', 'to', 'db'))
+        self.allow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+        backup = db.start_backup(datetime.datetime(2015, 4, 14, 21, 36, 12))
+        test_filename = b'Seigmen-Dr\xc3\xa5ben.txt'.decode('utf-8')
+        test_dirname = b'MULTI\xe5\x83\xa1UTF8'.decode('utf-8')
+        with backup:
+            tree._allow_modification(('path', 'to', 'db', 'content'))
+            cid = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
+            backup.add_file(
+                ('home', 'me', 'important', test_filename),
+                cid, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
+            cid = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 38), b'02' + b'0' * 30)
+            backup.add_file(
+                ('home', 'me', test_dirname, 'other.txt'),
+                cid, 2323, datetime.datetime(2014, 5, 5, 19, 23, 2), 0)
+            cid = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 39), b'03' + b'0' * 30)
+            backup.add_file(
+                ('toplevel',),
+                cid, 2323, datetime.datetime(2015, 4, 13, 13, 0, 0), 397261917)
+            tree._disallow_modification(('path', 'to', 'db', 'content'))
+            backup.commit(datetime.datetime(2015, 4, 14, 21, 36, 48))
+        self.disallow_create_dbfile(
+            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+        self.assertIn(
+            b'\x13Seigmen-Dr\xc3\xa5ben.txt\x2001000000000',
+            tree._files[('path', 'to', 'db', '2015', '04-14T21:36')].content)
+        self.assertIn(
+            b'\x0cMULTI\xe5\x83\xa1UTF8',
+            tree._files[('path', 'to', 'db', '2015', '04-14T21:36')].content)
+        bk = db.get_most_recent_backup()
+        self.assertCountEqual(
+            (test_filename,),
+            bk.get_directory_listing(('home', 'me', 'important'))[1])
+        self.assertCountEqual(
+            ('important', test_dirname),
+            bk.get_directory_listing(('home', 'me'))[0])
+        self.assertCountEqual(
+            ('other.txt',),
+            bk.get_directory_listing(('home', 'me', test_dirname))[1])
+        fileinfo = bk.get_file_info(('home', 'me', 'important', test_filename))
+        self.assertEqual(b'01' + b'0' * 30, fileinfo.contentid)
+        fileinfo = bk.get_file_info(('home', 'me', test_dirname, 'other.txt'))
+        self.assertEqual(b'02' + b'0' * 30, fileinfo.contentid)
 
     def test_various_timestamps_for_mtime(self):
         tree = FakeDirectory()

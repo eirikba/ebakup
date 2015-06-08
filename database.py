@@ -636,11 +636,12 @@ class BackupInfoBuilder(object):
         for i in range(1, len(path)):
             dirid = self.add_directory(path[:i])
         name = path[-1]
+        component = _path_component_to_bytes(name)
         entry = b''.join(
             (b'\x91',
              _make_varuint(dirid),
-             _make_varuint(len(name)),
-             _path_component_to_bytes(name),
+             _make_varuint(len(component)),
+             component,
              _make_varuint(len(content_id)),
              content_id,
              _make_varuint(size),
@@ -682,12 +683,13 @@ class BackupInfoBuilder(object):
         dirid = self._next_dirid
         self._next_dirid += 1
         self._directories[path] = dirid
+        component = _path_component_to_bytes(name)
         entry = b''.join((
             b'\x90',
             _make_varuint(dirid),
             _make_varuint(parentid),
-            _make_varuint(len(name)),
-            _path_component_to_bytes(name)))
+            _make_varuint(len(component)),
+            component))
         self._add_data_entry(entry)
         return dirid
 
