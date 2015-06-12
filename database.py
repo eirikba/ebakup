@@ -43,6 +43,12 @@ def _make_uint32(value):
         (value >> 16) & 0xff, (value >> 32) & 0xff))
 
 def _parse_varuint(data, done):
+    if data[done] < 0x80:
+        return data[done], done+1
+    if data[done+1] < 0x80:
+        return (data[done] & 0x7f) + (data[done+1] << 7), done+2
+    if data[done+2] < 0x80:
+        return (data[done] & 0x7f) + ((data[done+1] & 0x7f) << 7) + (data[done+2] << 14), done+3
     value = 0
     shift = 0
     while True:
