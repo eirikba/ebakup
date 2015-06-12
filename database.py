@@ -30,10 +30,8 @@ def create_database(directory, path):
     return Database(directory, path)
 
 def _parse_uint32(data, done):
-    value = 0
-    for i in range(4):
-        value += data[done+i] << (i * 8)
-    return value
+    return (data[done] + data[done+1] * 256 +
+            data[done+2] * 0x10000 + data[done+3] * 0x1000000)
 
 def _make_uint32(value):
     if value < 0:
