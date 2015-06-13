@@ -6,11 +6,18 @@ import database
 import logger
 
 class BackupCollectionFactory(object):
-    def __init__(self, tree, path):
+    def __init__(self, tree, path, factories=None):
         self._tree = tree
         self._path = path
-        self._dbopener = database.Database
-        self._dbcreator = database.create_database
+        self._dbopener = None
+        self._dbcreator = None
+        if factories is not None:
+            self._dbopener = factories.get('database.open')
+            self._dbcreator = factories.get('database.create')
+        if self._dbopener is None:
+            self._dbopener = database.Database
+        if self._dbcreator is None:
+            self._dbcreator = database.create_database
 
     def set_database_creator(self, dbcreator):
         self._dbcreator = dbcreator
