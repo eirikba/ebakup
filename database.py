@@ -317,6 +317,11 @@ class Database(object):
         name = self.get_checksum_algorithm_name()
         return self._get_checksum_algorithm_from_name(name)
 
+    def iterate_content_ids(self):
+        '''Iterates over all content ids in this database.
+        '''
+        yield from self._content.iterate_content_ids()
+
     def get_content_info(self, content_id):
         '''Return a ContentInfo for the content with 'content_id' as id.
         '''
@@ -425,6 +430,12 @@ class ContentInfoFile(object):
             infos.append(ContentInfo(self._db, self.contentdata[cid]))
         return infos
 
+    def iterate_content_ids(self):
+        '''Iterates over all content ids in this database.
+        '''
+        for key in self.contentdata.keys():
+            yield key
+
     def add_content_item(self, when, checksum):
         '''Add the given content item to the file and return its content id.
         '''
@@ -517,6 +528,9 @@ class ContentInfoDict(object):
 
     def get_contentids_for_checksum(self, cksum):
         return self._checksums.get(cksum, ())
+
+    def keys(self):
+        return self._infos.keys()
 
     def values(self):
         return self._infos.values()
