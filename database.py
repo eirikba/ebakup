@@ -792,7 +792,7 @@ class BackupInfo(object):
                 raise NotTestedError(
                     'Multiple directories with same name '
                     'in a single directory: ' + str(d.name))
-            parent.directories[d.name] = (d)
+            parent.directories[d.name] = d
         for f in self.files:
             parent = self.directories[f.parentid]
             if f.name in parent.files or f.name in parent.directories:
