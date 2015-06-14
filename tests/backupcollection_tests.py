@@ -835,3 +835,15 @@ class TestBrokenUsage(unittest.TestCase):
                 backup.add_file,
                 ('homedir', 'file.txt'), cid, 3412,
                 datetime.datetime(2014, 9, 11, 9, 5, 22), 989894082)
+
+    def test_open_collection_that_does_not_exist(self):
+        storetree = FakeDirectory()
+        bcfactory = backupcollection.BackupCollectionFactory(
+            storetree, ('path', 'to', 'store'))
+        db = FakeDatabases()
+        bcfactory.set_database_opener(db.open)
+        bcfactory.set_database_creator(db.create)
+        self.assertRaisesRegex(
+            FileNotFoundError,
+            'Backup collection does not exist.*path.*to.*store',
+            bcfactory.open_collection)

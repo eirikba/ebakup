@@ -77,7 +77,6 @@ class BackupCollection(object):
 
     def _verify_sane_directory_structure(self):
         if not self._tree.does_path_exist(self._path):
-            raise NotTestedError('No backup collection')
             raise FileNotFoundError(
                 'Backup collection does not exist: ' + str(self._path))
         if not self._tree.does_path_exist(self._path + ('db',)):
