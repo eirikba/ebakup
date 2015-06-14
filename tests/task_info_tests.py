@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
+import collections
+import datetime
 import re
+import textwrap
 import unittest
 
 import task_info
@@ -61,7 +64,7 @@ class FakeArgs(object):
         self._config = config
         self.logger = FakeLogger()
         self.factories = {
-            'backupcollection': FakeCollectionMaker
+            'backupcollection': FakeCollectionMaker().factory
             }
 
 class FakeLogger(object):
@@ -72,22 +75,60 @@ class FakeLogger(object):
         self._printed.append(msg)
 
 class FakeCollectionMaker(object):
-    def __init__(self, tree, path, factories):
-        self._tree = tree
-        self._path = path
-        self._factories = factories
+    def __init__(self):
+        self._collections = []
+
+    def factory(self, tree, path, factories):
+        fullpath = tree.path_to_full_string(path)
+        for coll in self._collections:
+            if coll._fullpath == fullpath:
+                return FakeCollectionFactory(coll)
+        raise NotImplementedError('No such collection')
+        return FakeCollection(fullpath)
 
     def open_collection(self):
-        return FakeCollection(self._tree, self._path, self._factories)
+        fullpath = self._tree.path_to_full_string(self._path)
+        for coll in self._collections:
+            if coll._fullpath == fullpath:
+                return coll
+        return FakeCollection(fullpath)
+
+class FakeCollectionFactory(object):
+    def __init__(self, coll):
+        self._coll = coll
+
+    def open_collection(self):
+        return self._coll
 
 class FakeCollection(object):
-    def __init__(self, tree, path, factories):
-        self._tree = tree
-        self._path = path
-        self._factories = factories
+    def __init__(self, fullpath):
+        self._fullpath = fullpath
+        self._content = []
+
+    def _add_content(self, cid_num=None, added=None):
+        cid = hex(cid_num)[2:] + '0' * 30
+        self._content.append(
+            FakeContentInfo(cid, checksum=cid, first=added))
 
     def iterate_content_ids(self):
-        return ()
+        for item in self._content:
+            yield item.contentid
+
+    def get_content_info(self, cid):
+        for item in self._content:
+            if item.contentid == cid:
+                return item
+
+ContentChecksum = collections.namedtuple(
+    'ContentChecksum', ('checksum', 'first', 'last', 'restored'))
+class FakeContentInfo(object):
+    def __init__(self, cid, checksum=None, first=None):
+        self.contentid = cid
+        if checksum is not None:
+            self.checksum = checksum
+        if first is not None:
+            self.first = first
+        self.timeline = ( ContentChecksum(checksum, first, first, True), )
 
 class InfoTestSupport(unittest.TestCase):
     def get_first_line(self, **kwargs):
@@ -133,10 +174,28 @@ class TestInfoForFullConfig(InfoTestSupport):
         config = FakeConfig()
         config._add_full_config()
         args = FakeArgs(config)
+        collection = FakeCollection('local:/data/backup1/mine')
+        collection._add_content(
+            cid_num=1, added=datetime.datetime(2015, 5, 17, 20, 47, 25))
+        collection._add_content(
+            cid_num=2, added=datetime.datetime(2014, 9, 7, 7, 49, 45))
+        collection._add_content(
+            cid_num=3, added=datetime.datetime(2015, 1, 15, 17, 47, 7))
+        collection._add_content(
+            cid_num=4, added=datetime.datetime(2014, 3, 24, 16, 49, 50))
+        collfact = FakeCollectionMaker()
+        collfact._collections.append(collection)
+        args.factories['backupcollection'] = collfact.factory
+        self._utcnow = datetime.datetime(2015, 6, 14, 14, 28, 54)
+        args.factories['utcnow'] = self.utcnow
         self.args = args
         self.task = task_info.InfoTask(config, args)
         self.task.execute()
         self.lines = self.args.logger._printed
+        self.text = '\n'.join(self.lines)
+
+    def utcnow(self):
+        return self._utcnow
 
     def test_toplevel_blocks(self):
         self.assertEqual(
@@ -162,12 +221,27 @@ class TestInfoForFullConfig(InfoTestSupport):
     def test_backup_mine_is_correct(self):
         if False: # Not implemented yet
          self.assertInfoHasBlock(textwrap.dedent('''\
-             backup mine:
-               collection local:/data/backup1/mine
-                 oldest unverified: 2013-04-09 15:50:21
-                 More than 1 year unverified: 2 files, 210kiB
-                 More than 1 month unverified: 15 files, 122GiB
-               source local:/home/me
-                 stored at: home
-                 ignored/static/dynamic rules: 3/2/0
+            backup mine
+              collection local:/data/backup1/mine
+                Least recently verified: 2014-03-24 16:49:50
+                Not verified for one year: 1 files
+                Not verified for three months: 3 files
+                Not verified for one month: 3 files
+                Not verified for one week: 4 files
+              source local:/home/me
+                stored at: home
+                ignored/static/dynamic rules: 3/2/0
              '''))
+
+    def test_backup_mine_is_correct_partial(self):
+        self.assertIn(textwrap.indent(textwrap.dedent('''\
+            backup mine
+              collection local:/data/backup1/mine
+                Least recently verified: 2014-03-24 16:49:50
+                Not verified for one year: 1 files
+                Not verified for three months: 3 files
+                Not verified for one month: 3 files
+                Not verified for one week: 4 files
+              source local:/home/me
+            '''), prefix='  '),
+        self.text)

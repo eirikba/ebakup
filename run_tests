@@ -177,6 +177,7 @@ expected_tests = set((
     'task_backup_tests.TestSimpleBackup.test_backup_to_collection_with_correct_path',
     'task_info_tests.TestInfoForEmptyConfig.test_output',
     'task_info_tests.TestInfoForFullConfig.test_backup_mine_is_correct',
+    'task_info_tests.TestInfoForFullConfig.test_backup_mine_is_correct_partial',
     'task_info_tests.TestInfoForFullConfig.test_configured_backups_are_listed',
     'task_info_tests.TestInfoForFullConfig.test_toplevel_blocks',
 ))

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import datetime
+
 import filesys
 
 class InfoTask(object):
@@ -41,25 +43,56 @@ class InfoTask(object):
                 self._print(prefix + '  (Does not exist)')
                 coll = None
             if coll:
-                colldata = CollectionSummarizer(coll)
+                colldata = CollectionSummarizer(self._args, coll)
                 self._print(
                     prefix + '  Least recently verified: ' +
                     str(colldata.least_recently_verified_timestamp))
+                for t in colldata.time_verify_stats:
+                    if t[2] > 0:
+                        self._print(
+                            prefix + '  Not verified for ' + t[0] + ': ' +
+                            str(t[2]) + ' files')
 
     def _print(self, msg):
         self._logger.print(msg)
 
 class CollectionSummarizer(object):
-    def __init__(self, collection):
+    def __init__(self, args, collection):
+        self.args = args
         self.collection = collection
         self._summarize()
 
     def _summarize(self):
         lrv = None
         lrv_time = None
+        utcnow = self.args.factories.get('utcnow')
+        if utcnow:
+            now = utcnow()
+        else:
+            now = datetime.datetime.utcnow()
+        one_week_ago = now - datetime.timedelta(days=7)
+        if now.month > 1:
+            one_month_ago = now.replace(month=now.month-1)
+        else:
+            one_month_ago = now.replace(year=now.year-1, month=12)
+        if now.month > 3:
+            three_months_ago = now.replace(month=now.month-3)
+        else:
+            three_months_ago = now.replace(year=now.year-1, month=9+now.month)
+        one_year_ago = now.replace(year=now.year-1)
+        times = [
+            ['one year', one_year_ago, 0],
+            ['three months', three_months_ago, 0],
+            ['one month', one_month_ago, 0],
+            ['one week', one_week_ago, 0],
+        ]
         for cid in self.collection.iterate_content_ids():
             info = self.collection.get_content_info(cid)
             if lrv_time is None or info.timeline[-1].last < lrv_time:
                 lrv_time = info.timeline[-1].last
                 lrv = cid
+            for t in times:
+                if t[1] >= info.timeline[-1].last:
+                    t[2] += 1
         self.least_recently_verified_timestamp = lrv_time
+        self.time_verify_stats = times
