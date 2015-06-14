@@ -17,9 +17,9 @@ from task_info import InfoTask
 
 class UnknownCommandError(Exception): pass
 
-def main(commandline=None, stdoutfile=None, factories=None):
+def main(commandline=None, stdoutfile=None, services=None):
     args = parse_commandline(commandline, stdoutfile)
-    args.factories = create_factories(factories)
+    args.services = create_services(services)
     args.logger = logger.Logger()
     if stdoutfile is not None:
         args.logger.set_outfile(stdoutfile)
@@ -67,8 +67,8 @@ def _fixup_arguments(args):
         localfs = filesys.get_file_system('local')
         args.config = localfs.path_from_string(args.config)
 
-def create_factories(overrides):
-    factories = {
+def create_services(overrides):
+    services = {
         'filesystem': filesys.get_file_system,
         'backupoperation': backupoperation.BackupOperation,
         'backupcollection.create': backupcollection.create_collection,
@@ -78,19 +78,19 @@ def create_factories(overrides):
         'utcnow': datetime.datetime.utcnow,
     }
     if overrides is None:
-        return factories
+        return services
     filtered = {}
     for key, value in overrides.items():
         if key == '*':
             continue
-        assert key in factories
+        assert key in services
         if value is None:
-            filtered[key] = factories[key]
+            filtered[key] = services[key]
         else:
             filtered[key] = value
     if '*' in overrides:
         if overrides['*'] is None:
-            for key,value in factories.items():
+            for key,value in services.items():
                 if key not in filtered:
                     filtered[key] = value
         else:
@@ -98,7 +98,7 @@ def create_factories(overrides):
     return filtered
 
 def make_tasks_from_args(args):
-    localtree = args.factories['filesystem']('local')
+    localtree = args.services['filesystem']('local')
     config = Config()
     if args.config:
         config.read_file(localtree, args.config)

@@ -33,7 +33,7 @@ class TestFullSequence(unittest.TestCase):
 
     def test_all(self):
         self.fs = fake_filesys.FakeFileSystem()
-        self.factories = {
+        self.services = {
             'utcnow': self.utcnow,
             'filesystem': self.get_filesys,
             '*': None,
@@ -73,7 +73,7 @@ class TestFullSequence(unittest.TestCase):
         self.advance_utcnow(seconds=20)
         cli.main(
             ('backup', '--create', 'home'),
-            factories=self.factories,
+            services=self.services,
             stdoutfile=out)
         self.advance_utcnow(seconds=20)
         self.assertEqual('', out.getvalue())
@@ -82,7 +82,7 @@ class TestFullSequence(unittest.TestCase):
         self.advance_utcnow(days=4, seconds=2000)
         self._update_sources_before_second_backup()
         self.advance_utcnow(seconds=600)
-        cli.main(('backup', 'home'), factories=self.factories, stdoutfile=out)
+        cli.main(('backup', 'home'), services=self.services, stdoutfile=out)
         self.advance_utcnow(seconds=80)
         self._check_result_of_second_backup(stdout=out.getvalue())
 
@@ -130,7 +130,7 @@ class TestFullSequence(unittest.TestCase):
 
     def _check_info_before_first_backup(self):
         out = io.StringIO()
-        cli.main(('info',), factories=self.factories, stdoutfile=out)
+        cli.main(('info',), services=self.services, stdoutfile=out)
         self.assertEqual(
             'Backup definitions:\n'
             '  backup home\n'
@@ -261,7 +261,7 @@ class TestFullSequence(unittest.TestCase):
 
     def _check_info_after_initial_backup(self):
         out = io.StringIO()
-        cli.main(('info',), factories=self.factories, stdoutfile=out)
+        cli.main(('info',), services=self.services, stdoutfile=out)
         self.assertEqual(
             'Backup definitions:\n  backup home\n'
             '    collection local:/backups/home\n'

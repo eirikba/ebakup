@@ -352,12 +352,12 @@ class TestUtilities(unittest.TestCase):
         storetree = FakeDirectory()
         sourcetree = FakeDirectory()
         db = FakeDatabases()
-        factories = {
+        services = {
             'database.open': db.open,
             'database.create': db.create,
             }
         bc = backupcollection.create_collection(
-            storetree, ('path', 'to', 'store'), factories=factories)
+            storetree, ('path', 'to', 'store'), services=services)
         mkpath = bc._make_path_from_content_id
 
         self.assertEqual(('00', '01', '0203'), mkpath(b'\x00\x01\x02\x03'))
@@ -378,13 +378,13 @@ class TestBasicBackup(unittest.TestCase):
         self.sourcetree = sourcetree
         db = FakeDatabases()
         self.db = db
-        factories = {
+        services = {
             'database.open': db.open,
             'database.create': db.create,
             }
-        self.factories = factories
+        self.services = services
         bc = backupcollection.create_collection(
-            storetree, ('path', 'to', 'store'), factories=factories)
+            storetree, ('path', 'to', 'store'), services=services)
 
         sourcetree._set_file(
             ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')
@@ -433,7 +433,7 @@ class TestBasicBackup(unittest.TestCase):
             backup.commit(datetime.datetime(2015, 2, 14, 19, 55, 54, 954321))
 
         self.backupcollection = backupcollection.open_collection(
-            storetree, ('path', 'to', 'store'), factories=factories)
+            storetree, ('path', 'to', 'store'), services=services)
 
     def test_backup_sequence(self):
         backup = self.backupcollection.get_most_recent_backup()
@@ -532,7 +532,7 @@ class TestBasicBackup(unittest.TestCase):
 
     def test_checksum_timeline(self):
         bc = backupcollection.open_collection(
-            self.storetree, ('path', 'to', 'store'), factories=self.factories)
+            self.storetree, ('path', 'to', 'store'), services=self.services)
         bc.update_content_checksum(
             self.cid1, datetime.datetime(2015, 2, 15, 8, 4, 32), self.checksum1)
         bc.update_content_checksum(
@@ -617,12 +617,12 @@ class TestTwoBackups(unittest.TestCase):
         self.sourcetree = sourcetree
         db = FakeDatabases()
         self.db = db
-        factories = {
+        services = {
             'database.open': db.open,
             'database.create': db.create,
             }
         bc = backupcollection.create_collection(
-            storetree, ('path', 'to', 'store'), factories=factories)
+            storetree, ('path', 'to', 'store'), services=services)
 
         sourcetree._set_file(
             ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')
@@ -719,7 +719,7 @@ class TestTwoBackups(unittest.TestCase):
             backup.commit(datetime.datetime(2015, 4, 20, 17, 0, 30, 954887))
 
         self.backupcollection = backupcollection.open_collection(
-            storetree, ('path', 'to', 'store'), factories=factories)
+            storetree, ('path', 'to', 'store'), services=services)
 
     def test_backup_sequence(self):
         backup = self.backupcollection.get_most_recent_backup()
@@ -751,12 +751,12 @@ class TestSingleStuff(unittest.TestCase):
         storetree = FakeDirectory()
         sourcetree = FakeDirectory()
         db = FakeDatabases()
-        factories = {
+        services = {
             'database.open': db.open,
             'database.create': db.create,
             }
         bc = backupcollection.create_collection(
-            storetree, ('path', 'to', 'store'), factories=factories)
+            storetree, ('path', 'to', 'store'), services=services)
 
         sourcetree._set_file(
             ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')
@@ -774,7 +774,7 @@ class TestSingleStuff(unittest.TestCase):
             backup.commit()
 
         bc2 = backupcollection.open_collection(
-            storetree, ('path', 'to', 'store'), factories=factories)
+            storetree, ('path', 'to', 'store'), services=services)
         backup2 = bc2.get_most_recent_backup()
         self.assertLessEqual(before_backup, backup2.get_start_time())
         self.assertLessEqual(backup2.get_start_time(), after_backup_started)
@@ -785,14 +785,14 @@ class TestSingleStuff(unittest.TestCase):
         storetree = FakeDirectory()
         sourcetree = FakeDirectory()
         db = FakeDatabases()
-        factories = {
+        services = {
             'database.open': db.open,
             'database.create': db.create,
             }
         bc = backupcollection.create_collection(
-            storetree, ('path', 'to', 'store'), factories=factories)
+            storetree, ('path', 'to', 'store'), services=services)
         bc2 = backupcollection.open_collection(
-            storetree, ('path', 'to', 'store'), factories=factories)
+            storetree, ('path', 'to', 'store'), services=services)
         self.assertEqual(None, bc2.get_most_recent_backup())
 
 class TestBrokenUsage(unittest.TestCase):
@@ -801,12 +801,12 @@ class TestBrokenUsage(unittest.TestCase):
         storetree = FakeDirectory()
         sourcetree = FakeDirectory()
         db = FakeDatabases()
-        factories = {
+        services = {
             'database.open': db.open,
             'database.create': db.create,
             }
         bc = backupcollection.create_collection(
-            storetree, ('path', 'to', 'store'), factories=factories)
+            storetree, ('path', 'to', 'store'), services=services)
 
         sourcetree._set_file(
             ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')
@@ -835,7 +835,7 @@ class TestBrokenUsage(unittest.TestCase):
     def test_open_collection_that_does_not_exist(self):
         storetree = FakeDirectory()
         db = FakeDatabases()
-        factories = {
+        services = {
             'database.open': db.open,
             'database.create': db.create,
             }
@@ -843,4 +843,4 @@ class TestBrokenUsage(unittest.TestCase):
             FileNotFoundError,
             'Backup collection does not exist.*path.*to.*store',
             backupcollection.open_collection,
-            storetree, ('path', 'to', 'store'), factories=factories)
+            storetree, ('path', 'to', 'store'), services=services)

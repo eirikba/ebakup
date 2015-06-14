@@ -28,7 +28,7 @@ class TestFullSequenceOfOperations(unittest.TestCase):
         self.stdout = io.StringIO()
         self.local_filesys = fake_filesys.FakeFileSystem()
         self._utcnow = datetime.datetime(2014, 8, 1, 12, 30, 21, 429865)
-        self.factories = {
+        self.services = {
             'filesystem': self.get_local_filesys,
             'backupoperation': None,
             'backupcollection.create': None,
@@ -76,7 +76,7 @@ class TestFullSequenceOfOperations(unittest.TestCase):
         self.time_backup1_start = self._utcnow
         cli.main(
             ('backup', '--create', 'home'),
-            stdoutfile=self.stdout, factories=self.factories)
+            stdoutfile=self.stdout, services=self.services)
         self.advance_utcnow(seconds=1)
         self.assertEqual('', self.stdout.getvalue())
 

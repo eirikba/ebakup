@@ -9,8 +9,8 @@ class InfoTask(object):
     def __init__(self, config, args):
         self._config = config
         self._args = args
-        self._factories = args.factories
-        self._getfilesys = self._factories.get(
+        self._services = args.services
+        self._getfilesys = self._services.get(
             'filesystem', filesys.get_file_system)
         self._logger = self._args.logger
 
@@ -35,9 +35,9 @@ class InfoTask(object):
             tree = self._getfilesys(collcfg.accessor)
             self._print(
                 prefix + 'collection ' + tree.path_to_full_string(collcfg.path))
-            opener = self._factories['backupcollection.open']
+            opener = self._services['backupcollection.open']
             try:
-                coll = opener(tree, collcfg.path, factories=self._factories)
+                coll = opener(tree, collcfg.path, services=self._services)
             except FileNotFoundError:
                 self._print(prefix + '  (Does not exist)')
                 coll = None
@@ -64,7 +64,7 @@ class CollectionSummarizer(object):
     def _summarize(self):
         lrv = None
         lrv_time = None
-        utcnow = self.args.factories.get('utcnow')
+        utcnow = self.args.services.get('utcnow')
         if utcnow:
             now = utcnow()
         else:

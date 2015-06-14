@@ -38,13 +38,13 @@ class TestBackup(unittest.TestCase):
     def test_all(self):
         self._make_source_tree()
         self._make_config()
-        factories = { '*': None, 'utcnow': self.utcnow }
-        self.factories = factories
+        services = { '*': None, 'utcnow': self.utcnow }
+        self.services = services
         self.advance_utcnow(seconds=123)
         cli.main(
             ('--config', os.path.join(root_path, 'ebakup.config'),
              'backup', '--create', 'home'),
-            factories=factories)
+            services=services)
         self.advance_utcnow(seconds=160)
         self._check_first_backup_on_disk()
         self.advance_utcnow(seconds=400)
@@ -127,7 +127,7 @@ class TestBackup(unittest.TestCase):
         cli.main(
             ('--config', os.path.join(root_path, 'ebakup.config'),
              'info'),
-            factories=self.factories, stdoutfile=out)
+            services=self.services, stdoutfile=out)
         info = out.getvalue()
         self.assertNotIn('local:/path/to/testbakup/', info)
         match = re.search('local:/[^\n]*/DELETEME_testebakup/', info)

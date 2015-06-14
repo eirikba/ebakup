@@ -63,7 +63,7 @@ class FakeArgs(object):
     def __init__(self, config):
         self._config = config
         self.logger = FakeLogger()
-        self.factories = {
+        self.services = {
             'backupcollection.open': FakeCollectionMaker().open_collection,
             }
 
@@ -78,7 +78,7 @@ class FakeCollectionMaker(object):
     def __init__(self):
         self._collections = []
 
-    def open_collection(self, tree, path, factories=None):
+    def open_collection(self, tree, path, services=None):
         fullpath = tree.path_to_full_string(path)
         for coll in self._collections:
             if coll._fullpath == fullpath:
@@ -170,9 +170,9 @@ class TestInfoForFullConfig(InfoTestSupport):
             cid_num=4, added=datetime.datetime(2014, 3, 24, 16, 49, 50))
         collfact = FakeCollectionMaker()
         collfact._collections.append(collection)
-        args.factories['backupcollection.open'] = collfact.open_collection
+        args.services['backupcollection.open'] = collfact.open_collection
         self._utcnow = datetime.datetime(2015, 6, 14, 14, 28, 54)
-        args.factories['utcnow'] = self.utcnow
+        args.services['utcnow'] = self.utcnow
         self.args = args
         self.task = task_info.InfoTask(config, args)
         self.task.execute()

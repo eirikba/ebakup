@@ -5,7 +5,7 @@ import datetime
 import database
 import logger
 
-def create_collection(tree, path, factories=None):
+def create_collection(tree, path, services=None):
     '''Create a new backup collection at tree:path and return a
     BackupCollection for accessing it.
     '''
@@ -13,18 +13,18 @@ def create_collection(tree, path, factories=None):
     # if it already exists.
     tree.create_directory(path)
     tree.create_directory(path + ('content',))
-    if factories is not None:
-        dbcreator = factories.get('database.create')
-    if factories is None or dbcreator is None:
+    if services is not None:
+        dbcreator = services.get('database.create')
+    if services is None or dbcreator is None:
         dbcreator = database.create_database
     db = dbcreator(tree, path + ('db',))
-    return BackupCollection(tree, path, factories=factories)
+    return BackupCollection(tree, path, services=services)
 
-def open_collection(tree, path, factories=None):
+def open_collection(tree, path, services=None):
     '''Return a BackupCollection object for the backup collection
     described by this object.
     '''
-    return BackupCollection(tree, path, factories=factories)
+    return BackupCollection(tree, path, services=services)
 
 
 hexits = '0123456789abcdef'
@@ -41,7 +41,7 @@ class BackupCollection(object):
     '''Provides access to a backup collection.
     '''
 
-    def __init__(self, tree, path, factories=None):
+    def __init__(self, tree, path, services=None):
         '''Return a BackupCollection object for the backup collection
         described by 'params'.
         '''
@@ -50,8 +50,8 @@ class BackupCollection(object):
         self._path = path
         self._verify_sane_directory_structure()
         dbopener = None
-        if factories is not None:
-            dbopener = factories.get('database.open')
+        if services is not None:
+            dbopener = services.get('database.open')
         if dbopener is None:
             dbopener = database.Database
         self._open_database(dbopener)
@@ -77,8 +77,8 @@ class BackupCollection(object):
             raise FileNotFoundError(
                 'Backup collection has no "content": ' + str(self._path))
 
-    def _open_database(self, dbfactory):
-        self._db = dbfactory(self._tree, self._path + ('db',))
+    def _open_database(self, dbopener):
+        self._db = dbopener(self._tree, self._path + ('db',))
 
     def start_backup(self, start=None):
         '''Starts a backup operation.

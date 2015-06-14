@@ -6,14 +6,14 @@ class BackupTask(object):
         self._config = config
         self._logger = args.logger
         self._create_collection = args.create
-        self._factories = args.factories
-        self._backupoperationfactory = args.factories['backupoperation']
-        self._collectionopener = args.factories['backupcollection.open']
-        self._collectioncreator = args.factories['backupcollection.create']
-        self._treefactory = args.factories['filesystem']
-        self._dbcreator = args.factories['database.create']
-        self._dbopener = args.factories['database.open']
-        self._utcnow = args.factories['utcnow']
+        self._services = args.services
+        self._backupoperationfactory = args.services['backupoperation']
+        self._collectionopener = args.services['backupcollection.open']
+        self._collectioncreator = args.services['backupcollection.create']
+        self._treefactory = args.services['filesystem']
+        self._dbcreator = args.services['database.create']
+        self._dbopener = args.services['database.open']
+        self._utcnow = args.services['utcnow']
         self._backups = [x for x in args.backups]
 
     def execute(self):
@@ -42,11 +42,11 @@ class BackupTask(object):
             raise NotTestedError('No backup collections available')
             return
         if self._create_collection:
-            collection = self._factories['backupcollection.create'](
-                storetree, storepath, factories=self._factories)
+            collection = self._services['backupcollection.create'](
+                storetree, storepath, services=self._services)
         else:
-            collection = self._factories['backupcollection.open'](
-                storetree, storepath, factories=self._factories)
+            collection = self._services['backupcollection.open'](
+                storetree, storepath, services=self._services)
         collection.set_utcnow(self._utcnow)
         collection.set_logger(self._logger)
         operation = self._backupoperationfactory(collection)
