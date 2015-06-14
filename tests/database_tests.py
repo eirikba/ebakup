@@ -483,6 +483,13 @@ class TestWriteDatabase(unittest.TestCase):
         self.assertEqual(b'03' + b'0' * 30, contentinfo.get_good_checksum())
         self.assertEqual(
             b'03' + b'0' * 30, contentinfo.get_last_known_checksum())
+        timeline = contentinfo.get_checksum_timeline()
+        self.assertEqual(1, len(timeline))
+        self.assertEqual(True, timeline[0].restored)
+        self.assertEqual(
+            datetime.datetime(2015, 4, 14, 21, 36, 39), timeline[0].first)
+        self.assertEqual(
+            datetime.datetime(2015, 4, 14, 21, 36, 39), timeline[0].last)
         filedata = backup.get_file_info(
             ('home', 'me', 'important', 'stuff.txt'))
         self.assertNotEqual(None, filedata)
@@ -495,6 +502,13 @@ class TestWriteDatabase(unittest.TestCase):
         self.assertEqual(b'01' + b'0' * 30, contentinfo.get_good_checksum())
         self.assertEqual(
             b'01' + b'0' * 30, contentinfo.get_last_known_checksum())
+        timeline = contentinfo.get_checksum_timeline()
+        self.assertEqual(1, len(timeline))
+        self.assertEqual(True, timeline[0].restored)
+        self.assertEqual(
+            datetime.datetime(2015, 4, 14, 21, 36, 36), timeline[0].first)
+        self.assertEqual(
+            datetime.datetime(2015, 4, 14, 21, 36, 36), timeline[0].last)
         filedata = backup.get_file_info(
             ('home', 'me', 'important', 'other.txt'))
         self.assertNotEqual(None, filedata)
@@ -507,6 +521,13 @@ class TestWriteDatabase(unittest.TestCase):
         self.assertEqual(b'02' + b'0' * 30, contentinfo.get_good_checksum())
         self.assertEqual(
             b'02' + b'0' * 30, contentinfo.get_last_known_checksum())
+        timeline = contentinfo.get_checksum_timeline()
+        self.assertEqual(1, len(timeline))
+        self.assertEqual(True, timeline[0].restored)
+        self.assertEqual(
+            datetime.datetime(2015, 4, 14, 21, 36, 38), timeline[0].first)
+        self.assertEqual(
+            datetime.datetime(2015, 4, 14, 21, 36, 38), timeline[0].last)
         self.assertEqual(None, backup.get_file_info(('home', 'me')))
 
     def test_new_database_with_a_few_files_has_small_data_files(self):

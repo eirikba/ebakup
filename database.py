@@ -40,7 +40,7 @@ def _make_uint32(value):
         raise ValueError('Value too big for uint32: ' + str(value))
     return bytes((
         value & 0xff, (value >> 8) & 0xff,
-        (value >> 16) & 0xff, (value >> 32) & 0xff))
+        (value >> 16) & 0xff, (value >> 24) & 0xff))
 
 def _parse_varuint(data, done):
     if data[done] < 0x80:

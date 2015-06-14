@@ -244,6 +244,22 @@ class TestFullSequence(unittest.TestCase):
         self.assertEqual(b'A different photo', reader.get_data_slice(0,17))
         self.assertEqual(b'A different pho', reader.get_data_slice(0,15))
         self.assertEqual(b'feren', reader.get_data_slice(5,10))
+        contentinfo = coll.get_content_info(cid)
+        self.assertEqual(
+            b'8M\x1c\xd1\xec\xf7\xcb\xd6\xdf\xbd\x82\x89'
+            b'J\xf0\x92+\xc1\x13X\x9d\x14\xd0lF^\xb1E\x92*\xe0\r\xd7',
+            contentinfo.goodsum)
+        self.assertEqual(
+            b'8M\x1c\xd1\xec\xf7\xcb\xd6\xdf\xbd\x82\x89'
+            b'J\xf0\x92+\xc1\x13X\x9d\x14\xd0lF^\xb1E\x92*\xe0\r\xd7',
+            contentinfo.lastsum)
+        timeline = contentinfo.timeline
+        self.assertEqual(1, len(timeline))
+        self.assertEqual(True, timeline[0].restored)
+        self.assertEqual(
+            datetime.datetime(1995, 1, 1, 0, 0, 20), timeline[0].first)
+        self.assertEqual(
+            datetime.datetime(1995, 1, 1, 0, 0, 20), timeline[0].last)
 
     def _check_info_after_initial_backup(self):
         out = io.StringIO()
