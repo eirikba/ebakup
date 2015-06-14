@@ -352,11 +352,12 @@ class TestUtilities(unittest.TestCase):
         storetree = FakeDirectory()
         sourcetree = FakeDirectory()
         db = FakeDatabases()
-        bcfactory = backupcollection.BackupCollectionFactory(
-            storetree, ('path', 'to', 'store'))
-        bcfactory.set_database_opener(db.open)
-        bcfactory.set_database_creator(db.create)
-        bc = bcfactory.create_collection()
+        factories = {
+            'database.open': db.open,
+            'database.create': db.create,
+            }
+        bc = backupcollection.create_collection(
+            storetree, ('path', 'to', 'store'), factories=factories)
         mkpath = bc._make_path_from_content_id
 
         self.assertEqual(('00', '01', '0203'), mkpath(b'\x00\x01\x02\x03'))
@@ -377,11 +378,13 @@ class TestBasicBackup(unittest.TestCase):
         self.sourcetree = sourcetree
         db = FakeDatabases()
         self.db = db
-        bcfactory = backupcollection.BackupCollectionFactory(
-            storetree, ('path', 'to', 'store'))
-        bcfactory.set_database_opener(db.open)
-        bcfactory.set_database_creator(db.create)
-        bc = bcfactory.create_collection()
+        factories = {
+            'database.open': db.open,
+            'database.create': db.create,
+            }
+        self.factories = factories
+        bc = backupcollection.create_collection(
+            storetree, ('path', 'to', 'store'), factories=factories)
 
         sourcetree._set_file(
             ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')
@@ -429,11 +432,8 @@ class TestBasicBackup(unittest.TestCase):
                 datetime.datetime(2014, 9, 22, 2, 11, 1), 797641421)
             backup.commit(datetime.datetime(2015, 2, 14, 19, 55, 54, 954321))
 
-        bcfactory = backupcollection.BackupCollectionFactory(
-            storetree, ('path', 'to', 'store'))
-        bcfactory.set_database_opener(db.open)
-        bcfactory.set_database_creator(db.create)
-        self.backupcollection = bcfactory.open_collection()
+        self.backupcollection = backupcollection.open_collection(
+            storetree, ('path', 'to', 'store'), factories=factories)
 
     def test_backup_sequence(self):
         backup = self.backupcollection.get_most_recent_backup()
@@ -531,11 +531,8 @@ class TestBasicBackup(unittest.TestCase):
         self.assertEqual(self.cid1, content_id)
 
     def test_checksum_timeline(self):
-        bcfactory = backupcollection.BackupCollectionFactory(
-            self.storetree, ('path', 'to', 'store'))
-        bcfactory.set_database_opener(self.db.open)
-        bcfactory.set_database_creator(self.db.create)
-        bc = bcfactory.open_collection()
+        bc = backupcollection.open_collection(
+            self.storetree, ('path', 'to', 'store'), factories=self.factories)
         bc.update_content_checksum(
             self.cid1, datetime.datetime(2015, 2, 15, 8, 4, 32), self.checksum1)
         bc.update_content_checksum(
@@ -620,11 +617,12 @@ class TestTwoBackups(unittest.TestCase):
         self.sourcetree = sourcetree
         db = FakeDatabases()
         self.db = db
-        bcfactory = backupcollection.BackupCollectionFactory(
-            storetree, ('path', 'to', 'store'))
-        bcfactory.set_database_opener(db.open)
-        bcfactory.set_database_creator(db.create)
-        bc = bcfactory.create_collection()
+        factories = {
+            'database.open': db.open,
+            'database.create': db.create,
+            }
+        bc = backupcollection.create_collection(
+            storetree, ('path', 'to', 'store'), factories=factories)
 
         sourcetree._set_file(
             ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')
@@ -720,11 +718,8 @@ class TestTwoBackups(unittest.TestCase):
                 datetime.datetime(2015, 3, 25, 6, 1, 4), 819205112)
             backup.commit(datetime.datetime(2015, 4, 20, 17, 0, 30, 954887))
 
-        bcfactory = backupcollection.BackupCollectionFactory(
-            storetree, ('path', 'to', 'store'))
-        bcfactory.set_database_opener(db.open)
-        bcfactory.set_database_creator(db.create)
-        self.backupcollection = bcfactory.open_collection()
+        self.backupcollection = backupcollection.open_collection(
+            storetree, ('path', 'to', 'store'), factories=factories)
 
     def test_backup_sequence(self):
         backup = self.backupcollection.get_most_recent_backup()
@@ -756,11 +751,12 @@ class TestSingleStuff(unittest.TestCase):
         storetree = FakeDirectory()
         sourcetree = FakeDirectory()
         db = FakeDatabases()
-        bcfactory = backupcollection.BackupCollectionFactory(
-            storetree, ('path', 'to', 'store'))
-        bcfactory.set_database_opener(db.open)
-        bcfactory.set_database_creator(db.create)
-        bc = bcfactory.create_collection()
+        factories = {
+            'database.open': db.open,
+            'database.create': db.create,
+            }
+        bc = backupcollection.create_collection(
+            storetree, ('path', 'to', 'store'), factories=factories)
 
         sourcetree._set_file(
             ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')
@@ -777,11 +773,8 @@ class TestSingleStuff(unittest.TestCase):
                 datetime.datetime(2014, 9, 11, 9, 3, 54), 759831036)
             backup.commit()
 
-        bcfactory = backupcollection.BackupCollectionFactory(
-            storetree, ('path', 'to', 'store'))
-        bcfactory.set_database_opener(db.open)
-        bcfactory.set_database_creator(db.create)
-        bc2 = bcfactory.open_collection()
+        bc2 = backupcollection.open_collection(
+            storetree, ('path', 'to', 'store'), factories=factories)
         backup2 = bc2.get_most_recent_backup()
         self.assertLessEqual(before_backup, backup2.get_start_time())
         self.assertLessEqual(backup2.get_start_time(), after_backup_started)
@@ -792,12 +785,14 @@ class TestSingleStuff(unittest.TestCase):
         storetree = FakeDirectory()
         sourcetree = FakeDirectory()
         db = FakeDatabases()
-        bcfactory = backupcollection.BackupCollectionFactory(
-            storetree, ('path', 'to', 'store'))
-        bcfactory.set_database_opener(db.open)
-        bcfactory.set_database_creator(db.create)
-        bc = bcfactory.create_collection()
-        bc2 = bcfactory.open_collection()
+        factories = {
+            'database.open': db.open,
+            'database.create': db.create,
+            }
+        bc = backupcollection.create_collection(
+            storetree, ('path', 'to', 'store'), factories=factories)
+        bc2 = backupcollection.open_collection(
+            storetree, ('path', 'to', 'store'), factories=factories)
         self.assertEqual(None, bc2.get_most_recent_backup())
 
 class TestBrokenUsage(unittest.TestCase):
@@ -805,12 +800,13 @@ class TestBrokenUsage(unittest.TestCase):
     def test_add_two_files_with_same_path(self):
         storetree = FakeDirectory()
         sourcetree = FakeDirectory()
-        bcfactory = backupcollection.BackupCollectionFactory(
-            storetree, ('path', 'to', 'store'))
         db = FakeDatabases()
-        bcfactory.set_database_opener(db.open)
-        bcfactory.set_database_creator(db.create)
-        bc = bcfactory.create_collection()
+        factories = {
+            'database.open': db.open,
+            'database.create': db.create,
+            }
+        bc = backupcollection.create_collection(
+            storetree, ('path', 'to', 'store'), factories=factories)
 
         sourcetree._set_file(
             ('home', 'me', 'file.txt'), content=b'127' * 42 + b'1')
@@ -838,12 +834,13 @@ class TestBrokenUsage(unittest.TestCase):
 
     def test_open_collection_that_does_not_exist(self):
         storetree = FakeDirectory()
-        bcfactory = backupcollection.BackupCollectionFactory(
-            storetree, ('path', 'to', 'store'))
         db = FakeDatabases()
-        bcfactory.set_database_opener(db.open)
-        bcfactory.set_database_creator(db.create)
+        factories = {
+            'database.open': db.open,
+            'database.create': db.create,
+            }
         self.assertRaisesRegex(
             FileNotFoundError,
             'Backup collection does not exist.*path.*to.*store',
-            bcfactory.open_collection)
+            backupcollection.open_collection,
+            storetree, ('path', 'to', 'store'), factories=factories)

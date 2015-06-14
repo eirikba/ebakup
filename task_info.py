@@ -35,10 +35,9 @@ class InfoTask(object):
             tree = self._getfilesys(collcfg.accessor)
             self._print(
                 prefix + 'collection ' + tree.path_to_full_string(collcfg.path))
-            collfact = self._factories['backupcollection'](
-                tree, collcfg.path, factories=self._factories)
+            opener = self._factories['backupcollection.open']
             try:
-                coll = collfact.open_collection()
+                coll = opener(tree, collcfg.path, factories=self._factories)
             except FileNotFoundError:
                 self._print(prefix + '  (Does not exist)')
                 coll = None

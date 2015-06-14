@@ -31,7 +31,8 @@ class TestFullSequenceOfOperations(unittest.TestCase):
         self.factories = {
             'filesystem': self.get_local_filesys,
             'backupoperation': None,
-            'backupcollection': None,
+            'backupcollection.create': None,
+            'backupcollection.open': None,
             'database.create': None,
             'database.open': None,
             'utcnow': self.utcnow,

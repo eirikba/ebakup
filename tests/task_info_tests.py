@@ -64,7 +64,7 @@ class FakeArgs(object):
         self._config = config
         self.logger = FakeLogger()
         self.factories = {
-            'backupcollection': FakeCollectionMaker().factory
+            'backupcollection.open': FakeCollectionMaker().open_collection,
             }
 
 class FakeLogger(object):
@@ -78,27 +78,12 @@ class FakeCollectionMaker(object):
     def __init__(self):
         self._collections = []
 
-    def factory(self, tree, path, factories):
+    def open_collection(self, tree, path, factories=None):
         fullpath = tree.path_to_full_string(path)
-        for coll in self._collections:
-            if coll._fullpath == fullpath:
-                return FakeCollectionFactory(coll)
-        raise NotImplementedError('No such collection')
-        return FakeCollection(fullpath)
-
-    def open_collection(self):
-        fullpath = self._tree.path_to_full_string(self._path)
         for coll in self._collections:
             if coll._fullpath == fullpath:
                 return coll
         return FakeCollection(fullpath)
-
-class FakeCollectionFactory(object):
-    def __init__(self, coll):
-        self._coll = coll
-
-    def open_collection(self):
-        return self._coll
 
 class FakeCollection(object):
     def __init__(self, fullpath):
@@ -185,7 +170,7 @@ class TestInfoForFullConfig(InfoTestSupport):
             cid_num=4, added=datetime.datetime(2014, 3, 24, 16, 49, 50))
         collfact = FakeCollectionMaker()
         collfact._collections.append(collection)
-        args.factories['backupcollection'] = collfact.factory
+        args.factories['backupcollection.open'] = collfact.open_collection
         self._utcnow = datetime.datetime(2015, 6, 14, 14, 28, 54)
         args.factories['utcnow'] = self.utcnow
         self.args = args

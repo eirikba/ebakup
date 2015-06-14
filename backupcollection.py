@@ -5,42 +5,26 @@ import datetime
 import database
 import logger
 
-class BackupCollectionFactory(object):
-    def __init__(self, tree, path, factories=None):
-        self._tree = tree
-        self._path = path
-        self._dbopener = None
-        self._dbcreator = None
-        if factories is not None:
-            self._dbopener = factories.get('database.open')
-            self._dbcreator = factories.get('database.create')
-        if self._dbopener is None:
-            self._dbopener = database.Database
-        if self._dbcreator is None:
-            self._dbcreator = database.create_database
+def create_collection(tree, path, factories=None):
+    '''Create a new backup collection at tree:path and return a
+    BackupCollection for accessing it.
+    '''
+    # Explicitly create the top-level directory to ensure failure
+    # if it already exists.
+    tree.create_directory(path)
+    tree.create_directory(path + ('content',))
+    if factories is not None:
+        dbcreator = factories.get('database.create')
+    if factories is None or dbcreator is None:
+        dbcreator = database.create_database
+    db = dbcreator(tree, path + ('db',))
+    return BackupCollection(tree, path, factories=factories)
 
-    def set_database_creator(self, dbcreator):
-        self._dbcreator = dbcreator
-
-    def set_database_opener(self, dbopener):
-        self._dbopener = dbopener
-
-    def create_collection(self):
-        '''Create a new backup collection as described by this object and
-        return a BackupCollection for accessing it.
-        '''
-        # Explicitly create the top-level directory to ensure failure
-        # if it already exists.
-        self._tree.create_directory(self._path)
-        self._tree.create_directory(self._path + ('content',))
-        db = self._dbcreator(self._tree, self._path + ('db',))
-        return BackupCollection(self)
-
-    def open_collection(self):
-        '''Return a BackupCollection object for the backup collection
-        described by this object.
-        '''
-        return BackupCollection(self)
+def open_collection(tree, path, factories=None):
+    '''Return a BackupCollection object for the backup collection
+    described by this object.
+    '''
+    return BackupCollection(tree, path, factories=factories)
 
 
 hexits = '0123456789abcdef'
@@ -57,15 +41,20 @@ class BackupCollection(object):
     '''Provides access to a backup collection.
     '''
 
-    def __init__(self, params):
+    def __init__(self, tree, path, factories=None):
         '''Return a BackupCollection object for the backup collection
         described by 'params'.
         '''
         self._logger = logger.Logger()
-        self._tree = params._tree
-        self._path = params._path
+        self._tree = tree
+        self._path = path
         self._verify_sane_directory_structure()
-        self._open_database(params._dbopener)
+        dbopener = None
+        if factories is not None:
+            dbopener = factories.get('database.open')
+        if dbopener is None:
+            dbopener = database.Database
+        self._open_database(dbopener)
         self._utcnow = datetime.datetime.utcnow
 
     def set_logger(self, logger):

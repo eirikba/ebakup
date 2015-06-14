@@ -196,10 +196,7 @@ class TestFullSequence(unittest.TestCase):
         self.assertCountEqual(expected, contentfiles)
 
     def _check_db_after_initial_backup(self):
-        coll = (
-            backupcollection
-            .BackupCollectionFactory(self.fs, ('backups', 'home'))
-            .open_collection())
+        coll = backupcollection.open_collection(self.fs, ('backups', 'home'))
         bkup = coll.get_most_recent_backup()
         self.assertEqual(
             datetime.datetime(1995, 1, 1, 0, 0, 20), bkup.get_start_time())
@@ -305,10 +302,7 @@ class TestFullSequence(unittest.TestCase):
 
     def _check_result_of_second_backup(self, stdout):
         self.assertEqual('', stdout)
-        coll = (
-            backupcollection
-            .BackupCollectionFactory(self.fs, ('backups', 'home'))
-            .open_collection())
+        coll = backupcollection.open_collection(self.fs, ('backups', 'home'))
         bkup = coll.get_most_recent_backup()
         self.assertEqual(
             datetime.datetime(1995, 1, 5, 0, 44, 0), bkup.get_start_time())

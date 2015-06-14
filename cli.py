@@ -71,7 +71,8 @@ def create_factories(overrides):
     factories = {
         'filesystem': filesys.get_file_system,
         'backupoperation': backupoperation.BackupOperation,
-        'backupcollection': backupcollection.BackupCollectionFactory,
+        'backupcollection.create': backupcollection.create_collection,
+        'backupcollection.open': backupcollection.open_collection,
         'database.create': database.create_database,
         'database.open': database.Database,
         'utcnow': datetime.datetime.utcnow,

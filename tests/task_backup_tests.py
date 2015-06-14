@@ -47,19 +47,11 @@ class FakeCollectionData(object):
         self.accessor = access
         self.path = path
 
-class FakeCollectionFactory(object):
-    def __init__(self, tree, path):
-        self._tree = tree
-        self._path = path
+def open_collection(tree, path, factories=None):
+    return FakeCollection(factories.get('database.open'), tree, path)
 
-    def set_database_creator(self, creator):
-        self._creator = creator
-
-    def set_database_opener(self, opener):
-        self._opener = opener
-
-    def open_collection(self):
-        return FakeCollection(self._opener, self._tree, self._path)
+def create_collection(tree, path, factories=None):
+    raise NotImplementedError()
 
 class FakeCollection(object):
     def __init__(self, action, tree, path):
@@ -126,7 +118,8 @@ class FakeArgs(object):
         self.logger = 'arglogger'
         self.factories = {
             'backupoperation': self.create_operation,
-            'backupcollection': FakeCollectionFactory,
+            'backupcollection.open': open_collection,
+            'backupcollection.create': create_collection,
             'filesystem': FakeTree,
             'database.create': 'argdbcreate',
             'database.open': 'argdbopen',

@@ -6,8 +6,10 @@ class BackupTask(object):
         self._config = config
         self._logger = args.logger
         self._create_collection = args.create
+        self._factories = args.factories
         self._backupoperationfactory = args.factories['backupoperation']
-        self._backupcollectionfactory = args.factories['backupcollection']
+        self._collectionopener = args.factories['backupcollection.open']
+        self._collectioncreator = args.factories['backupcollection.create']
         self._treefactory = args.factories['filesystem']
         self._dbcreator = args.factories['database.create']
         self._dbopener = args.factories['database.open']
@@ -39,13 +41,12 @@ class BackupTask(object):
                 self._logger.LOG_ERROR, 'No backup collections available', name)
             raise NotTestedError('No backup collections available')
             return
-        collectionfactory = self._backupcollectionfactory(storetree, storepath)
-        collectionfactory.set_database_creator(self._dbcreator)
-        collectionfactory.set_database_opener(self._dbopener)
         if self._create_collection:
-            collection = collectionfactory.create_collection()
+            collection = self._factories['backupcollection.create'](
+                storetree, storepath, factories=self._factories)
         else:
-            collection = collectionfactory.open_collection()
+            collection = self._factories['backupcollection.open'](
+                storetree, storepath, factories=self._factories)
         collection.set_utcnow(self._utcnow)
         collection.set_logger(self._logger)
         operation = self._backupoperationfactory(collection)
