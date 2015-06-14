@@ -128,6 +128,17 @@ class FakeFileSystem(object):
     def is_accessible(self):
         return True
 
+    def path_to_string(self, path):
+        return '/' + '/'.join(path)
+
+    def path_from_string(self, stringpath):
+        if not stringpath.startswith('/'):
+            stringpath = '/current/working/directory/' + stringpath
+        return tuple(x for x in stringpath.split('/') if x)
+
+    def path_to_full_string(self, path):
+        return 'local:' + self.path_to_string(path)
+
     def does_path_exist(self, path):
         self._check_access(path, 'stat')
         return path in self._paths

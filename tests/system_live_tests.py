@@ -137,6 +137,7 @@ class TestBackup(unittest.TestCase):
             Backup definitions:
               backup home
                 collection local:/path/to/testbakup/backup
+                  Least recently verified: 2014-12-01 00:02:03
                 source local:/path/to/testbakup/sources
             '''),
         info)

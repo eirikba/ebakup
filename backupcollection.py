@@ -263,6 +263,11 @@ class BackupCollection(object):
         having 'checksum' as checksum.
         '''
 
+    def iterate_content_ids(self):
+        '''Iterates over all content ids in this collection.
+        '''
+        yield from self._db.iterate_content_ids()
+
     def list_content_ids(self, first, count):
         '''Return a list of content ids that exist in the database.
 

@@ -60,6 +60,9 @@ class FakeArgs(object):
     def __init__(self, config):
         self._config = config
         self.logger = FakeLogger()
+        self.factories = {
+            'backupcollection': FakeCollectionMaker
+            }
 
 class FakeLogger(object):
     def __init__(self):
@@ -67,6 +70,24 @@ class FakeLogger(object):
 
     def print(self, msg):
         self._printed.append(msg)
+
+class FakeCollectionMaker(object):
+    def __init__(self, tree, path, factories):
+        self._tree = tree
+        self._path = path
+        self._factories = factories
+
+    def open_collection(self):
+        return FakeCollection(self._tree, self._path, self._factories)
+
+class FakeCollection(object):
+    def __init__(self, tree, path, factories):
+        self._tree = tree
+        self._path = path
+        self._factories = factories
+
+    def iterate_content_ids(self):
+        return ()
 
 class InfoTestSupport(unittest.TestCase):
     def get_first_line(self, **kwargs):

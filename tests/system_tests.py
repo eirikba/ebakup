@@ -135,6 +135,7 @@ class TestFullSequence(unittest.TestCase):
             'Backup definitions:\n'
             '  backup home\n'
             '    collection local:/backups/home\n'
+            '      (Does not exist)\n'
             '    source local:/home/me\n',
             out.getvalue())
 
@@ -266,7 +267,9 @@ class TestFullSequence(unittest.TestCase):
         cli.main(('info',), factories=self.factories, stdoutfile=out)
         self.assertEqual(
             'Backup definitions:\n  backup home\n'
-            '    collection local:/backups/home\n    source local:/home/me\n',
+            '    collection local:/backups/home\n'
+            '      Least recently verified: 1995-01-01 00:00:20\n'
+            '    source local:/home/me\n',
             out.getvalue())
 
     def _update_sources_before_second_backup(self):
