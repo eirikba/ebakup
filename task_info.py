@@ -46,6 +46,13 @@ class InfoTask(object):
                 self._print(
                     prefix + '  Least recently verified: ' +
                     str(colldata.least_recently_verified_timestamp))
+                self._print(
+                    prefix + '  Total number of content files: ' +
+                    str(colldata.total_number_of_cids))
+                if colldata.verified_in_the_future > 0:
+                    self._print(
+                        prefix + '  Verified in the future: ' +
+                        str(colldata.verified_in_the_future) + ' files')
                 for t in colldata.time_verify_stats:
                     if t[2] > 0:
                         self._print(
@@ -85,7 +92,10 @@ class CollectionSummarizer(object):
             ['one month', one_month_ago, 0],
             ['one week', one_week_ago, 0],
         ]
+        verified_in_the_future = 0
+        total_number_of_cids = 0
         for cid in self.collection.iterate_content_ids():
+            total_number_of_cids += 1
             info = self.collection.get_content_info(cid)
             if lrv_time is None or info.timeline[-1].last < lrv_time:
                 lrv_time = info.timeline[-1].last
@@ -93,5 +103,9 @@ class CollectionSummarizer(object):
             for t in times:
                 if t[1] >= info.timeline[-1].last:
                     t[2] += 1
+            if info.timeline[-1].last > now:
+                verified_in_the_future += 1
         self.least_recently_verified_timestamp = lrv_time
         self.time_verify_stats = times
+        self.verified_in_the_future = verified_in_the_future
+        self.total_number_of_cids = total_number_of_cids

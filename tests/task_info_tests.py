@@ -223,6 +223,7 @@ class TestInfoForFullConfig(InfoTestSupport):
             backup mine
               collection local:/data/backup1/mine
                 Least recently verified: 2014-03-24 16:49:50
+                Total number of content files: 4
                 Not verified for one year: 1 files
                 Not verified for three months: 3 files
                 Not verified for one month: 3 files

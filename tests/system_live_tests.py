@@ -138,6 +138,7 @@ class TestBackup(unittest.TestCase):
               backup home
                 collection local:/path/to/testbakup/backup
                   Least recently verified: 2014-12-01 00:02:03
+                  Total number of content files: 3
                 source local:/path/to/testbakup/sources
             '''),
         info)
