@@ -181,8 +181,10 @@ class TestBasicBackup(unittest.TestCase):
         bc = FakeBackupCollection()
         self.backupcollection = bc
         self.logger = logger.Logger()
-        bo = backupoperation.BackupOperation(bc)
-        bo.set_logger(self.logger)
+        self.services = {
+            'logger': self.logger,
+            }
+        bo = backupoperation.BackupOperation(bc, services=self.services)
         self.backupoperation = bo
         sourcetree = FakeTree()
         self.sourcetree = sourcetree
@@ -279,8 +281,8 @@ class TestBasicBackup(unittest.TestCase):
             ('home', 'me', 'tmp', 'subdir'), sourcetree._listed_directories)
 
     def test_changed_static_data_causes_error_to_be_reported(self):
-        bo = backupoperation.BackupOperation(self.backupcollection)
-        bo.set_logger(self.logger)
+        bo = backupoperation.BackupOperation(
+            self.backupcollection, services=self.services)
         sourcetree2 = FakeTree()
         sourcetree2._copy_tree(self.sourcetree)
         # Change one static file
@@ -313,8 +315,8 @@ class TestBasicBackup(unittest.TestCase):
                 ('main', 'myfiles', 'static', 'more', 'three')].contentid)
 
     def test_removed_static_data_causes_error_to_be_reported(self):
-        bo = backupoperation.BackupOperation(self.backupcollection)
-        bo.set_logger(self.logger)
+        bo = backupoperation.BackupOperation(
+            self.backupcollection, services=self.services)
         sourcetree2 = FakeTree()
         sourcetree2._copy_tree(self.sourcetree)
         # Change one static file
@@ -344,8 +346,8 @@ class TestBasicBackup(unittest.TestCase):
             ('main', 'myfiles', 'static', 'more', 'three'), backup2._files)
 
     def test_moved_static_data_causes_no_error_to_be_reported(self):
-        bo = backupoperation.BackupOperation(self.backupcollection)
-        bo.set_logger(self.logger)
+        bo = backupoperation.BackupOperation(
+            self.backupcollection, services=self.services)
         sourcetree2 = FakeTree()
         sourcetree2._copy_tree(self.sourcetree)
         # Change one static file
@@ -380,8 +382,8 @@ class TestBasicBackup(unittest.TestCase):
         self.assertNoLoggedProblems()
 
     def test_move_static_data_to_nonstatic_causes_error_to_be_reported(self):
-        bo = backupoperation.BackupOperation(self.backupcollection)
-        bo.set_logger(self.logger)
+        bo = backupoperation.BackupOperation(
+            self.backupcollection, services=self.services)
         sourcetree2 = FakeTree()
         sourcetree2._copy_tree(self.sourcetree)
         # Change one static file
@@ -424,8 +426,8 @@ class TestBasicBackup(unittest.TestCase):
         for content, count in self.backupcollection._content_add_count.items():
             old_contents.append(content)
             self.assertEqual(1, count)
-        bo = backupoperation.BackupOperation(self.backupcollection)
-        bo.set_logger(self.logger)
+        bo = backupoperation.BackupOperation(
+            self.backupcollection, services=self.services)
         sourcetree2 = FakeTree()
         sourcetree2._copy_tree(self.sourcetree)
         # Change one file
@@ -469,8 +471,8 @@ class TestBasicBackup(unittest.TestCase):
         for content, count in self.backupcollection._content_add_count.items():
             old_contents.append(content)
             self.assertEqual(1, count)
-        bo = backupoperation.BackupOperation(self.backupcollection)
-        bo.set_logger(self.logger)
+        bo = backupoperation.BackupOperation(
+            self.backupcollection, services=self.services)
         sourcetree2 = FakeTree()
         sourcetree2._copy_tree(self.sourcetree)
         # Intentionally break the assumption that unchanged mtime and
@@ -504,8 +506,8 @@ class TestBasicBackup(unittest.TestCase):
         for content, count in self.backupcollection._content_add_count.items():
             old_contents.append(content)
             self.assertEqual(1, count)
-        bo = backupoperation.BackupOperation(self.backupcollection)
-        bo.set_logger(self.logger)
+        bo = backupoperation.BackupOperation(
+            self.backupcollection, services=self.services)
         sourcetree2 = FakeTree()
         sourcetree2._copy_tree(self.sourcetree)
         # And change one file, and let its content be the same as another
@@ -549,8 +551,10 @@ class TestTwoBackups(unittest.TestCase):
         bc = FakeBackupCollection()
         self.backupcollection = bc
         self.logger = logger.Logger()
-        bo = backupoperation.BackupOperation(bc)
-        bo.set_logger(self.logger)
+        self.services = {
+            'logger': self.logger,
+            }
+        bo = backupoperation.BackupOperation(bc, services=self.services)
         self.backupoperation = bo
         sourcetree = FakeTree()
         self.sourcetree = sourcetree
@@ -574,8 +578,7 @@ class TestTwoBackups(unittest.TestCase):
         self.backuptree = tree
         bo.execute_backup()
 
-        bo = backupoperation.BackupOperation(bc)
-        bo.set_logger(self.logger)
+        bo = backupoperation.BackupOperation(bc, services=self.services)
         self.backupoperation2 = bo
         sourcetree2 = FakeTree()
         self.sourcetree2 = sourcetree2

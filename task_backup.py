@@ -47,10 +47,8 @@ class BackupTask(object):
         else:
             collection = self._services['backupcollection.open'](
                 storetree, storepath, services=self._services)
-        collection.set_utcnow(self._utcnow)
-        collection.set_logger(self._logger)
-        operation = self._backupoperationfactory(collection)
-        operation.set_logger(self._logger)
+        operation = self._backupoperationfactory(
+            collection, services=self._services)
         for sourcedata in backup_config.sources:
             source = self._treefactory(sourcedata.accessor)
             bktree = operation.add_tree_to_backup(

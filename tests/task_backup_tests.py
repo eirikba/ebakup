@@ -59,21 +59,12 @@ class FakeCollection(object):
         self._tree = tree
         self._path = path
 
-    def set_utcnow(self, utcnow):
-        self._utcnow = utcnow
-
-    def set_logger(self, logger):
-        self._logger = logger
-
 class FakeBackupOperation(object):
-    def __init__(self, collection):
+    def __init__(self, collection, services=None):
         self._collection = collection
         self._trees = []
         self._backup_done = False
-
-    def set_logger(self, logger):
-        assert not self._backup_done
-        self._logger = logger
+        self._services = services
 
     def add_tree_to_backup(self, tree, sourcepath, targetpath):
         assert not self._backup_done
@@ -129,8 +120,8 @@ class FakeArgs(object):
         self.backups = []
         self._operations = []
 
-    def create_operation(self, collection):
-        op = FakeBackupOperation(collection)
+    def create_operation(self, collection, services=None):
+        op = FakeBackupOperation(collection, services)
         self._operations.append(op)
         return op
 

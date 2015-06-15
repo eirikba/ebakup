@@ -45,7 +45,12 @@ class BackupCollection(object):
         '''Return a BackupCollection object for the backup collection
         described by 'params'.
         '''
-        self._logger = logger.Logger()
+        if services is None:
+            services = {}
+        self._logger = services.get('logger')
+        if not self._logger:
+            self._logger = logger.Logger()
+        self._utcnow = services.get('utcnow', datetime.datetime.utcnow)
         self._tree = tree
         self._path = path
         self._verify_sane_directory_structure()
@@ -55,14 +60,6 @@ class BackupCollection(object):
         if dbopener is None:
             dbopener = database.Database
         self._open_database(dbopener)
-        self._utcnow = datetime.datetime.utcnow
-
-    def set_logger(self, logger):
-        self._logger.replay_log(logger)
-        self._logger = logger
-
-    def set_utcnow(self, utcnow):
-        self._utcnow = utcnow
 
     def _verify_sane_directory_structure(self):
         if not self._tree.does_path_exist(self._path):
