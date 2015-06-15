@@ -20,9 +20,8 @@ class UnknownCommandError(Exception): pass
 def main(commandline=None, stdoutfile=None, services=None):
     args = parse_commandline(commandline, stdoutfile)
     args.services = create_services(services)
-    args.logger = logger.Logger()
     if stdoutfile is not None:
-        args.logger.set_outfile(stdoutfile)
+        args.services['logger'].set_outfile(stdoutfile)
     tasks = make_tasks_from_args(args)
     perform_tasks(tasks)
 
@@ -75,6 +74,7 @@ def create_services(overrides):
         'backupcollection.open': backupcollection.open_collection,
         'database.create': database.create_database,
         'database.open': database.Database,
+        'logger': logger.Logger(),
         'utcnow': datetime.datetime.utcnow,
     }
     if overrides is None:

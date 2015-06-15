@@ -62,8 +62,8 @@ class FakeSourceConfig(object):
 class FakeArgs(object):
     def __init__(self, config):
         self._config = config
-        self.logger = FakeLogger()
         self.services = {
+            'logger': FakeLogger(),
             'backupcollection.open': FakeCollectionMaker().open_collection,
             }
 
@@ -144,11 +144,12 @@ class TestInfoForEmptyConfig(InfoTestSupport):
         config = FakeConfig()
         args = FakeArgs(config)
         self.args = args
+        self.services = args.services
         self.task = task_info.InfoTask(config, args)
         self.task.execute()
 
     def test_output(self):
-        out = self.args.logger._printed
+        out = self.services['logger']._printed
         self.assertEqual(
             ['Backup definitions:',
              '  No backups defined'],
@@ -174,9 +175,10 @@ class TestInfoForFullConfig(InfoTestSupport):
         self._utcnow = datetime.datetime(2015, 6, 14, 14, 28, 54)
         args.services['utcnow'] = self.utcnow
         self.args = args
+        self.services = args.services
         self.task = task_info.InfoTask(config, args)
         self.task.execute()
-        self.lines = self.args.logger._printed
+        self.lines = self.services['logger']._printed
         self.text = '\n'.join(self.lines)
 
     def utcnow(self):

@@ -115,7 +115,6 @@ class FakeBackupTree(object):
 class FakeArgs(object):
     def __init__(self, config):
         self._config = config
-        self.logger = 'arglogger'
         self.services = {
             'backupoperation': self.create_operation,
             'backupcollection.open': open_collection,
@@ -123,6 +122,7 @@ class FakeArgs(object):
             'filesystem': FakeTree,
             'database.create': 'argdbcreate',
             'database.open': 'argdbopen',
+            'logger': 'arglogger',
             'utcnow': 'argutcnow',
             }
         self.create = False

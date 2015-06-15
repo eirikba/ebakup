@@ -4,9 +4,9 @@ class BackupTask(object):
 
     def __init__(self, config, args):
         self._config = config
-        self._logger = args.logger
         self._create_collection = args.create
         self._services = args.services
+        self._logger = self._services['logger']
         self._backupoperationfactory = args.services['backupoperation']
         self._collectionopener = args.services['backupcollection.open']
         self._collectioncreator = args.services['backupcollection.create']

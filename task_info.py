@@ -12,7 +12,7 @@ class InfoTask(object):
         self._services = args.services
         self._getfilesys = self._services.get(
             'filesystem', filesys.get_file_system)
-        self._logger = self._args.logger
+        self._logger = self._services['logger']
 
     def execute(self):
         backup_names = self._config.get_all_backup_names()

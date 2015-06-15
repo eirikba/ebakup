@@ -35,6 +35,7 @@ class TestFullSequenceOfOperations(unittest.TestCase):
             'backupcollection.open': None,
             'database.create': None,
             'database.open': None,
+            'logger': None,
             'utcnow': self.utcnow,
             }
         self.advance_utcnow(seconds=1)
