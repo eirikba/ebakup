@@ -219,17 +219,17 @@ class FakeDatabase(object):
         return None
 
     def add_content_item(self, when, checksum):
-        content_id_base = checksum[:4] + b'ci' + checksum[4:]
-        content_id = content_id_base
+        contentid_base = checksum[:4] + b'ci' + checksum[4:]
+        contentid = contentid_base
         altcount = 0
-        while content_id in self._content:
-            content_id = content_id_base + str(altcount).encode('utf8')
+        while contentid in self._content:
+            contentid = contentid_base + str(altcount).encode('utf8')
             altcount += 1
-        self._content[content_id] = FakeContentInfo(content_id, when, checksum)
-        return content_id
+        self._content[contentid] = FakeContentInfo(contentid, when, checksum)
+        return contentid
 
-    def get_content_info(self, content_id):
-        return self._content.get(content_id)
+    def get_content_info(self, contentid):
+        return self._content.get(contentid)
 
     def get_all_content_infos_with_checksum(self, checksum):
         return [x for x in self._content.values()
@@ -244,7 +244,7 @@ class FakeBackupBuilder(object):
         self._db = db
         self._backup = FakeBackup(start_time)
 
-    def add_file(self, path, content_id, size, mtime, mtime_nsec):
+    def add_file(self, path, contentid, size, mtime, mtime_nsec):
         if path in self._backup._files:
             raise FileExistsError('File already exists: ' + str(path))
         for i in range(1, len(path)):
@@ -253,7 +253,7 @@ class FakeBackupBuilder(object):
                     'Path is not a directory: ' + str(path[:i]))
             self._backup._directories.add(path[:i])
         self._backup._files[path] = FakeFileData(
-            content_id, size, mtime, mtime_nsec)
+            contentid, size, mtime, mtime_nsec)
 
     def commit(self, end_time):
         backup = self._backup
@@ -287,12 +287,12 @@ class FakeBackup(object):
         return self._files.get(path)
 
 class FakeContentInfo(object):
-    def __init__(self, content_id, when, checksum):
-        self._content_id = content_id
+    def __init__(self, contentid, when, checksum):
+        self._contentid = contentid
         self._timeline = [FakeContentTimelineItem(checksum, when, when, True)]
 
-    def get_content_id(self):
-        return self._content_id
+    def get_contentid(self):
+        return self._contentid
 
     def get_good_checksum(self):
         return self._timeline[0].checksum
@@ -336,15 +336,15 @@ class FakeContentTimelineItem(object):
         self.restored = restored
 
 class FakeFileData(object):
-    def __init__(self, content_id, size, mtime, mtime_nsec):
-        self.contentid = content_id
+    def __init__(self, contentid, size, mtime, mtime_nsec):
+        self.contentid = contentid
         self.size = size
         self.mtime = mtime
         self.mtime_nsec = mtime_nsec
 
 class TestUtilities(unittest.TestCase):
-    def test_make_path_from_content_id_in_new_collection(self):
-        # _make_path_from_content_id() is currently slightly broken in
+    def test_make_path_from_contentid_in_new_collection(self):
+        # _make_path_from_contentid() is currently slightly broken in
         # that it doesn't check the existing splitting choices. Nor
         # does it make any attempt at optimized number of splits.
         # However, for a clean, new collection, I think the strategy
@@ -358,7 +358,7 @@ class TestUtilities(unittest.TestCase):
             }
         bc = backupcollection.create_collection(
             storetree, ('path', 'to', 'store'), services=services)
-        mkpath = bc._make_path_from_content_id
+        mkpath = bc._make_path_from_contentid
 
         self.assertEqual(('00', '01', '0203'), mkpath(b'\x00\x01\x02\x03'))
         self.assertEqual(('61', '62', '63646566676869'), mkpath(b'abcdefghi'))
@@ -525,10 +525,10 @@ class TestBasicBackup(unittest.TestCase):
         self.assertEqual(data, b'127' * 42 + b'1')
 
     def test_add_duplicate_content(self):
-        content_id = self.backupcollection.add_content(
+        contentid = self.backupcollection.add_content(
             self.sourcetree, ('home', 'me', 'file.txt'),
             now=datetime.datetime(2015, 2, 18, 5, 27, 43))
-        self.assertEqual(self.cid1, content_id)
+        self.assertEqual(self.cid1, contentid)
 
     def test_checksum_timeline(self):
         bc = backupcollection.open_collection(

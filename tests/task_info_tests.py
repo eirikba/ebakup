@@ -95,7 +95,7 @@ class FakeCollection(object):
         self._content.append(
             FakeContentInfo(cid, checksum=cid, first=added))
 
-    def iterate_content_ids(self):
+    def iterate_contentids(self):
         for item in self._content:
             yield item.contentid
 

@@ -12,7 +12,7 @@ from config_subtree import CfgSubtree
 class FakeBackupCollection(object):
     def __init__(self):
         self._backups = []
-        self._content = {} # { content: content_id }
+        self._content = {} # { content: contentid }
         self._content_add_count = {} # { content: count }
 
     def start_backup(self):
@@ -47,10 +47,10 @@ class FakeBackupBuilder(object):
         self._done = True
         self._collection._backups.append(self._backup)
 
-    def add_file(self, path, content_id, size, mtime, mtime_ns):
+    def add_file(self, path, contentid, size, mtime, mtime_ns):
         assert path not in self._backup._files
         self._backup._files[path] = FakeBackupFileInfo(
-            content_id, size, mtime, mtime_ns)
+            contentid, size, mtime, mtime_ns)
 
 FakeBackupFileInfo = collections.namedtuple(
     'FakeBackupFileInfo', ('contentid', 'size', 'mtime', 'mtime_nsec'))
@@ -498,7 +498,7 @@ class TestBasicBackup(unittest.TestCase):
             self.assertIn(content, old_contents)
         self.assertNoLoggedProblems()
 
-    def test_file_with_identical_content_gets_same_content_id(self):
+    def test_file_with_identical_content_gets_same_contentid(self):
         # First, verify that each content has only been added once
         # during the first back-up operation.
         self.assertEqual(1, len(self.backupcollection._backups))

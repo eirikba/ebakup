@@ -92,8 +92,8 @@ class BackupCollection(object):
         builder = BackupBuilder(self, start)
         return builder
 
-    def _make_shadow_copy(self, path, content_id):
-        contentpath = self._make_path_from_content_id(content_id)
+    def _make_shadow_copy(self, path, contentid):
+        contentpath = self._make_path_from_contentid(contentid)
         contentpath = self._path + ('content',) + contentpath
         shadowpath = self._path + path
         self._tree.make_cheap_copy(contentpath, shadowpath)
@@ -171,29 +171,29 @@ class BackupCollection(object):
             assert len(data) == size or written == size
             assert written == 0 or written == size
             if len(data) == size:
-                content_id = self._find_duplicate_content_of_data(
+                contentid = self._find_duplicate_content_of_data(
                     data, checksum)
             elif written == size:
-                content_id = self._find_duplicate_content_of_file(
+                contentid = self._find_duplicate_content_of_file(
                     target, checksum)
             else:
                 raise AssertionError('Neither file nor data complete!')
-            if content_id:
-                return content_id
+            if contentid:
+                return contentid
             if written == 0 and data:
                 written = target.write_data_slice(0, data)
             assert written == size
-            content_id = self._db.add_content_item(now, checksum)
-            target_path = self._make_path_from_content_id(content_id)
+            contentid = self._db.add_content_item(now, checksum)
+            target_path = self._make_path_from_contentid(contentid)
             target.rename_without_overwrite_on_close(
                 self._tree, self._path + ('content',) + target_path)
-        return content_id
+        return contentid
 
     def _find_duplicate_content_of_data(self, data, checksum):
         read_size = 1024 * 1024 * 10
         datalen = len(data)
         for cand in self._db.get_all_content_infos_with_checksum(checksum):
-            candpath = self._make_path_from_content_id(cand.get_content_id())
+            candpath = self._make_path_from_contentid(cand.get_contentid())
             with self._tree.get_item_at_path(
                     self._path + ('content',) + candpath) as candfile:
                 if candfile.get_size() != datalen:
@@ -208,14 +208,14 @@ class BackupCollection(object):
                         done = datalen
                         ok = False
                 if ok:
-                    return cand.get_content_id()
+                    return cand.get_contentid()
         return None
 
     def _find_duplicate_content_of_file(self, datafile, checksum):
         read_size = 1024 * 1024 * 10
         datalen = datafile.get_size()
         for cand in self._db.get_all_content_infos_with_checksum(checksum):
-            candpath = self._make_path_from_content_id(cand.get_content_id())
+            candpath = self._make_path_from_contentid(cand.get_contentid())
             with self._tree.get_item_at_path(
                     self._path + ('content',) + candpath) as candfile:
                 if candfile.get_size() != datalen:
@@ -230,31 +230,31 @@ class BackupCollection(object):
                         done = datalen
                         ok = False
                 if ok:
-                    return cand.get_content_id()
+                    return cand.get_contentid()
         return None
 
-    def _make_path_from_content_id(self, content_id):
+    def _make_path_from_contentid(self, contentid):
         # Slightly broken. Should make sure each path component except
         # the last has the same length as the items already in those
         # directories. As long as this method is used to create all
         # new content files, the resulting tree will be valid anyway.
         # But this won't work correctly with all valid trees.
-        first = hexify(content_id[0:1])
-        second = hexify(content_id[1:2])
-        rest = hexify(content_id[2:])
+        first = hexify(contentid[0:1])
+        second = hexify(contentid[1:2])
+        rest = hexify(contentid[2:])
         return first, second, rest
 
-    def list_content_ids_for_checksum(self, checksum):
+    def list_contentids_for_checksum(self, checksum):
         '''Return a list of all content ids that represent content items
         having 'checksum' as checksum.
         '''
 
-    def iterate_content_ids(self):
+    def iterate_contentids(self):
         '''Iterates over all content ids in this collection.
         '''
-        yield from self._db.iterate_content_ids()
+        yield from self._db.iterate_contentids()
 
-    def list_content_ids(self, first, count):
+    def list_contentids(self, first, count):
         '''Return a list of content ids that exist in the database.
 
         The returned list will contain the 'count' smallest content
@@ -287,26 +287,26 @@ class BackupCollection(object):
             timeline = dbinfo.get_checksum_timeline())
 
     def update_content_checksum(
-            self, content_id, when, checksum, restored=False):
+            self, contentid, when, checksum, restored=False):
         '''Update the checksum timeline of the content item with content id
-        'content_id' to indicate that its checksum was 'checksum' at
+        'contentid' to indicate that its checksum was 'checksum' at
         the time 'when'. If 'restored' is True, it means that the
         content item was somehow checked to be the same as a "believed
         good" copy.
         '''
-        info = self._db.get_content_info(content_id)
+        info = self._db.get_content_info(contentid)
         if restored:
             info.register_content_recovered(when, checksum)
         else:
             info.register_checksum(when, checksum)
 
-    def get_content_reader(self, content_id):
+    def get_content_reader(self, contentid):
         '''Return a FileInterface object that can be used to access the data
-        stored as the content item with id 'content_id'. The returned
+        stored as the content item with id 'contentid'. The returned
         object only supports the methods that do not modify the
         content item.
         '''
-        path = self._make_path_from_content_id(content_id)
+        path = self._make_path_from_contentid(contentid)
         return ContentReader(
             self._tree.get_item_at_path(self._path + ('content',) + path))
 
@@ -414,15 +414,15 @@ class BackupData(object):
             return None
         return FileData(
             self._collection._db,
-            content_id = filedata.contentid,
+            contentid = filedata.contentid,
             size = filedata.size,
             mtime = filedata.mtime,
             mtime_nsec = filedata.mtime_nsec)
 
 class FileData(object):
-    def __init__(self, db, content_id, size, mtime, mtime_nsec):
+    def __init__(self, db, contentid, size, mtime, mtime_nsec):
         self._db = db
-        self.contentid = content_id
+        self.contentid = contentid
         self.size = size
         self.mtime = mtime
         self.mtime_nsec = mtime_nsec

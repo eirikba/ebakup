@@ -169,7 +169,7 @@ class TestSimpleDatabase(unittest.TestCase):
         self.assertEqual(
             b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
             b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
-            info.get_content_id())
+            info.get_contentid())
         checks = info.get_checksum_timeline()
         self.assertEqual(3, len(checks))
         self.assertEqual(
@@ -205,7 +205,7 @@ class TestSimpleDatabase(unittest.TestCase):
         self.assertEqual(
             b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
             b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98\x37\x73",
-            info.get_content_id())
+            info.get_contentid())
         self.assertEqual(
             b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
             b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98",
@@ -252,7 +252,7 @@ class TestSimpleDatabase(unittest.TestCase):
         self.assertEqual(
             b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
             b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98\x37\x73",
-            infos[0].get_content_id())
+            infos[0].get_contentid())
         infos = db.get_all_content_infos_with_checksum(
             b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
             b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98\x37\x73")
@@ -585,7 +585,7 @@ class TestWriteDatabase(unittest.TestCase):
                 b'02' + b'0' * 30)
             self.assertNotEqual(None, contentinfos)
             self.assertEqual(1, len(contentinfos))
-            self.assertEqual(cid, contentinfos[0].get_content_id())
+            self.assertEqual(cid, contentinfos[0].get_contentid())
             tree._disallow_modification(('path', 'to', 'db', 'content'))
             backup.commit(datetime.datetime(2015, 4, 14, 21, 36, 41))
         self.disallow_create_dbfile(
@@ -617,7 +617,7 @@ class TestWriteDatabase(unittest.TestCase):
             backup.commit(datetime.datetime(2015, 4, 14, 21, 36, 41))
         self.disallow_create_dbfile(
             tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
-        self.assertCountEqual(cids, [x for x in db.iterate_content_ids()])
+        self.assertCountEqual(cids, [x for x in db.iterate_contentids()])
 
     def test_database_with_multiple_backups(self):
         tree = FakeDirectory()
@@ -964,7 +964,7 @@ class TestWriteDatabase(unittest.TestCase):
             self.assertEqual(test[1], f.mtime)
             self.assertEqual(test[2], f.mtime_nsec)
 
-    def test_iterate_content_ids(self):
+    def test_iterate_contentids(self):
         tree = FakeDirectory()
         db = self.create_empty_database(tree, ('path', 'to', 'db'))
         self.allow_create_dbfile(
@@ -997,7 +997,7 @@ class TestWriteDatabase(unittest.TestCase):
             tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
 
         db = database.Database(tree, ('path', 'to', 'db'))
-        self.assertCountEqual(cids, [x for x in db.iterate_content_ids()])
+        self.assertCountEqual(cids, [x for x in db.iterate_contentids()])
 
 class TestDBUtils(unittest.TestCase):
     def test_mtime_to_db_codec(self):

@@ -317,15 +317,15 @@ class Database(object):
         name = self.get_checksum_algorithm_name()
         return self._get_checksum_algorithm_from_name(name)
 
-    def iterate_content_ids(self):
+    def iterate_contentids(self):
         '''Iterates over all content ids in this database.
         '''
-        yield from self._content.iterate_content_ids()
+        yield from self._content.iterate_contentids()
 
-    def get_content_info(self, content_id):
-        '''Return a ContentInfo for the content with 'content_id' as id.
+    def get_content_info(self, contentid):
+        '''Return a ContentInfo for the content with 'contentid' as id.
         '''
-        data = self._content.contentdata.get(content_id)
+        data = self._content.contentdata.get(contentid)
         if data is None:
             return None
         return ContentInfo(self, data)
@@ -430,7 +430,7 @@ class ContentInfoFile(object):
             infos.append(ContentInfo(self._db, self.contentdata[cid]))
         return infos
 
-    def iterate_content_ids(self):
+    def iterate_contentids(self):
         '''Iterates over all content ids in this database.
         '''
         for key in self.contentdata.keys():
@@ -443,7 +443,7 @@ class ContentInfoFile(object):
                         datetime.timedelta(seconds=1))
         timestamp32 = _make_uint32(timestamp)
         current = set(
-            x.get_content_id() for x in
+            x.get_contentid() for x in
             self.get_all_content_infos_with_checksum(checksum))
         contentid = checksum
         extra = b'\x00'
@@ -540,7 +540,7 @@ class ContentInfo(object):
         self._db = db
         self._data = data
 
-    def get_content_id(self):
+    def get_contentid(self):
         '''Return the content id of this content item.
         '''
         return self._data.contentid
@@ -644,7 +644,7 @@ class BackupInfoBuilder(object):
         '''
         self._dbfile.close_and_unlock()
 
-    def add_file(self, path, content_id, size, mtime, mtime_nsec):
+    def add_file(self, path, contentid, size, mtime, mtime_nsec):
         '''Add a file to the backup data object.
 
         Note: mtime.microsecond will be ignored! (But should be either
@@ -660,8 +660,8 @@ class BackupInfoBuilder(object):
              _make_varuint(dirid),
              _make_varuint(len(component)),
              component,
-             _make_varuint(len(content_id)),
-             content_id,
+             _make_varuint(len(contentid)),
+             contentid,
              _make_varuint(size),
              _make_mtime_with_nsec(mtime, mtime_nsec)))
         self._add_data_entry(entry)

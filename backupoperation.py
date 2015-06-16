@@ -38,7 +38,7 @@ class BackupOperation(object):
         '''Perform the backup operation. Make the necessary copies and update
         the necessary databases.
         '''
-        self._added_static_content_ids = set()
+        self._added_static_contentids = set()
         self.previous = self._backupcollection.get_most_recent_backup()
         backup = self._backupcollection.start_backup()
         with backup:
@@ -67,7 +67,7 @@ class BackupOperation(object):
                 if how == 'static':
                     old_cid = self._get_old_cid_for_path(targetpath)
                     if old_cid is None:
-                        self._added_static_content_ids.add(cid)
+                        self._added_static_contentids.add(cid)
                     elif cid != old_cid:
                         self._logger.log(
                             self._logger.LOG_ERROR,
@@ -115,7 +115,7 @@ class BackupOperation(object):
             handler = self._how_should_target_path_be_handled(fpath)
             if handler == 'static' and backup.get_file_info(fpath) is None:
                 cid = self.previous.get_file_info(fpath).contentid
-                if cid not in self._added_static_content_ids:
+                if cid not in self._added_static_contentids:
                     self._logger.log(
                         self._logger.LOG_ERROR, 'static file removed', fpath)
 

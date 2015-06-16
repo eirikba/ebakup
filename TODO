@@ -76,7 +76,7 @@ the database none the less.
 
 ---------------------------------------------------------------------------
 
-BackupCollection._make_path_from_content_id() hardcodes the splitting points.
+BackupCollection._make_path_from_contentid() hardcodes the splitting points.
 
 Test: Not created
 

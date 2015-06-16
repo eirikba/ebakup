@@ -94,7 +94,7 @@ class CollectionSummarizer(object):
         ]
         verified_in_the_future = 0
         total_number_of_cids = 0
-        for cid in self.collection.iterate_content_ids():
+        for cid in self.collection.iterate_contentids():
             total_number_of_cids += 1
             info = self.collection.get_content_info(cid)
             if lrv_time is None or info.timeline[-1].last < lrv_time:
