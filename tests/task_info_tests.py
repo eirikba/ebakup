@@ -8,14 +8,22 @@ import unittest
 
 import task_info
 
+class FakeFilesys(object):
+    def __init__(self, name):
+        self._name = name
+
+    def path_to_full_string(self, path):
+        return 'local:/' + '/'.join(path)
+
 class FakeConfig(object):
     def __init__(self):
         self._backups = []
 
     def _add_full_config(self):
         bk = self._add_backup('mine')
-        coll = bk._add_collection('local', ('data', 'backup1', 'mine'))
-        src = bk._add_source('local', ('home', 'me'))
+        coll = bk._add_collection(
+            FakeFilesys('local'), ('data', 'backup1', 'mine'))
+        src = bk._add_source(FakeFilesys('local'), ('home', 'me'))
         bk = self._add_backup('stuff')
         bk = self._add_backup('other')
 

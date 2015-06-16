@@ -6,21 +6,19 @@ from config_subtree import CfgSubtree
 
 class InvalidDataError(Exception): pass
 
-def parse_full_path(fullpath):
+def parse_full_path(services, fullpath):
     if fullpath.startswith('local:'):
-        filesystem = 'local'
+        filesystem_name = 'local'
         localpath = fullpath[6:]
     else:
         raise InvalidDataError('Unknown path specification: ' + fullpath)
-    path = parse_relative_path(localpath)
+    filesystem = services['filesystem'](filesystem_name)
+    path = filesystem.path_from_string(localpath)
     return filesystem, path
 
-def parse_relative_path(path):
-    return tuple(x for x in path.split('/') if x)
-
-
 class Config(object):
-    def __init__(self):
+    def __init__(self, services):
+        self.services = services
         self.backups = []
 
     def read_file(self, tree, path):
@@ -45,7 +43,7 @@ class Config(object):
                     raise InvalidDataError(
                         'Backup named "' + backup.name +
                         '" defined twice in config data')
-            return CfgBackup(args)
+            return CfgBackup(self, args)
 
     def parse_exit_block(self, key, args, item):
         if key == 'backup':
@@ -124,17 +122,18 @@ class ConfigData(object):
 
 
 class CfgBackup(object):
-    def __init__(self, name):
+    def __init__(self, config, name):
+        self.config = config
         self.name = name
         self.collections = []
         self.sources = []
 
     def parse_enter_block(self, key, args):
         if key == 'collection':
-            filesystem, path = parse_full_path(args)
+            filesystem, path = parse_full_path(self.config.services, args)
             return CfgCollection(filesystem, path)
         if key == 'source':
-            filesystem, path = parse_full_path(args)
+            filesystem, path = parse_full_path(self.config.services, args)
             return CfgSource(filesystem, path)
 
     def parse_exit_block(self, key, args, item):
@@ -157,12 +156,12 @@ class CfgSource(object):
         self.filesystem = filesystem
         self.path = path
         self.targetpath = ()
-        self.tree = CfgTree(None, None)
+        self.tree = CfgTree(filesystem, None, None)
         # self.subtree_handlers set by ..._finalize_data()
 
     def parse_enter_block(self, key, args):
         if key == 'targetpath':
-            path = parse_relative_path(args)
+            path = self.filesystem.relative_path_from_string(args)
             if self.targetpath is not ():
                 raise InvalidDataError(
                     'Tried to set targetpath twice for the same source: ' +
@@ -187,7 +186,8 @@ class CfgSource(object):
         return handler
 
 class CfgTree(object):
-    def __init__(self, matchtype, matchdata):
+    def __init__(self, filesystem, matchtype, matchdata):
+        self.filesystem = filesystem
         self.matchtype = matchtype
         self.matchdata = matchdata
         self.children = []
@@ -216,22 +216,23 @@ class CfgTree(object):
         else:
             elems = (args,)
         paths = []
+        fs = self.filesystem
         for elem in elems:
-            paths.append(parse_relative_path(elem))
+            paths.append(fs.relative_path_from_string(elem))
         if key == 'path':
-            tree = CfgTree('plain', paths[0])
+            tree = CfgTree(fs, 'plain', paths[0])
             self.children.append(tree)
             return tree
         elif key == 'paths':
-            tree = CfgTree('plain multi', paths)
+            tree = CfgTree(fs, 'plain multi', paths)
             self.children.append(tree)
             return tree
         elif key == 'path-glob':
-            tree = CfgTree('glob', paths[0])
+            tree = CfgTree(fs, 'glob', paths[0])
             self.children.append(tree)
             return tree
         elif key == 'path-globs':
-            tree = CfgTree('glob multi', paths)
+            tree = CfgTree(fs, 'glob multi', paths)
             self.children.append(tree)
             return tree
         else:

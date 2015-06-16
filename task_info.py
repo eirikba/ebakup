@@ -2,16 +2,12 @@
 
 import datetime
 
-import filesys
-
 class InfoTask(object):
 
     def __init__(self, config, args):
         self._config = config
         self._args = args
         self._services = args.services
-        self._getfilesys = self._services.get(
-            'filesystem', filesys.get_file_system)
         self._logger = self._services['logger']
 
     def execute(self):
@@ -28,11 +24,11 @@ class InfoTask(object):
         for collection in bkconfig.collections:
             self._print_collection_info('    ', collection)
         for source in bkconfig.sources:
-            tree = self._getfilesys(source.filesystem)
+            tree = source.filesystem
             self._print('    source ' + tree.path_to_full_string(source.path))
 
     def _print_collection_info(self, prefix, collcfg):
-            tree = self._getfilesys(collcfg.filesystem)
+            tree = collcfg.filesystem
             self._print(
                 prefix + 'collection ' + tree.path_to_full_string(collcfg.path))
             opener = self._services['backupcollection.open']

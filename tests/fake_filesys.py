@@ -136,6 +136,10 @@ class FakeFileSystem(object):
             stringpath = '/current/working/directory/' + stringpath
         return tuple(x for x in stringpath.split('/') if x)
 
+    def relative_path_from_string(self, stringpath):
+        assert not stringpath.startswith('/')
+        return tuple(x for x in stringpath.split('/') if x)
+
     def path_to_full_string(self, path):
         return 'local:' + self.path_to_string(path)
 

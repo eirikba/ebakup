@@ -21,6 +21,17 @@ class LocalFileSystem(object):
         assert fullpath == os.path.join('/', *path)
         return path
 
+    def relative_path_from_string(self, stringpath):
+        if stringpath.startswith('/'):
+            raise ValueError(
+                'Relative string paths can not start with "/": ' + stringpath)
+        assert os.path.join('home', '/') == '/'
+        path = tuple(x for x in stringpath.split('/') if x)
+        assert '..' not in path
+        assert '.' not in path
+        assert stringpath == os.path.join(*path)
+        return path
+
     def path_to_full_string(self, path):
         return 'local:' + self.path_to_string(path)
 

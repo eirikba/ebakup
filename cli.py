@@ -99,7 +99,7 @@ def create_services(overrides):
 
 def make_tasks_from_args(args):
     localtree = args.services['filesystem']('local')
-    config = Config()
+    config = Config(args.services)
     if args.config:
         config.read_file(localtree, args.config)
     else:

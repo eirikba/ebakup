@@ -21,6 +21,16 @@ class FakeTree(object):
             raise FileNotFoundError('No such file: ' + str(path))
         return FakeFile(self, path)
 
+class FakeNamedTree(object):
+    def __init__(self, name):
+        self.name = name
+
+    def path_from_string(self, stringpath):
+        return tuple(x for x in stringpath.split('/') if x)
+
+    def relative_path_from_string(self, stringpath):
+        return tuple(x for x in stringpath.split('/') if x)
+
 class FakeFileData(object): pass
 
 class FakeFile(object):
@@ -45,7 +55,8 @@ class FakeFile(object):
 class TestSimpleConfig(unittest.TestCase):
 
     def setUp(self):
-        conf = config.Config()
+        services = { 'filesystem': FakeNamedTree }
+        conf = config.Config(services)
         self.config = conf
         tree = FakeTree()
         self.tree = tree
@@ -75,7 +86,7 @@ class TestSimpleConfig(unittest.TestCase):
         self.assertNotEqual(None, backup)
         self.assertEqual(1, len(backup.collections))
         collection = backup.collections[0]
-        self.assertEqual('local', collection.filesystem)
+        self.assertEqual('local', collection.filesystem.name)
         self.assertEqual(('backup', 'mine'), collection.path)
 
     def test_backup_home_source(self):
@@ -83,7 +94,7 @@ class TestSimpleConfig(unittest.TestCase):
         self.assertNotEqual(None, backup)
         self.assertEqual(1, len(backup.sources))
         source = backup.sources[0]
-        self.assertEqual('local', source.filesystem)
+        self.assertEqual('local', source.filesystem.name)
         self.assertEqual(('home', 'me'), source.path)
         self.assertEqual(('home',), source.targetpath)
 
@@ -134,7 +145,8 @@ class TestSimpleConfig(unittest.TestCase):
 class TestFullConfig(unittest.TestCase):
 
     def setUp(self):
-        conf = config.Config()
+        services = { 'filesystem': FakeNamedTree }
+        conf = config.Config(services)
         self.config = conf
         tree = FakeTree()
         self.tree = tree
@@ -208,13 +220,15 @@ class TestFullConfig(unittest.TestCase):
 class TestVarious(unittest.TestCase):
 
     def test_read_non_existing_file(self):
-        conf = config.Config()
+        services = { 'filesystem': FakeNamedTree }
+        conf = config.Config(services)
         tree = FakeTree()
         conf.read_file(tree, ('path', 'to', 'config'))
         self.assertEqual(0, len(conf.backups))
 
     def test_read_two_simple_files(self):
-        conf = config.Config()
+        services = { 'filesystem': FakeNamedTree }
+        conf = config.Config(services)
         tree = FakeTree()
         tree.set_file(
             ('path', 'to', 'config'),
