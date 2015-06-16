@@ -28,11 +28,11 @@ class InfoTask(object):
         for collection in bkconfig.collections:
             self._print_collection_info('    ', collection)
         for source in bkconfig.sources:
-            tree = self._getfilesys(source.accessor)
+            tree = self._getfilesys(source.filesystem)
             self._print('    source ' + tree.path_to_full_string(source.path))
 
     def _print_collection_info(self, prefix, collcfg):
-            tree = self._getfilesys(collcfg.accessor)
+            tree = self._getfilesys(collcfg.filesystem)
             self._print(
                 prefix + 'collection ' + tree.path_to_full_string(collcfg.path))
             opener = self._services['backupcollection.open']

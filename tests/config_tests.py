@@ -75,7 +75,7 @@ class TestSimpleConfig(unittest.TestCase):
         self.assertNotEqual(None, backup)
         self.assertEqual(1, len(backup.collections))
         collection = backup.collections[0]
-        self.assertEqual('local', collection.accessor)
+        self.assertEqual('local', collection.filesystem)
         self.assertEqual(('backup', 'mine'), collection.path)
 
     def test_backup_home_source(self):
@@ -83,7 +83,7 @@ class TestSimpleConfig(unittest.TestCase):
         self.assertNotEqual(None, backup)
         self.assertEqual(1, len(backup.sources))
         source = backup.sources[0]
-        self.assertEqual('local', source.accessor)
+        self.assertEqual('local', source.filesystem)
         self.assertEqual(('home', 'me'), source.path)
         self.assertEqual(('home',), source.targetpath)
 

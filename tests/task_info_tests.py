@@ -39,24 +39,24 @@ class FakeBackupConfig(object):
         self.collections = []
         self.sources = []
 
-    def _add_collection(self, accessor, path):
-        coll = FakeCollectionConfig(accessor, path)
+    def _add_collection(self, filesystem, path):
+        coll = FakeCollectionConfig(filesystem, path)
         self.collections.append(coll)
         return coll
 
-    def _add_source(self, accessor, path):
-        src = FakeSourceConfig(accessor, path)
+    def _add_source(self, filesystem, path):
+        src = FakeSourceConfig(filesystem, path)
         self.sources.append(src)
         return src
 
 class FakeCollectionConfig(object):
-    def __init__(self, accessor, path):
-        self.accessor = accessor
+    def __init__(self, filesystem, path):
+        self.filesystem = filesystem
         self.path = path
 
 class FakeSourceConfig(object):
-    def __init__(self, accessor, path):
-        self.accessor = accessor
+    def __init__(self, filesystem, path):
+        self.filesystem = filesystem
         self.path = path
 
 class FakeArgs(object):

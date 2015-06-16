@@ -10,7 +10,7 @@ def get_file_system(kind):
     if kind == 'local':
         return LocalFileSystem()
     else:
-        raise NotTestedError('Unknown accessor type: ' + kind)
+        raise NotTestedError('Unknown file system: ' + kind)
 
 
 class FileInterface(object):

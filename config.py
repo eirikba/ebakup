@@ -8,12 +8,12 @@ class InvalidDataError(Exception): pass
 
 def parse_full_path(fullpath):
     if fullpath.startswith('local:'):
-        accessor = 'local'
+        filesystem = 'local'
         localpath = fullpath[6:]
     else:
         raise InvalidDataError('Unknown path specification: ' + fullpath)
     path = parse_relative_path(localpath)
-    return accessor, path
+    return filesystem, path
 
 def parse_relative_path(path):
     return tuple(x for x in path.split('/') if x)
@@ -131,11 +131,11 @@ class CfgBackup(object):
 
     def parse_enter_block(self, key, args):
         if key == 'collection':
-            accessor, path = parse_full_path(args)
-            return CfgCollection(accessor, path)
+            filesystem, path = parse_full_path(args)
+            return CfgCollection(filesystem, path)
         if key == 'source':
-            accessor, path = parse_full_path(args)
-            return CfgSource(accessor, path)
+            filesystem, path = parse_full_path(args)
+            return CfgSource(filesystem, path)
 
     def parse_exit_block(self, key, args, item):
         if key == 'collection':
@@ -145,16 +145,16 @@ class CfgBackup(object):
             self.sources.append(item)
 
 class CfgCollection(object):
-    def __init__(self, accessor, path):
-        self.accessor = accessor
+    def __init__(self, filesystem, path):
+        self.filesystem = filesystem
         self.path = path
 
     def parse_enter_block(self, key, args):
         return None
 
 class CfgSource(object):
-    def __init__(self, accessor, path):
-        self.accessor = accessor
+    def __init__(self, filesystem, path):
+        self.filesystem = filesystem
         self.path = path
         self.targetpath = ()
         self.tree = CfgTree(None, None)

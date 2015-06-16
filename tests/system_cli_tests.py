@@ -14,7 +14,7 @@ class TestFullSequenceOfOperations(unittest.TestCase):
 
     def get_local_filesys(self, kind=None):
         if kind is not None and kind != 'local':
-            raise NotImplementedError('Only local accessors supported')
+            raise NotImplementedError('Only local filesystem is supported')
         return self.local_filesys
 
     def utcnow(self):

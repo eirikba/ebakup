@@ -31,7 +31,7 @@ class BackupTask(object):
         # recent" backup.
         storetree = None
         for collectiondata in backup_config.collections:
-            cand = self._treefactory(collectiondata.accessor)
+            cand = self._treefactory(collectiondata.filesystem)
             if cand.is_accessible():
                 storetree = cand
                 storepath = collectiondata.path
@@ -50,7 +50,7 @@ class BackupTask(object):
         operation = self._backupoperationfactory(
             collection, services=self._services)
         for sourcedata in backup_config.sources:
-            source = self._treefactory(sourcedata.accessor)
+            source = self._treefactory(sourcedata.filesystem)
             bktree = operation.add_tree_to_backup(
                 source, sourcedata.path, sourcedata.targetpath)
             bktree.set_backup_handlers(sourcedata.subtree_handlers)

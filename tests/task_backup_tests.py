@@ -29,22 +29,22 @@ class FakeBackupConfig(object):
         self.sources.append(source)
 
 class FakeBackupSource(object):
-    def __init__(self, access, path, targetpath):
-        self.accessor = access
+    def __init__(self, filesystem, path, targetpath):
+        self.filesystem = filesystem
         self.path = path
         self.targetpath = targetpath
         self.subtree_handlers = None
 
 class FakeTree(object):
-    def __init__(self, accessor):
-        self._accessor = accessor
+    def __init__(self, filesystem):
+        self._filesystem = filesystem
 
     def is_accessible(self):
         return True
 
 class FakeCollectionData(object):
-    def __init__(self, access, path):
-        self.accessor = access
+    def __init__(self, filesystem, path):
+        self.filesystem = filesystem
         self.path = path
 
 def open_collection(tree, path, services=None):
@@ -154,14 +154,14 @@ class TestSimpleBackup(unittest.TestCase):
     def test_backup_to_collection_with_correct_path(self):
         operation = self.args._operations[0]
         collection = operation._collection
-        self.assertEqual('local', collection._tree._accessor)
+        self.assertEqual('local', collection._tree._filesystem)
         self.assertEqual(('data', 'backup'), collection._path)
 
     def test_backup_from_and_to_correct_path(self):
         operation = self.args._operations[0]
         self.assertEqual(1, len(operation._trees))
         tree = operation._trees[0]
-        self.assertEqual('local', tree._tree._accessor)
+        self.assertEqual('local', tree._tree._filesystem)
         self.assertEqual(('home', 'me'), tree._sourcepath)
         self.assertEqual((), tree._targetpath)
 
