@@ -36,20 +36,6 @@ database changes").
 
 ---------------------------------------------------------------------------
 
-Avoid writing "small" duplicate files to disk needlessly
-
-Currently the code writes every file to a temporary file before
-checking whether the file already exists. I should have a moderately
-large buffer (100MiB?) and any file smaller than that should just be
-read into that buffer so I can check whether it already exists in the
-content store before writing.
-
-Actually, reading twice may be better than writing during the first
-read, as the second read is likely to be filled from the OS's disk
-cache.
-
----------------------------------------------------------------------------
-
 Buffer database changes
 
 Instead of writing every change to the database as they are made, I
