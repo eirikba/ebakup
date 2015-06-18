@@ -10,9 +10,6 @@ class Logger(object):
             self._utcnow = services['utcnow']
         self._outfile = None
 
-    def set_utcnow(self, utcnow):
-        self._utcnow = utcnow
-
     def set_outfile(self, outfile):
         '''The file object where direct output is sent. Defaults to standard
         output.
