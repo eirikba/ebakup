@@ -178,6 +178,53 @@ class FileSystemInterface(object):
     FileSystem abstraction.
     '''
 
+    def path_to_string(self, path):
+        '''Convert a path in tuple form to the file system's string
+        representation.
+
+        'path' is a tuple of strings giving the components of the path
+        in order. The returned value should be a string describing the
+        same path in the way it is usually represented by the file
+        system.
+
+        'path' is assumed to be an absolute path, and the returned
+        string should also be on the absolute form.
+        '''
+
+    def path_from_string(self, stringpath):
+        '''Convert a path in the file system's string representation to tuple
+        format.
+
+        'stringpath' is a string describing a path in the file
+        system's common representation. The method returns a tuple of
+        strings giving the same path as a sequence of components.
+
+        If 'stringpath' is not an absolute path, it is interpreted as
+        a path relative to the current working directory (for the file
+        system) and an absolute path is returned.
+        '''
+
+    def relative_path_from_string(self, stringpath):
+        '''Convert a relative path in the file system's string representation
+        to tuple format.
+
+        'stringpath' is a string describing a relative path in the
+        file system's common representation. The method returns a
+        tuple of strings giving the same path as a sequence of
+        components.
+
+        Some path components have non-trivial behaviour. If
+        'stringpath' contains any such path components, this method
+        may show unexpected behaviour. Or raise an exception. The
+        common examples are path components referring to the parent
+        directory or the directory itself.
+        '''
+
+    def path_to_full_string(self, path):
+        '''Convert a path in tuple form to a string representation of the
+        full path, including the file system specification.
+        '''
+
     def does_path_exist(self, path):
         '''Returns True if 'path' exists in the tree, and False otherwise.
         '''
