@@ -12,7 +12,7 @@ class BackupOperation(object):
             services = {}
         self._logger = services.get('logger')
         if self._logger is None:
-            self._logger = logger.Logger()
+            self._logger = logger.Logger(services=services)
 
     @property
     def logger(self):

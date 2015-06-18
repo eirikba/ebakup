@@ -49,7 +49,7 @@ class BackupCollection(object):
             services = {}
         self._logger = services.get('logger')
         if not self._logger:
-            self._logger = logger.Logger()
+            self._logger = logger.Logger(services=services)
         self._utcnow = services.get('utcnow', datetime.datetime.utcnow)
         self._tree = tree
         self._path = path

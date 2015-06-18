@@ -196,7 +196,8 @@ class TestFullSequence(unittest.TestCase):
         self.assertCountEqual(expected, contentfiles)
 
     def _check_db_after_initial_backup(self):
-        coll = backupcollection.open_collection(self.fs, ('backups', 'home'))
+        coll = backupcollection.open_collection(
+            self.fs, ('backups', 'home'), services=self.services)
         bkup = coll.get_most_recent_backup()
         self.assertEqual(
             datetime.datetime(1995, 1, 1, 0, 0, 20), bkup.get_start_time())
@@ -302,7 +303,15 @@ class TestFullSequence(unittest.TestCase):
             mtime_ns=743283546)
 
     def _check_result_of_second_backup(self, stdout):
-        self.assertEqual('', stdout)
+        self.assertEqual(
+            '1995-01-05 00:44:00 ERROR: Permission denied to source file '
+            "(('home', 'me', 'rootnotes.txt'))\n"
+            '1995-01-05 00:44:00 ERROR: File not backed up '
+            "(('home', 'me', 'rootnotes.txt'))\n"
+            '1995-01-05 00:44:00 ERROR: Failed to descend source directory '
+            "(('home', 'me', 'rootdata'))" ' - No "r" permission for '
+            "('home', 'me', 'rootdata')\n",
+            stdout)
         coll = backupcollection.open_collection(self.fs, ('backups', 'home'))
         bkup = coll.get_most_recent_backup()
         self.assertEqual(

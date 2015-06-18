@@ -3,9 +3,11 @@
 import datetime
 
 class Logger(object):
-    def __init__(self):
+    def __init__(self, services=None):
         self.raw_log = []
         self._utcnow = datetime.datetime.utcnow
+        if services is not None and 'utcnow' in services:
+            self._utcnow = services['utcnow']
         self._outfile = None
 
     def set_utcnow(self, utcnow):
@@ -39,8 +41,27 @@ class Logger(object):
         providing further details about this specific event, intended
         for human consumption.
         '''
-        self.raw_log.append(
-            LogItem(self._utcnow(), severity, what, which, comment))
+        item = LogItem(self._utcnow(), severity, what, which, comment)
+        self.raw_log.append(item)
+        self._log_item_added(item)
+
+    severity_names = {
+        LOG_DEBUG2: 'DBG2',
+        LOG_DEBUG: 'DBG',
+        LOG_INFO: 'INFO',
+        LOG_NOTICE: 'NOTICE',
+        LOG_WARNING: 'WARNING',
+        LOG_ERROR: 'ERROR',
+        LOG_CRITICAL: 'CRITICAL',
+        }
+    def _log_item_added(self, item):
+        if item.severity < self.LOG_NOTICE:
+            return
+        msg = (str(item.when) + ' ' + self.severity_names[item.severity] +
+               ': ' + item.what + ' (' + str(item.which) + ')')
+        if item.comment:
+            msg += ' - ' + item.comment
+        self.print(msg)
 
     def log_error(self, what, which, comment=''):
         self.log(self.LOG_ERROR, what, which, comment)

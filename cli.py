@@ -74,8 +74,8 @@ def create_services(overrides):
         'backupcollection.open': backupcollection.open_collection,
         'database.create': database.create_database,
         'database.open': database.Database,
-        'logger': logger.Logger(),
         'utcnow': datetime.datetime.utcnow,
+        'logger': True,
     }
     if overrides is None:
         return services
@@ -95,6 +95,8 @@ def create_services(overrides):
                     filtered[key] = value
         else:
             raise AssertionError('overrides["*"] has unexpected value')
+    if filtered.get('logger', True) is True:
+        filtered['logger'] = logger.Logger(services=filtered)
     return filtered
 
 def make_tasks_from_args(args):

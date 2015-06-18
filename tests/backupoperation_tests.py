@@ -2,10 +2,11 @@
 
 import collections
 import datetime
-import logger
+import io
 import unittest
 
 import backupoperation
+import logger
 
 from config_subtree import CfgSubtree
 
@@ -180,10 +181,13 @@ class TestBasicBackup(unittest.TestCase):
     def setUp(self):
         bc = FakeBackupCollection()
         self.backupcollection = bc
-        self.logger = logger.Logger()
         self.services = {
-            'logger': self.logger,
+            'utcnow': lambda : datetime.datetime(2001, 8, 12, 9, 3, 15),
             }
+        self.logger = logger.Logger(services=self.services)
+        self.stdout = io.StringIO()
+        self.logger.set_outfile(self.stdout)
+        self.services['logger'] = self.logger
         bo = backupoperation.BackupOperation(bc, services=self.services)
         self.backupoperation = bo
         sourcetree = FakeTree()
@@ -299,6 +303,8 @@ class TestBasicBackup(unittest.TestCase):
             static=(('myfiles', 'static'),))
         self.assertNoLoggedProblems()
         bo.execute_backup()
+        self.assertRegex(
+            self.stdout.getvalue(), 'static file changed.*more.*three')
         self.assertLoggedError(
             ('main', 'myfiles', 'static', 'more', 'three'),
             'static file changed')
@@ -332,6 +338,8 @@ class TestBasicBackup(unittest.TestCase):
             static=(('myfiles', 'static'),))
         self.assertNoLoggedProblems()
         bo.execute_backup()
+        self.assertRegex(
+            self.stdout.getvalue(), 'static file removed.*more.*three')
         self.assertLoggedError(
             ('main', 'myfiles', 'static', 'more', 'three'),
             'static file removed')
@@ -366,6 +374,7 @@ class TestBasicBackup(unittest.TestCase):
             static=(('myfiles', 'static'),))
         self.assertNoLoggedProblems()
         bo.execute_backup()
+        self.assertEqual('', self.stdout.getvalue())
         self.assertNoLoggedProblems()
         self.assertEqual(2, len(self.backupcollection._backups))
         backup = self.backupcollection._backups[0]
@@ -402,6 +411,8 @@ class TestBasicBackup(unittest.TestCase):
             static=(('myfiles', 'static'),))
         self.assertNoLoggedProblems()
         bo.execute_backup()
+        self.assertRegex(
+            self.stdout.getvalue(), 'static file removed.*more.*three')
         self.assertLoggedError(
             ('main', 'myfiles', 'static', 'more', 'three'),
             'static file removed')
@@ -443,6 +454,7 @@ class TestBasicBackup(unittest.TestCase):
             static=(('myfiles', 'static'),))
         self.assertNoLoggedProblems()
         bo.execute_backup()
+        self.assertEqual('', self.stdout.getvalue())
         self.assertNoLoggedProblems()
         self.assertEqual(2, len(self.backupcollection._backups))
         backup = self.backupcollection._backups[0]
