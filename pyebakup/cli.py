@@ -78,7 +78,7 @@ def create_services(overrides):
         'logger': True,
     }
     if overrides is None:
-        return services
+        overrides={'*':None}
     filtered = {}
     for key, value in overrides.items():
         if key == '*':

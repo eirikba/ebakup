@@ -38,3 +38,20 @@ class TestSimpleStuff(unittest.TestCase):
         self.assertRegex(stdout.getvalue(), '^$')
         return args
 
+    def test_create_default_services(self):
+        services = cli.create_services(None)
+        expected_services = {
+            'filesystem': callable,
+            'backupoperation': callable,
+            'backupcollection.create': callable,
+            'backupcollection.open': callable,
+            'database.create': callable,
+            'database.open': callable,
+            'utcnow': callable,
+            'logger': lambda x: hasattr(x, 'log_error'),
+        }
+        self.assertCountEqual(expected_services.keys(), services.keys())
+        for service, what in expected_services.items():
+            self.assertTrue(
+                what(services[service]),
+                msg='Not correct: ' + service + ' is ' + str(services[service]))
