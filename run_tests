@@ -2,8 +2,12 @@
 # -*- mode: python -*-
 
 import argparse
+import os
 import re
+import sys
 import unittest
+
+sys.path.append(os.path.join(os.path.dirname(__file__), 'pyebakup'))
 
 import tests.settings as test_settings
 
