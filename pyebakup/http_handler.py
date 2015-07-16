@@ -41,9 +41,12 @@ class HttpHandler(http_server.NullHandler):
         path = os.path.join(self._datadir, *filepath)
         with open(path, 'rb') as f:
             body = f.read()
+        self._send_static_data(contenttype, body)
+
+    def _send_static_data(self, contenttype, data):
         self.response.send_response(b'200 OK', contenttype)
         self.response.send_headers_done()
-        self.response.send_body_data(body)
+        self.response.send_body_data(data)
         self.response.send_response_done()
 
     def _send_template_file(self, contenttype, filepath=None):
@@ -54,10 +57,7 @@ class HttpHandler(http_server.NullHandler):
         with open(path, 'rb') as f:
             body = f.read()
         body = self._expand_template(body)
-        self.response.send_response(b'200 OK', contenttype)
-        self.response.send_headers_done()
-        self.response.send_body_data(body)
-        self.response.send_response_done()
+        self._send_static_data(contenttype, body)
 
     def _expand_template(self, body):
         parts = re.split(br'\${([a-z_]*)(:[^}]*)?}', body)
