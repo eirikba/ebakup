@@ -83,6 +83,8 @@ class HttpHandler(http_server.NullHandler):
             handler = None
         if handler:
             return handler(args)
+        if name == b'' and args is None:
+            return b'${'
         if args is not None:
             argstr = b':' + args
         else:
