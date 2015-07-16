@@ -188,6 +188,7 @@ expected_tests = set((
     'task_info_tests.TestInfoForFullConfig.test_backup_mine_is_correct_partial',
     'task_info_tests.TestInfoForFullConfig.test_configured_backups_are_listed',
     'task_info_tests.TestInfoForFullConfig.test_toplevel_blocks',
+    'webui_tests.TestWebUI.test_basic_404',
 ))
 expected_test_count = len(expected_tests)
 

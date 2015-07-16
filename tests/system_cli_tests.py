@@ -36,6 +36,7 @@ class TestFullSequenceOfOperations(unittest.TestCase):
             'database.create': None,
             'database.open': None,
             'logger': None,
+            'uistate': None,
             'utcnow': self.utcnow,
             }
         self.advance_utcnow(seconds=1)
@@ -79,7 +80,8 @@ class TestFullSequenceOfOperations(unittest.TestCase):
             ('backup', '--create', 'home'),
             stdoutfile=self.stdout, services=self.services)
         self.advance_utcnow(seconds=1)
-        self.assertEqual('', self.stdout.getvalue())
+        self.assertRegex(
+            self.stdout.getvalue(), r'Web ui started on port \d+\n')
 
     def build_initial_filesystem(self):
         basepath = ('home', 'me')

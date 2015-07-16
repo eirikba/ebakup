@@ -4,16 +4,20 @@ import argparse
 import datetime
 import os
 import sys
+import time
 
 import backupcollection
 import backupoperation
 import database
 import filesys
+import http_handler
 import logger
+import ui_state
 
 from config import Config
 from task_backup import BackupTask
 from task_info import InfoTask
+from task_webui import WebUITask
 
 class UnknownCommandError(Exception): pass
 
@@ -24,6 +28,10 @@ def main(commandline=None, stdoutfile=None, services=None):
         args.services['logger'].set_outfile(stdoutfile)
     tasks = make_tasks_from_args(args)
     perform_tasks(tasks)
+    if args.no_exit:
+        while True:
+            time.sleep(3600)
+
 
 class ArgumentParser(argparse.ArgumentParser):
     _overridden_output_file = None
@@ -39,6 +47,10 @@ def parse_commandline(commandline=None, msgfile=None):
         parser._overridden_output_file = msgfile
     parser.add_argument(
         '--config', help='Config file to use instead of the default')
+    parser.add_argument(
+        '--no-exit', action='store_true',
+        help='Do not exit when tasks are complete '
+        '(e.g. to keep the web ui running)')
     subparsers = parser.add_subparsers(dest='command')
     backupparser = subparsers.add_parser(
         'backup', help='Perform one or more backup operations')
@@ -48,9 +60,16 @@ def parse_commandline(commandline=None, msgfile=None):
     backupparser.add_argument('backups', nargs='+', help='Which backups to run')
     infoparser = subparsers.add_parser(
         'info', help='Display information about the state of the backups')
+    webuiparser = subparsers.add_parser(
+        'webui',
+        help='Run the web ui. By default, the web ui is always started '
+        'anyway. This command can be used to avoid giving any other command '
+        'when only the web ui is needed. This command will also '
+        'imply --no-exit.')
     if msgfile is not None:
         backupparser._overridden_output_file = msgfile
         infoparser._overridden_output_file = msgfile
+        webuiparser._overridden_output_file = msgfile
     if commandline is None:
         args = parser.parse_args()
     else:
@@ -65,8 +84,12 @@ def _fixup_arguments(args):
     if args.config is not None:
         localfs = filesys.get_file_system('local')
         args.config = localfs.path_from_string(args.config)
+    if args.command == 'webui':
+        args.no_exit = True
 
 def create_services(overrides):
+    ui = ui_state.UIState()
+    ui.set_http_handler(http_handler.HttpHandler)
     services = {
         'filesystem': filesys.get_file_system,
         'backupoperation': backupoperation.BackupOperation,
@@ -75,6 +98,7 @@ def create_services(overrides):
         'database.create': database.create_database,
         'database.open': database.Database,
         'utcnow': datetime.datetime.utcnow,
+        'uistate': ui,
         'logger': True,
     }
     if overrides is None:
@@ -109,12 +133,15 @@ def make_tasks_from_args(args):
         for path in confpaths:
             config.read_file(localtree, path + ('config',))
     tasks = []
+    tasks.append(WebUITask(config, args))
     if args.command == 'backup':
         task = BackupTask(config, args)
         tasks.append(task)
     elif args.command == 'info':
         task = InfoTask(config, args)
         tasks.append(task)
+    elif args.command == 'webui':
+        pass
     else:
         raise UnknownCommandError('Unknown command: ' + args.command)
     return tasks

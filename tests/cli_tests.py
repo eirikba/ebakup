@@ -47,6 +47,7 @@ class TestSimpleStuff(unittest.TestCase):
             'backupcollection.open': callable,
             'database.create': callable,
             'database.open': callable,
+            'uistate': lambda x: hasattr(x, 'make_http_handler'),
             'utcnow': callable,
             'logger': lambda x: hasattr(x, 'log_error'),
         }

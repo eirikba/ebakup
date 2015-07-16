@@ -60,6 +60,9 @@ class Logger(object):
             msg += ' - ' + item.comment
         self.print(msg)
 
+    def log_info(self, what, which, comment=''):
+        self.log(self.LOG_INFO, what, which, comment)
+
     def log_error(self, what, which, comment=''):
         self.log(self.LOG_ERROR, what, which, comment)
 

@@ -41,10 +41,12 @@ class TestBackup(unittest.TestCase):
         services = { '*': None, 'utcnow': self.utcnow }
         self.services = services
         self.advance_utcnow(seconds=123)
+        out = io.StringIO()
         cli.main(
             ('--config', os.path.join(root_path, 'ebakup.config'),
              'backup', '--create', 'home'),
-            services=services)
+            services=services, stdoutfile=out)
+        self.assertRegex(out.getvalue(), r'Web ui started on port \d+\n')
         self.advance_utcnow(seconds=160)
         self._check_first_backup_on_disk()
         self.advance_utcnow(seconds=400)
@@ -133,6 +135,7 @@ class TestBackup(unittest.TestCase):
         match = re.search('local:/[^\n]*/DELETEME_testebakup/', info)
         basepath = match.group(0)
         info = info.replace(basepath, 'local:/path/to/testbakup/')
+        first, info = info.split('\n', 1)
         self.assertEqual(textwrap.dedent('''\
             Backup definitions:
               backup home
@@ -142,6 +145,7 @@ class TestBackup(unittest.TestCase):
                 source local:/path/to/testbakup/sources
             '''),
         info)
+        self.assertRegex(first, r'Web ui started on port \d+')
 
 @unittest.skipUnless(
     tests.settings.run_live_tests,

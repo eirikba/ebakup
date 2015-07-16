@@ -76,7 +76,7 @@ class TestFullSequence(unittest.TestCase):
             services=self.services,
             stdoutfile=out)
         self.advance_utcnow(seconds=20)
-        self.assertEqual('', out.getvalue())
+        self.assertRegex(out.getvalue(), r'Web ui started on port \d+\n')
         self._check_result_of_initial_backup()
         self._check_info_after_initial_backup()
         self.advance_utcnow(days=4, seconds=2000)
@@ -131,13 +131,17 @@ class TestFullSequence(unittest.TestCase):
     def _check_info_before_first_backup(self):
         out = io.StringIO()
         cli.main(('info',), services=self.services, stdoutfile=out)
+        outstr = out.getvalue()
+        if outstr.startswith('Web ui started'):
+            firstline, outstr = outstr.split('\n', 1)
         self.assertEqual(
             'Backup definitions:\n'
             '  backup home\n'
             '    collection local:/backups/home\n'
             '      (Does not exist)\n'
             '    source local:/home/me\n',
-            out.getvalue())
+            outstr)
+        self.assertRegex(firstline, r'Web ui started on port \d+')
 
     def _check_result_of_initial_backup(self):
         self._check_filesys_after_initial_backup()
@@ -263,13 +267,17 @@ class TestFullSequence(unittest.TestCase):
     def _check_info_after_initial_backup(self):
         out = io.StringIO()
         cli.main(('info',), services=self.services, stdoutfile=out)
+        outstr = out.getvalue()
+        if outstr.startswith('Web ui started'):
+            firstline, outstr = outstr.split('\n', 1)
         self.assertEqual(
             'Backup definitions:\n  backup home\n'
             '    collection local:/backups/home\n'
             '      Least recently verified: 1995-01-01 00:00:20\n'
             '      Total number of content files: 4\n'
             '    source local:/home/me\n',
-            out.getvalue())
+            outstr)
+        self.assertRegex(firstline, r'Web ui started on port \d+')
 
     def _update_sources_before_second_backup(self):
         fs = self.fs
@@ -303,6 +311,10 @@ class TestFullSequence(unittest.TestCase):
             mtime_ns=743283546)
 
     def _check_result_of_second_backup(self, stdout):
+        output = stdout
+        first, second, rest = output.split('\n', 2)
+        self.assertRegex(first, r'Web ui started on port \d+')
+        self.assertRegex(second, r'Web ui started on port \d+')
         self.assertEqual(
             '1995-01-05 00:44:00 ERROR: Permission denied to source file '
             "(('home', 'me', 'rootnotes.txt'))\n"
@@ -311,7 +323,7 @@ class TestFullSequence(unittest.TestCase):
             '1995-01-05 00:44:00 ERROR: Failed to descend source directory '
             "(('home', 'me', 'rootdata'))" ' - No "r" permission for '
             "('home', 'me', 'rootdata')\n",
-            stdout)
+            rest)
         coll = backupcollection.open_collection(self.fs, ('backups', 'home'))
         bkup = coll.get_most_recent_backup()
         self.assertEqual(
