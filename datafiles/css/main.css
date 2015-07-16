@@ -1,0 +1,12 @@
+.kvlist {
+    display: table;
+}
+
+.kvlist .item {
+    display: table-row;
+}
+
+.kvlist .item .key {
+    display: table-cell;
+    padding-right: 1em;
+}

@@ -23,7 +23,7 @@ class UnknownCommandError(Exception): pass
 
 def main(commandline=None, stdoutfile=None, services=None):
     args = parse_commandline(commandline, stdoutfile)
-    args.services = create_services(services)
+    args.services = create_services(args, services)
     if stdoutfile is not None:
         args.services['logger'].set_outfile(stdoutfile)
     tasks = make_tasks_from_args(args)
@@ -87,8 +87,8 @@ def _fixup_arguments(args):
     if args.command == 'webui':
         args.no_exit = True
 
-def create_services(overrides):
-    ui = ui_state.UIState()
+def create_services(args, overrides):
+    ui = ui_state.UIState(args)
     ui.set_http_handler(http_handler.HttpHandler)
     services = {
         'filesystem': filesys.get_file_system,
@@ -121,6 +121,8 @@ def create_services(overrides):
             raise AssertionError('overrides["*"] has unexpected value')
     if filtered.get('logger', True) is True:
         filtered['logger'] = logger.Logger(services=filtered)
+    if filtered.get('utcnow'):
+        ui.set_start_time(filtered['utcnow']())
     return filtered
 
 def make_tasks_from_args(args):

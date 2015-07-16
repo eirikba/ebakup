@@ -39,7 +39,7 @@ class TestSimpleStuff(unittest.TestCase):
         return args
 
     def test_create_default_services(self):
-        services = cli.create_services(None)
+        services = cli.create_services(None, None)
         expected_services = {
             'filesystem': callable,
             'backupoperation': callable,
