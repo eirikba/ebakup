@@ -162,6 +162,8 @@ expected_tests = set((
     'glob_utils_tests.TestSimpleGlobs.test_special_chars',
     'glob_utils_tests.TestSimpleGlobs.test_trivial_matches',
     'glob_utils_tests.TestSimpleGlobs.test_valid_globs',
+    'http_handler_tests.TestTemplates.test_args_command',
+    'http_handler_tests.TestTemplates.test_start_time',
     'http_server_tests.TestBasics.test_parallel_pipelined_requests',
     'http_server_tests.TestBasics.test_pipelined_requests',
     'http_server_tests.TestBasics.test_simple_request',
