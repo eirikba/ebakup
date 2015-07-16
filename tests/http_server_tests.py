@@ -66,6 +66,9 @@ class Handler(object):
         if self.resource.startswith(b'/echo/'):
             self._send_echo_resource()
             return
+        if self.resource == b'/async':
+            self._send_async_resource()
+            return
         self._send_404()
 
     def _send_simple_resource(self):
@@ -81,11 +84,27 @@ class Handler(object):
         self.response.send_body_data(self.resource[6:])
         self.response.send_response_done()
 
+    def _send_async_resource(self):
+        self.async_resource_body = None
+        self.response.send_response(b'200 OK', b'text/plain')
+        self.response.send_headers_done()
+
+    def set_async_body(self, body):
+        # Called on non-http-server thread!
+        # Something must call the server's wakeup() method.
+        self.async_resource_body = body
+
     def _send_404(self):
         self.response.send_response(b'404 Not found', b'text/plain')
         self.response.send_headers_done()
         self.response.send_body_data(b'Failed to find ' + self.resource)
         self.response.send_response_done()
+
+    def handle_wakeup(self, what):
+        if self.async_resource_body:
+            self.response.send_body_data(self.async_resource_body)
+            self.async_resource_body = None
+            self.response.send_response_done()
 
     def handle_request_aborted(self):
         self.request_aborted = True
@@ -237,3 +256,27 @@ class TestBasics(unittest.TestCase):
         headers, body, rest = parse_response(rest)
         self.assertEqual(b'', rest)
         self.assertEqual(b'echo: parallel_two', body)
+
+    def test_wakeup(self):
+        sock = connect_server(self.server.port)
+        sock.send(b'GET /async HTTP/1.1\r\nHost: localhost\r\n\r\n')
+        data = b''
+        while not b'\r\n\r\n' in data:
+            data += sock.recv(4096)
+        self.assertRaises(socket.timeout, sock.recv, 4096)
+        self.assertNotIn(b'async-data', data)
+        self.assertEqual(1, len(self.handlers))
+        handler = self.handlers[0]
+        handler.set_async_body(b'async request: async-data')
+        self.server.wakeup(b'async')
+        while not data.endswith(b'\r\n0\r\n\r\n'):
+            data += sock.recv(4096)
+        self.server.stop()
+        sock.close()
+        self.assertEqual(b'HTTP/1.1 200 OK\r\n', data[:17])
+        self.assertIn(b'async-data', data)
+        self.assertEqual(1, len(self.handlers))
+        self.assertEqual({b'Host':b'localhost'}, handler.headers)
+        headers, body, rest = parse_response(data)
+        self.assertEqual(b'', rest)
+        self.assertEqual(b'async request: async-data', body)

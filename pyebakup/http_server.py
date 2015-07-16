@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import errno
+import os
 import re
 import select
 import socket
@@ -121,6 +122,13 @@ class NullHandler(object):
         whichever is called last.
         '''
 
+    def handle_wakeup(self, what):
+        '''Called once for each handler that has an unfinished response
+        whenever the server's wakeup() method is called.
+
+        'what' is the value passed to wakeup().
+        '''
+
     def handle_request_aborted(self):
         '''Called if the request was aborted.
 
@@ -177,10 +185,14 @@ class HttpServer(object):
         self._sockets = {}
         self._poller = select.poll()
         self._poller.register(self._sock_listen)
+        self._pipe_wakeup = os.pipe()
+        self._poller.register(self._pipe_wakeup[0])
         while self.running:
             for pollfd in self._poller.poll():
                 if pollfd[0] == self._sock_listen.fileno():
                     self._handle_connect()
+                elif pollfd[0] == self._pipe_wakeup[0]:
+                    self._handle_wakeup()
                 else:
                     self._handle_communicate(self._sockets[pollfd[0]])
 
@@ -197,6 +209,22 @@ class HttpServer(object):
     def _handle_communicate(self, socket):
         socket.write_pending_data()
         socket.read_data()
+
+    def _handle_wakeup(self):
+        what = b''
+        while True:
+            what += os.read(self._pipe_wakeup[0], 4096)
+            events = what.split(b'\n')
+            for event in events[1:]:
+                for sock in self._sockets.values():
+                    sock.handle_wakeup(event)
+            if events[-1] == b'':
+                return
+            what = events[-1]
+
+    def wakeup(self, what):
+        assert b'\n' not in what
+        os.write(self._pipe_wakeup[1], what + b'\n')
 
     def register_for_write(self, socket):
         self._poller.modify(socket.fileno, select.POLLIN | select.POLLOUT)
@@ -281,6 +309,11 @@ class SocketData(object):
         self.requests = self.requests[1:]
         if self.requests:
             self.requests[0].handle_response_ready()
+
+    def handle_wakeup(self, what):
+        if not self.requests:
+            return
+        self.requests[0].handle_wakeup(what)
 
 class HttpHandler(object):
     def __init__(self, socket, handler):
@@ -393,6 +426,9 @@ class HttpHandler(object):
     def _parse_body_data(self, data, done):
         self.state = 3
         return done
+
+    def handle_wakeup(self, what):
+        self.handler.handle_wakeup(what)
 
 
 class HttpResponse(object):

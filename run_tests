@@ -167,6 +167,7 @@ expected_tests = set((
     'http_server_tests.TestBasics.test_parallel_pipelined_requests',
     'http_server_tests.TestBasics.test_pipelined_requests',
     'http_server_tests.TestBasics.test_simple_request',
+    'http_server_tests.TestBasics.test_wakeup',
     'system_cli_tests.TestFullSequenceOfOperations.test_everything',
     'system_backupoperation_tests.TestSimpleBackup.test_backed_up_files_have_correct_checksum',
     'system_backupoperation_tests.TestSimpleBackup.test_backed_up_files_have_correct_content',
