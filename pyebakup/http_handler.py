@@ -5,10 +5,12 @@ import re
 
 import http_server
 
+class TemplateError(Exception): pass
 
 class HttpHandler(http_server.NullHandler):
     def __init__(self, state):
         self._state = state
+        self._variables = {}
         maindir = os.path.dirname(os.path.dirname(__file__))
         self._datadir = os.path.join(maindir, 'datafiles').encode('utf-8')
         self._handlers = {
@@ -91,8 +93,29 @@ class HttpHandler(http_server.NullHandler):
             argstr = b''
         return b'{UNKNOWN COMMAND:' + name + argstr + b'}'
 
+    re_varname = re.compile(b'[a-zA-Z0-9-]+')
+    def add_variable(self, var, value):
+        assert isinstance(var, bytes)
+        match = self.re_varname.match(var)
+        if not match or match.group(0) != var:
+            raise TemplateError('Invalid variable name: ' + var.decode('utf-8'))
+        if var in self._variables:
+            raise TemplateError(
+                'Variable "' + var.decode('utf-8') + '" is already defined')
+        self._variables[var] = value
+
+    def drop_variable(self, var):
+        assert isinstance(var, bytes)
+        assert var in self._variables
+        del self._variables[var]
+
     def tmpl_start_time(self, args):
         return str(self._state.start_time).encode('utf-8')
 
     def tmpl_args_command(self, args):
         return self._state.args.command.encode('utf-8')
+
+    def tmpl_var(self, args):
+        if args not in self._variables:
+            return b'[UNKNOWN VARIABLE: ' + args + b']'
+        return str(self._variables[args]).encode('utf-8')

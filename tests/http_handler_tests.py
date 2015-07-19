@@ -40,3 +40,32 @@ class TestTemplates(unittest.TestCase):
         self.assertEqual(
             b'Will do something.',
             http._expand_template(b'Will ${args_command}.'))
+
+    def test_variable(self):
+        ui = FakeUIState()
+        http = http_handler.HttpHandler(ui)
+        self.assertEqual(
+            b'And x is [UNKNOWN VARIABLE: x]',
+            http._expand_template(b'And x is ${var:x}'))
+        http.add_variable(b'x', 'a string')
+        self.assertEqual(
+            b'And x is a string',
+            http._expand_template(b'And x is ${var:x}'))
+        http.drop_variable(b'x')
+        self.assertEqual(
+            b'And x is [UNKNOWN VARIABLE: x]',
+            http._expand_template(b'And x is ${var:x}'))
+        http.add_variable(b'x', 5)
+        self.assertEqual(
+            b'And x is 5',
+            http._expand_template(b'And x is ${var:x}'))
+        self.assertRaisesRegex(
+            http_handler.TemplateError, 'ariable "x" is already defined',
+            http.add_variable, b'x', 'different')
+
+    def test_invalid_variable_name(self):
+        ui = FakeUIState()
+        http = http_handler.HttpHandler(ui)
+        self.assertRaisesRegex(
+            http_handler.TemplateError, 'Invalid variable name: x y',
+            http.add_variable, b'x y', 5)
