@@ -39,11 +39,17 @@ class HttpHandler(http_server.NullHandler):
         self.response.send_response_done()
 
     def _send_static_file(self, contenttype):
-        filepath = [x for x in self.resource.split(b'/') if x]
+        body  = self._get_file_content()
+        self._send_static_data(contenttype, body)
+
+    def _get_file_content(self, filepath=None):
+        if filepath is None:
+            filepath = self.resource
+        filepath = [x for x in filepath.split(b'/') if x]
         path = os.path.join(self._datadir, *filepath)
         with open(path, 'rb') as f:
             body = f.read()
-        self._send_static_data(contenttype, body)
+        return body
 
     def _send_static_data(self, contenttype, data):
         self.response.send_response(b'200 OK', contenttype)
@@ -52,12 +58,7 @@ class HttpHandler(http_server.NullHandler):
         self.response.send_response_done()
 
     def _send_template_file(self, contenttype, filepath=None):
-        if filepath is None:
-            filepath = self.resource
-        filepath = [x for x in filepath.split(b'/') if x]
-        path = os.path.join(self._datadir, *filepath)
-        with open(path, 'rb') as f:
-            body = f.read()
+        body = self._get_file_content(filepath)
         body = self._expand_template(body)
         self._send_static_data(contenttype, body)
 
