@@ -253,12 +253,14 @@ class TestReadSimpleDBFile(unittest.TestCase):
         self.tree._add_file(
             ('path', 'to', 'file'),
             b'dbfile magic\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n'
             b'key:value\n'
             b'a setting: its value\n'
             b'key:another value\n'
-            + b'\x00' * 4002 +
-            b"\x91\xce@;X5\xd1\xa9\xd9c\x8f\xf3\xfar\xf2\xc1\xdb"
-            b"\x1a'\xb7\xabv\xa3d\xa7H\x8b\x96\xa7\x9fm\xfa"
+            + b'\x00' * 3963 +
+            b'I\xe2\xf50Wx|\xb9\x07\x99\xe9\xa74\xd1\xa8'
+            b'\xc5\x10\x99\xddb\xbc\x12\x99\x15yc\x02z\xb2z\xd9\xcb'
             b'second block\n'
             + b'\x00' * 4051 +
             b'\x14\xffcF\xf7?\xb2\xc0\xd5`\x15\xf8\xf9\\ZN\x14s'
@@ -268,8 +270,6 @@ class TestReadSimpleDBFile(unittest.TestCase):
             b'\xbd\xe6G4\xf5$&\xda\xaa5\xf3\x96N\x08'
             b'x\xf3\x82\x9aG"\x89\x11\x8f\x1f\xa0\x0fw\xc2$wk\xbd')
         self.dbfile = dbfile.DBFile(self.tree, ('path', 'to', 'file'))
-        self.dbfile.set_block_size(4096)
-        self.dbfile.set_block_checksum_algorithm(hashlib.sha256)
         self.dbfile.open_for_reading()
 
     def tearDown(self):
@@ -416,12 +416,14 @@ class TestInspectUnopenedSimpleDBFile(unittest.TestCase):
         self.tree._add_file(
             ('path', 'to', 'file'),
             b'dbfile magic\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n'
             b'key:value\n'
             b'a setting: its value\n'
             b'key:another value\n'
-            + b'\x00' * 4002 +
-            b"\x91\xce@;X5\xd1\xa9\xd9c\x8f\xf3\xfar\xf2\xc1\xdb"
-            b"\x1a'\xb7\xabv\xa3d\xa7H\x8b\x96\xa7\x9fm\xfa"
+            + b'\x00' * 3963 +
+            b'I\xe2\xf50Wx|\xb9\x07\x99\xe9\xa74\xd1\xa8'
+            b'\xc5\x10\x99\xddb\xbc\x12\x99\x15yc\x02z\xb2z\xd9\xcb'
             b'second block\n'
             + b'\x00' * 4051 +
             b'\x14\xffcF\xf7?\xb2\xc0\xd5`\x15\xf8\xf9\\ZN\x14s'
@@ -431,14 +433,16 @@ class TestInspectUnopenedSimpleDBFile(unittest.TestCase):
             b'\xbd\xe6G4\xf5$&\xda\xaa5\xf3\x96N\x08'
             b'x\xf3\x82\x9aG"\x89\x11\x8f\x1f\xa0\x0fw\xc2$wk\xbd')
         self.dbfile = dbfile.DBFile(self.tree, ('path', 'to', 'file'))
-        self.dbfile.set_block_size(4096)
-        self.dbfile.set_block_checksum_algorithm(hashlib.sha256)
 
     def test_get_block_data_size(self):
-        self.assertEqual(4064, self.dbfile.get_block_data_size())
+        self.assertRaisesRegex(
+            dbfile.DBFileUsageError, 'must be called on an open',
+            self.dbfile.get_block_data_size,)
 
     def test_get_block_count(self):
-        self.assertEqual(3, self.dbfile.get_block_count())
+        self.assertRaisesRegex(
+            dbfile.DBFileUsageError, 'must be called on an open',
+            self.dbfile.get_block_count,)
 
 class TestBrokenFiles(unittest.TestCase):
     def test_non_matching_checksum_of_settings_block(self):
@@ -446,12 +450,14 @@ class TestBrokenFiles(unittest.TestCase):
         tree._add_file(
             ('dbfile',),
             b'dbfile magic\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n'
             b'key:valux\n'
             b'a setting: its value\n'
             b'key:another value\n'
-            + b'\x00' * 4002 +
-            b"\x91\xce@;X5\xd1\xa9\xd9c\x8f\xf3\xfar\xf2\xc1\xdb"
-            b"\x1a'\xb7\xabv\xa3d\xa7H\x8b\x96\xa7\x9fm\xfa"
+            + b'\x00' * 3963 +
+            b'I\xe2\xf50Wx|\xb9\x07\x99\xe9\xa74\xd1\xa8'
+            b'\xc5\x10\x99\xddb\xbc\x12\x99\x15yc\x02z\xb2z\xd9\xcb'
             b'second block\n'
             + b'\x00' * 4051 +
             b'\x14\xffcF\xf7?\xb2\xc0\xd5`\x15\xf8\xf9\\ZN\x14s'
@@ -461,8 +467,6 @@ class TestBrokenFiles(unittest.TestCase):
             b'\xbd\xe6G4\xf5$&\xda\xaa5\xf3\x96N\x08'
             b'x\xf3\x82\x9aG"\x89\x11\x8f\x1f\xa0\x0fw\xc2$wk\xbd')
         dbf = dbfile.DBFile(tree, ('dbfile',))
-        dbf.set_block_size(4096)
-        dbf.set_block_checksum_algorithm(hashlib.sha256)
         self.assertRaisesRegex(
             dbfile.DataCorruptError, 'checksum of block 0 did not match',
             dbf.open_for_reading)
@@ -472,12 +476,14 @@ class TestBrokenFiles(unittest.TestCase):
         tree._add_file(
             ('dbfile',),
             b'dbfile magic\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n'
             b'key:value\n'
             b'a setting: its value\n'
             b'key:another value\n'
-            + b'\x00' * 4002 +
-            b"\x91\xce@;X5\xd1\xa9\xd9c\x8f\xf3\xfar\xf2\xc1\xdb"
-            b"\x1a'\xb7\xabv\xa3d\xa7H\x8b\x96\xa7\x9fm\xfa"
+            + b'\x00' * 3963 +
+            b'I\xe2\xf50Wx|\xb9\x07\x99\xe9\xa74\xd1\xa8'
+            b'\xc5\x10\x99\xddb\xbc\x12\x99\x15yc\x02z\xb2z\xd9\xcb'
             b'second block?\n'
             + b'\x00' * 4050 +
             b'\x14\xffcF\xf7?\xb2\xc0\xd5`\x15\xf8\xf9\\ZN\x14s'
@@ -487,8 +493,6 @@ class TestBrokenFiles(unittest.TestCase):
             b'\xbd\xe6G4\xf5$&\xda\xaa5\xf3\x96N\x08'
             b'x\xf3\x82\x9aG"\x89\x11\x8f\x1f\xa0\x0fw\xc2$wk\xbd')
         dbf = dbfile.DBFile(tree, ('dbfile',))
-        dbf.set_block_size(4096)
-        dbf.set_block_checksum_algorithm(hashlib.sha256)
         dbf.open_for_reading()
         self.assertEqual(b'last block\n' + b'\x00' * 4053, dbf.get_block(2))
         self.assertRaisesRegex(
@@ -497,46 +501,19 @@ class TestBrokenFiles(unittest.TestCase):
 
 class TestReadBlockConfigurationFromSettings(unittest.TestCase):
 
-    def test_read_block_size_from_settings(self):
+    def test_other_block_size(self):
         self.tree = FakeDirectory()
         self.tree._add_file(
             ('path', 'to', 'file'),
             b'dbfile magic\n'
+            b'edb-blocksize:2777\n'
+            b'edb-blocksum:sha256\n'
             b'key:value\n'
             b'a setting: its value\n'
-            b'blocksize:4096\n'
             b'key:another value\n'
-            + b'\x00' * 3987 +
-            b'\x18\xeaJ\xb3h.\x7f\xc30F`rE\x17\x16\x99\xae1'
-            b'8\xb0\x88\x87\x01\xbdi*P\xbf0G\x00B'
-            b'second block\n'
-            + b'\x00' * 4051 +
-            b'\x14\xffcF\xf7?\xb2\xc0\xd5`\x15\xf8\xf9\\ZN\x14s'
-            b'{\x06d\xed\x97\xd7\x82\xa2h\xa4\x96k\xc2\xa8'
-            b'last block\n'
-            + b'\x00' * 4053 +
-            b'\xbd\xe6G4\xf5$&\xda\xaa5\xf3\x96N\x08'
-            b'x\xf3\x82\x9aG"\x89\x11\x8f\x1f\xa0\x0fw\xc2$wk\xbd')
-        self.dbfile = dbfile.DBFile(self.tree, ('path', 'to', 'file'))
-        self.dbfile.take_block_size_from_setting('blocksize')
-        self.dbfile.set_block_checksum_algorithm(hashlib.sha256)
-        self.dbfile.open_for_reading()
-        self.assertEqual(
-            b'second block\n' + b'\x00' * 4051, self.dbfile.get_block(1))
-        self.dbfile.close_and_unlock()
-
-    def test_read_other_block_size_from_settings(self):
-        self.tree = FakeDirectory()
-        self.tree._add_file(
-            ('path', 'to', 'file'),
-            b'dbfile magic\n'
-            b'key:value\n'
-            b'a setting: its value\n'
-            b'blocksize:2777\n'
-            b'key:another value\n'
-            + b'\x00' * 2668 +
-            b'o\x9a\xcbBa\xd6G\x93\xef\x92\xdcR\x9eC*\xe2+'
-            b'\xd6\nU,\xea\x04^\x1eu\x1aM\x97\xdb\xe6('
+            + b'\x00' * 2644 +
+            b'\xbb\xcdL\x8d\x085N4\x16\x8a)\xf3\xba\xfd\xf9'
+            b'\x03X\xea\xa6\xc7\x00\xf4pZ\xa7\xe5$!\xabf\xe4\xeb'
             b'second block\n'
             + b'\x00' * 2732 +
             b"\x9cY\xe7\xc8\xb2\x11\xcdn\xa5\xdd\xf9\xc2\x89j\xa9\xfc"
@@ -546,53 +523,24 @@ class TestReadBlockConfigurationFromSettings(unittest.TestCase):
             b"\xfeF*}\t\x1c4\x1ek[\xce8\xec'\xc5W"
             b"\xec\x95$\xaf\xf1_4U\x88\x92\xdc\xdd\x07X\xea\x96")
         self.dbfile = dbfile.DBFile(self.tree, ('path', 'to', 'file'))
-        self.dbfile.take_block_size_from_setting('blocksize')
-        self.dbfile.set_block_checksum_algorithm(hashlib.sha256)
         self.dbfile.open_for_reading()
         self.assertEqual(
             b'second block\n' + b'\x00' * 2732, self.dbfile.get_block(1))
         self.assertEqual(2777-32, self.dbfile.get_block_data_size())
         self.dbfile.close_and_unlock()
 
-    def test_read_block_checksum_algorithm_from_settings(self):
+    def test_other_block_checksum_algorithm(self):
         self.tree = FakeDirectory()
         self.tree._add_file(
             ('path', 'to', 'file'),
             b'dbfile magic\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:md5\n'
             b'key:value\n'
-            b'blockchecksum:sha256\n'
             b'a setting: its value\n'
             b'key:another value\n'
-            + b'\x00' * 3981 +
-            b'\x9a\xeb\x82\x08\xcf)\x0c\xa3D)Nq\xe3\xa9\n\x05'
-            b'\x02\xf0\x06\xd0\xed\x02\xf3\x842Y\xc7\xb3\x9c\xc3?\xbd'
-            b'second block\n'
-            + b'\x00' * 4051 +
-            b'\x14\xffcF\xf7?\xb2\xc0\xd5`\x15\xf8\xf9\\ZN\x14s'
-            b'{\x06d\xed\x97\xd7\x82\xa2h\xa4\x96k\xc2\xa8'
-            b'last block\n'
-            + b'\x00' * 4053 +
-            b'\xbd\xe6G4\xf5$&\xda\xaa5\xf3\x96N\x08'
-            b'x\xf3\x82\x9aG"\x89\x11\x8f\x1f\xa0\x0fw\xc2$wk\xbd')
-        self.dbfile = dbfile.DBFile(self.tree, ('path', 'to', 'file'))
-        self.dbfile.set_block_size(4096)
-        self.dbfile.take_block_checksum_algorithm_from_setting('blockchecksum')
-        self.dbfile.open_for_reading()
-        self.assertEqual(
-            b'second block\n' + b'\x00' * 4051, self.dbfile.get_block(1))
-        self.dbfile.close_and_unlock()
-
-    def test_read_other_block_checksum_algorithm_from_settings(self):
-        self.tree = FakeDirectory()
-        self.tree._add_file(
-            ('path', 'to', 'file'),
-            b'dbfile magic\n'
-            b'key:value\n'
-            b'blockchecksum:md5\n'
-            b'a setting: its value\n'
-            b'key:another value\n'
-            + b'\x00' * 4000 +
-            b'\x89"d\x97\xa7\xccC$w\x81\xc2\x82-\xc75\x04'
+            + b'\x00' * 3982 +
+            b'\x10\x96sd\xe0\xc8r,\xc4\xe6n\xaeT\x84p\x8a'
             b'second block\n'
             + b'\x00' * 4067 +
             b'v8Gi&e\xe4\x0f\xbai\x0f\xe4\xaf\xe6\x0b\xb0'
@@ -600,8 +548,6 @@ class TestReadBlockConfigurationFromSettings(unittest.TestCase):
             + b'\x00' * 4069 +
             b'\x8dCSA9\xeb@V\x93b~\x89z\xa0\xf1>')
         self.dbfile = dbfile.DBFile(self.tree, ('path', 'to', 'file'))
-        self.dbfile.set_block_size(4096)
-        self.dbfile.take_block_checksum_algorithm_from_setting('blockchecksum')
         self.dbfile.open_for_reading()
         self.assertEqual(
             b'second block\n' + b'\x00' * 4067, self.dbfile.get_block(1))
@@ -613,12 +559,14 @@ class TestModifySimpleDBFile(unittest.TestCase):
         self.tree._add_file(
             ('path', 'to', 'file'),
             b'dbfile magic\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n'
             b'key:value\n'
             b'a setting: its value\n'
             b'key:another value\n'
-            + b'\x00' * 4002 +
-            b"\x91\xce@;X5\xd1\xa9\xd9c\x8f\xf3\xfar\xf2\xc1\xdb"
-            b"\x1a'\xb7\xabv\xa3d\xa7H\x8b\x96\xa7\x9fm\xfa"
+            + b'\x00' * 3963 +
+            b'I\xe2\xf50Wx|\xb9\x07\x99\xe9\xa74\xd1\xa8'
+            b'\xc5\x10\x99\xddb\xbc\x12\x99\x15yc\x02z\xb2z\xd9\xcb'
             b'second block\n'
             + b'\x00' * 4051 +
             b'\x14\xffcF\xf7?\xb2\xc0\xd5`\x15\xf8\xf9\\ZN\x14s'
@@ -628,8 +576,6 @@ class TestModifySimpleDBFile(unittest.TestCase):
             b'\xbd\xe6G4\xf5$&\xda\xaa5\xf3\x96N\x08'
             b'x\xf3\x82\x9aG"\x89\x11\x8f\x1f\xa0\x0fw\xc2$wk\xbd')
         self.dbfile = dbfile.DBFile(self.tree, ('path', 'to', 'file'))
-        self.dbfile.set_block_size(4096)
-        self.dbfile.set_block_checksum_algorithm(hashlib.sha256)
 
     def test_add_block(self):
         filedata = self.tree._files[('path', 'to', 'file')]
@@ -643,7 +589,8 @@ class TestModifySimpleDBFile(unittest.TestCase):
                 b'\xd7E\x1fRG\x96\x00\xbd(mi\xd7\x87\xf1\x86'
                 b'\xce2\xd4\xcfXr\xb5\\\x14P\x1b\xe3<\xb5;^\xfc',
                 filedata.content)
-        self.assertEqual(4, self.dbfile.get_block_count())
+        with self.dbfile.open_for_reading():
+            self.assertEqual(4, self.dbfile.get_block_count())
 
     def test_change_block(self):
         filedata = self.tree._files[('path', 'to', 'file')]
@@ -658,7 +605,8 @@ class TestModifySimpleDBFile(unittest.TestCase):
                 b'\xce2\xd4\xcfXr\xb5\\\x14P\x1b\xe3<\xb5;^\xfc' +
                 oldcontent[8192:],
                 filedata.content)
-        self.assertEqual(3, self.dbfile.get_block_count())
+        with self.dbfile.open_for_reading():
+            self.assertEqual(3, self.dbfile.get_block_count())
 
     def test_change_first_block_fails(self):
         with self.dbfile.open_for_in_place_modification():
@@ -1020,13 +968,15 @@ class TestModifySimpleDBFile(unittest.TestCase):
             self.tree._disallow_overwrite_file(('path', 'to', 'file'))
         self.assertEqual(
             b'dbfile magic\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n'
             b'key:value\n'
             b'a setting: its value\n'
             b'key:another value\n'
             b'new setting:good value\n'
-            + b'\x00' * 3979 +
-            b'\xc0j\xaecI\xf0H\xe1\xb8\x05:, ?\xb4o5\xbb\xa4'
-            b'\x05Q\x95\xa9-S\xe2\xe94\x9b\xa3\xdc0' +
+            + b'\x00' * 3940 +
+            b'\xc4\x8cb;,\x03\x19\xbf\x93\x9dH\xff\x90f\xfa\xb4,f'
+            b'I\x0f\xad\xfe\xec\xb8>Y\xba\xf1\x025\x88\x91' +
             old_content[4096:],
             self.tree._files[('path', 'to', 'file')].content)
 
@@ -1047,13 +997,15 @@ class TestModifySimpleDBFile(unittest.TestCase):
             self.tree._disallow_overwrite_file(('path', 'to', 'file'))
         self.assertEqual(
             b'dbfile magic\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n'
             b'key:value\n'
             b'a setting: its value\n'
             b'key:another value\n'
             b'new setting:good value\n'
-            + b'\x00' * 3979 +
-            b'\xc0j\xaecI\xf0H\xe1\xb8\x05:, ?\xb4o5\xbb\xa4'
-            b'\x05Q\x95\xa9-S\xe2\xe94\x9b\xa3\xdc0',
+            + b'\x00' * 3940 +
+            b'\xc4\x8cb;,\x03\x19\xbf\x93\x9dH\xff\x90f\xfa\xb4,f'
+            b'I\x0f\xad\xfe\xec\xb8>Y\xba\xf1\x025\x88\x91',
             self.tree._files[('path', 'to', 'file')].content)
 
     def test_rewrite_file_swap_blocks(self):
@@ -1098,12 +1050,14 @@ class TestOtherOperations(unittest.TestCase):
         self.tree._add_file(
             ('path', 'to', 'file'),
             b'dbfile magic\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n'
             b'key:value\n'
             b'a setting: its value\n'
             b'key:another value\n'
-            + b'\x00' * 4002 +
-            b"\x91\xce@;X5\xd1\xa9\xd9c\x8f\xf3\xfar\xf2\xc1\xdb"
-            b"\x1a'\xb7\xabv\xa3d\xa7H\x8b\x96\xa7\x9fm\xfa"
+            + b'\x00' * 3963 +
+            b'I\xe2\xf50Wx|\xb9\x07\x99\xe9\xa74\xd1\xa8'
+            b'\xc5\x10\x99\xddb\xbc\x12\x99\x15yc\x02z\xb2z\xd9\xcb'
             b'second block\n'
             + b'\x00' * 4051 +
             b'\x14\xffcF\xf7?\xb2\xc0\xd5`\x15\xf8\xf9\\ZN\x14s'
@@ -1113,8 +1067,6 @@ class TestOtherOperations(unittest.TestCase):
             b'\xbd\xe6G4\xf5$&\xda\xaa5\xf3\x96N\x08'
             b'x\xf3\x82\x9aG"\x89\x11\x8f\x1f\xa0\x0fw\xc2$wk\xbd')
         self.dbfile = dbfile.DBFile(self.tree, ('path', 'to', 'file'))
-        self.dbfile.set_block_size(4096)
-        self.dbfile.set_block_checksum_algorithm(hashlib.sha256)
         with self.dbfile.open_for_reading():
             self.assertEqual(
                 b'second block\n' + b'\x00' * 4051, self.dbfile.get_block(1))
@@ -1124,12 +1076,10 @@ class TestOtherOperations(unittest.TestCase):
     def test_create_empty_file(self):
         tree = FakeDirectory()
         dbf = dbfile.DBFile(tree, ('new', 'db'))
-        dbf.set_block_size(4096)
-        dbf.set_block_checksum_algorithm(hashlib.sha256)
         tree._allow_create_regular_file(('new', 'db'))
         tree._allow_create_regular_file(('new', 'db.new'))
         tree._allow_modification(('new', 'db.new'))
-        with dbf.create(b'new db magic'):
+        with dbf.create(b'new db magic', 4096, hashlib.sha256):
             tree._disallow_create_regular_file(('new', 'db'))
             tree._disallow_create_regular_file(('new', 'db.new'))
             tree._disallow_modification(('new', 'db.new'))
@@ -1140,9 +1090,12 @@ class TestOtherOperations(unittest.TestCase):
             tree._disallow_overwrite_file(('new', 'db'))
             tree._disallow_rename_file(('new', 'db.new'))
         self.assertEqual(
-            b'new db magic\n' + b'\x00' * 4051 +
-            b'\xe8\xe6\x0e~\xa3\x05\xcc\xa1\xb4\xd1\x7f'
-            b'\xda\xe6\x00\xde\x0f\xcf\x88j\xbfj/\x86c\xd7kC\x84\xaf 6\r',
+            b'new db magic\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n' +
+            b'\x00' * 4012 +
+            b"\xc9\xe7\x1b\x96\xe2\xf8\x9c\xf8(\xbe#\xfb"
+            b"\xec:\x9d'\x8c\xa4\xbb\xb6\x05@\xd7r>\xbes\x88\x91\xb7YL",
             tree._files[('new', 'db')].content)
 
     def test_create_fails_if_file_exists(self):
@@ -1157,12 +1110,10 @@ class TestOtherOperations(unittest.TestCase):
     def test_create_file_with_data(self):
         tree = FakeDirectory()
         dbf = dbfile.DBFile(tree, ('path', 'to', 'db'))
-        dbf.set_block_size(4096)
-        dbf.set_block_checksum_algorithm(hashlib.sha256)
         tree._allow_create_regular_file(('path', 'to', 'db'))
         tree._allow_create_regular_file(('path', 'to', 'db.new'))
         tree._allow_modification(('path', 'to', 'db.new'))
-        with dbf.create(b'ebadb file'):
+        with dbf.create(b'ebadb file', 4096, hashlib.sha256):
             tree._disallow_create_regular_file(('path', 'to', 'db'))
             tree._disallow_create_regular_file(('path', 'to', 'db.new'))
             dbf.set_setting('first setting', 'yes')
@@ -1175,10 +1126,13 @@ class TestOtherOperations(unittest.TestCase):
             tree._disallow_overwrite_file(('path', 'to', 'db'))
             tree._disallow_rename_file(('path', 'to', 'db.new'))
         self.assertEqual(
-            b'ebadb file\nfirst setting:yes\nanother setting:no\n' +
-            b'\x00' * 4016 +
-            b'\xe5\xf3\xc4\xb91\xc1\xa7\x0e\x19`a\x0c\x85\x9e'
-            b'\xb9eXJ\xdc\x1f\x99\xcbWYo\xbc\x05\xaeS+\xfc4'
+            b'ebadb file\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n'
+            b'first setting:yes\nanother setting:no\n' +
+            b'\x00' * 3977 +
+            b"\x17\xd4W@\xf9\x83\xac\x17#n\xe886}G\xc1"
+            b"\xa5S\x84n\xceP\xe4\xd4H\x030'\xff\xe4\xd7M"
             b'And some data' + b'\x00' * 4051 +
             b'\xc4\xd5d\xe7ZV\x18\x1bw\x0cC\xce9\xaa\xdd'
             b'\xa9_\x7f\xddb\xc6\xaa(\xe8J\xb9\x90\xe5\x02\x82z\xdd',
@@ -1187,12 +1141,10 @@ class TestOtherOperations(unittest.TestCase):
     def test_create_without_explicit_commit_will_abort(self):
         tree = FakeDirectory()
         dbf = dbfile.DBFile(tree, ('path', 'to', 'db'))
-        dbf.set_block_size(4096)
-        dbf.set_block_checksum_algorithm(hashlib.sha256)
         tree._allow_create_regular_file(('path', 'to', 'db'))
         tree._allow_create_regular_file(('path', 'to', 'db.new'))
         tree._allow_modification(('path', 'to', 'db.new'))
-        with dbf.create(b'ebadb file'):
+        with dbf.create(b'ebadb file', 4096, hashlib.sha256):
             tree._disallow_create_regular_file(('path', 'to', 'db'))
             tree._disallow_create_regular_file(('path', 'to', 'db.new'))
             dbf.set_setting('first setting', 'yes')

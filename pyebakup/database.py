@@ -16,16 +16,11 @@ def create_database(directory, path):
     if directory.does_path_exist(path):
         raise FileExistsError('Path already exists: ' + str(path))
     main = dbfile.DBFile(directory, path + ('main',))
-    main.set_block_checksum_algorithm(hashlib.sha256)
-    main.set_block_size(4096)
-    with main.create(b'ebakup database v1'):
+    with main.create(b'ebakup database v1', 4096, hashlib.sha256):
         main.set_setting('checksum', 'sha256')
-        main.set_setting('blocksize', '4096')
         main.commit()
     content = dbfile.DBFile(directory, path + ('content',))
-    content.set_block_checksum_algorithm(hashlib.sha256)
-    content.set_block_size(4096)
-    content.create(b'ebakup content data')
+    content.create(b'ebakup content data', 4096, hashlib.sha256)
     content.commit()
     return Database(directory, path)
 
@@ -148,8 +143,6 @@ class Database(object):
         self._directory = directory
         self._path = path
         self._main = dbfile.DBFile(directory, path + ('main',))
-        self._main.take_block_size_from_setting('blocksize')
-        self._main.take_block_checksum_algorithm_from_setting('checksum')
         self._content = ContentInfoFile(self)
 
     def _get_block_size(self):
@@ -354,9 +347,6 @@ class ContentInfoFile(object):
     def __init__(self, db):
         self._db = db
         self._dbfile = dbfile.DBFile(db._directory, db._path + ('content',))
-        self._dbfile.set_block_size(db._get_block_size())
-        self._dbfile.set_block_checksum_algorithm(
-            db._get_block_checksum_algorithm())
         self._read_file()
 
     def _read_file(self):
@@ -600,10 +590,7 @@ class BackupInfoBuilder(object):
         self._next_dirid = 8
         self._directories = { (): 0 }
         self._dbfile = dbfile.DBFile(self._db._directory, self._path)
-        self._dbfile.set_block_size(self._db._get_block_size())
-        self._dbfile.set_block_checksum_algorithm(
-            self._db._get_block_checksum_algorithm())
-        self._dbfile.create(b'ebakup backup data')
+        self._dbfile.create(b'ebakup backup data', 4096, hashlib.sha256)
         try:
             self._dbfile.set_setting(
                 'start',
@@ -727,9 +714,6 @@ class BackupInfo(object):
         self._db = db
         self._path = path
         self._dbfile = dbfile.DBFile(self._db._directory, self._path)
-        self._dbfile.set_block_size(self._db._get_block_size())
-        check_algo = self._db._get_block_checksum_algorithm()
-        self._dbfile.set_block_checksum_algorithm(check_algo)
         self._read_whole_file()
 
     def _read_whole_file(self):

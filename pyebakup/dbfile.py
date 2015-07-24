@@ -20,23 +20,30 @@ class OpenContext(object):
 
 class DBFile(object):
 
+    _block_size_setting = b'edb-blocksize'
+    _block_checksum_setting = b'edb-blocksum'
     def __init__(self, directory, path):
         self._directory = directory
         self._path = path
         self._block_size = None
-        self._block_size_setting = None
         self._block_checksum = None
-        self._block_checksum_setting = None
         self._read_file = None
         self._write_file = None
         self._write_path = None # When _write_file is temporary
         self._target_file = None # When _write_file is temporary
 
-    def create(self, magic):
+    def create(self, magic, block_size=4096, block_checksum='sha-256'):
         '''Create the file.
 
         'magic' is the "magic" line to be written to the beginning of
         the file.
+
+        'block_size' is the block size of the file and
+        'block_checksum' is the checksum to be used for each block.
+        'block_size' should be an integer while 'block_checksum' can
+        either be a string identifying a known checksum algorithm or a
+        factory function for objects implementing the checksum
+        interface.
 
         Will raise FileExistsError if the file already exists.
 
@@ -63,6 +70,13 @@ class DBFile(object):
         self._write_path = temp_path
         self._read_file = None
         self._magic = magic
+        self._block_size = block_size
+        if isinstance(block_checksum, str):
+            block_checksum = block_checksum.encode('utf-8')
+        if isinstance(block_checksum, bytes):
+            block_checksum = self._get_checksum_algorithm_by_name(
+                block_checksum)
+        self._block_checksum = block_checksum
         self._settings = {}
         self._write_file = temp_file
         self._write_file.lock_for_writing()
@@ -72,45 +86,6 @@ class DBFile(object):
             self.close_and_unlock()
             raise
         return OpenContext(self)
-
-    def set_block_size(self, block_size):
-        '''Set the block size of the file.
-
-        This method can only be called while the file is not open.
-        '''
-        self._block_size = block_size
-        self._block_size_setting = None
-
-    def take_block_size_from_setting(self, setting):
-        '''The block size of the file is given by the setting 'setting'.
-
-        The block size will be set to the value of the setting every
-        time the file is opened.
-        '''
-        self._block_size = None
-        if isinstance(setting, str):
-            self._block_size_setting = setting.encode('utf-8')
-        else:
-            self._block_size_setting = setting
-
-    def set_block_checksum_algorithm(self, algo):
-        '''Set the checksum algorithm to be used for the block checksums.
-        '''
-        self._block_checksum = algo
-        self._block_checksum_setting = None
-
-    def take_block_checksum_algorithm_from_setting(self, setting):
-        '''The checksum algorithm to be used for the block checksums is given
-        by the setting 'setting'.
-
-        The checksum algorithm will be set to the value of the setting
-        every time the file is opened.
-        '''
-        self._block_checksum = None
-        if isinstance(setting, str):
-            self._block_checksum_setting = setting.encode('utf-8')
-        else:
-            self._block_checksum_setting = setting
 
     def open_for_reading(self):
         '''This locks and opens the file for reading.
@@ -132,8 +107,7 @@ class DBFile(object):
         return OpenContext(self)
 
     def _prepare_read_file(self):
-        if self._block_size_setting or self._block_checksum_setting:
-            self._read_block_configuration_from_settings()
+        self._read_block_configuration_from_settings()
         if not self._block_size:
             raise NotTestedError()
         if not self._block_checksum:
@@ -142,40 +116,42 @@ class DBFile(object):
 
     def _read_block_configuration_from_settings(self):
         data = self._read_file.get_data_slice(0, 10000)
-        if self._block_size_setting:
-            start = data.find(b'\n' + self._block_size_setting + b':')
-            if start < 0:
-                raise DataCorruptError(
-                    'Could not find block size setting in first '
-                    '10000 octets of data file')
-            start += 2 + len(self._block_size_setting)
-            end = data.find(b'\n', start)
-            if end < 0:
-                raise DataCorruptError(
-                    'Could not find block size setting in first '
-                    '10000 octets of data file')
-            self._block_size = int(data[start:end], 10)
-        if self._block_checksum_setting:
-            start = data.find(
-                b'\n' + self._block_checksum_setting + b':')
-            if start < 0:
-                raise DataCorruptError(
-                    'Could not find block checksum setting in first '
-                    '10000 octets of data file')
-            start += 2 + len(self._block_checksum_setting)
-            end = data.find(b'\n', start)
-            if end < 0:
-                raise DataCorruptError(
-                    'Could not find block checksum setting in first '
-                    '10000 octets of data file')
-            check = data[start:end]
-            if check == b'sha256':
-                self._block_checksum = hashlib.sha256
-            elif check == b'md5':
-                self._block_checksum = hashlib.md5
-            else:
-                raise DataCorruptError(
-                    'Unknown checksum algorithm: ' + str(check))
+
+        start = data.find(b'\n' + self._block_size_setting + b':')
+        if start < 0:
+            raise DataCorruptError(
+                'Could not find block size setting in first '
+                '10000 octets of data file')
+        start += 2 + len(self._block_size_setting)
+        end = data.find(b'\n', start)
+        if end < 0:
+            raise DataCorruptError(
+                'Could not find block size setting in first '
+                '10000 octets of data file')
+        self._block_size = int(data[start:end], 10)
+
+        start = data.find(
+            b'\n' + self._block_checksum_setting + b':')
+        if start < 0:
+            raise DataCorruptError(
+                'Could not find block checksum setting in first '
+                '10000 octets of data file')
+        start += 2 + len(self._block_checksum_setting)
+        end = data.find(b'\n', start)
+        if end < 0:
+            raise DataCorruptError(
+                'Could not find block checksum setting in first '
+                '10000 octets of data file')
+        check = data[start:end]
+        self._block_checksum = self._get_checksum_algorithm_by_name(check)
+
+    def _get_checksum_algorithm_by_name(self, name):
+        if name == b'sha256':
+            return hashlib.sha256
+        if name == b'md5':
+            return hashlib.md5
+        raise DataCorruptError(
+            'Unknown checksum algorithm: ' + str(name))
 
     def _parse_settings(self, block):
         self._magic = None
@@ -191,7 +167,12 @@ class DBFile(object):
             pair = block[done:end].split(b':', 1)
             if len(pair) != 2:
                 raise DataCorruptError('Setting line without ":"')
-            self._settings.append(pair)
+            if pair[0] == b'edb-blocksize':
+                assert(int(pair[1], 10) == self._block_size)
+            elif pair[0] == b'edb-blocksum':
+                assert(self._block_checksum().name.encode('utf-8') == pair[1])
+            else:
+                self._settings.append(pair)
             done = end + 1
             end = block.find(b'\n', done)
         if block[done:].strip(b'\x00') != b'':
@@ -412,6 +393,9 @@ class DBFile(object):
         if b'\n' in use_key:
             raise DBFileUsageError(
                 'Setting keys can not contain newlines: ' + repr(key))
+        if use_key.startswith(b'edb-'):
+            raise DBFileUsageError(
+                'Setting keys starting with "edb-" are reserved: ' + repr(key))
         if b'\n' in use_value:
             raise DBFileUsageError(
                 'Setting values can not contain newlines: ' + repr(value))
@@ -421,7 +405,10 @@ class DBFile(object):
         self._write_settings_to_file()
 
     def _write_settings_to_file(self):
-        data = [ x[0] + b':' + x[1] for x in self._settings ]
+        data = [ b'edb-blocksize:' + str(self._block_size).encode('utf-8') +
+                 b'\nedb-blocksum:' +
+                 self._block_checksum().name.encode('utf-8') ]
+        data += [ x[0] + b':' + x[1] for x in self._settings ]
         data = [ self._magic ] + data + [ b'' ]
         data = b'\n'.join(data)
         self._write_block_to_file(0, data)
@@ -476,7 +463,8 @@ class DBFile(object):
         if not dbfile:
             dbfile = self._write_file
         if not dbfile:
-            dbfile = self._directory.get_item_at_path(self._path)
+            raise DBFileUsageError(
+                'get_block_count() must be called on an open DBFile')
         size = dbfile.get_size()
         count = size // self._block_size
         if count * self._block_size != size:
@@ -486,6 +474,9 @@ class DBFile(object):
 
     def get_block_data_size(self):
         '''Return the size of the data in each block (in octets).'''
+        if not self._read_file and not self._write_file:
+            raise DBFileUsageError(
+                'get_block_data_size() must be called on an open DBFile')
         return self._block_size - self._block_checksum().digest_size
 
     def set_block(self, index, data):

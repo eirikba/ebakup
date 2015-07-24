@@ -13,19 +13,22 @@ class TestSimpleDatabase(unittest.TestCase):
         d._add_file(
             ('db', 'main'),
             b'ebakup database v1\n'
-            b'checksum:sha256\n'
-            b'blocksize:4096\n' +
-            b'\x00' * 4014 +
-            b'\nF\xf5TM\xa2)SR\x02\xd8\\K$\x99\xcaw\xd7\x10\xa9\xd2"'
-            b'a\x17\xa6$\xed\x11\xbe"M`')
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n'
+            b'checksum:sha256\n' +
+            b'\x00' * 3990 +
+            b'\xfbT\x16=\xf4\xe9j\x9fG\xdf\xbb!\xe0\xc9\xe9\xaa\xe3/'
+            b'\xe9\x8e\xd5\xf5\xe4\xdc\xb1C\xbf\xd6\x03\xf2\xf0\xce')
         d._add_file(
             ('db', '2015', '04-03T10:46'),
             b'ebakup backup data\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n'
             b'start:2015-04-03T10:46:06\n'
             b'end:2015-04-03T10:47:59\n' +
-            b'\x00' * 3995 +
-            b'I\x9c\x15\xd6\x94V=\xa9:\x0fy!\xb0\xc2kK\x1e\xcd'
-            b'\x1e\xc7\x82Up\\\xc9D\x1a\x0c\xd1\xa9\xb2\xc9'
+            b'\x00' * 3956 +
+            b'\xf5\xf8\xa5\xcf\x94\xd7\x97\xd6j\xab8\xf1\xc8-&\xd50'
+            b':\x9f\x8c4H\xf2\xf4\x1d\x04\xab\x8b]:\xe9\xfe'
             b'\x90\x08\x00\x04path'
             b'\x90\x09\x08\x02to'
             b'\x91\x09\x04file\x20'
@@ -43,10 +46,12 @@ class TestSimpleDatabase(unittest.TestCase):
             b'\xdb\\oqU\x8eGHmxv\xc9\xdb\x15')
         d._add_file(
             ('db', 'content'),
-            b'ebakup content data\n' +
-            b'\x00' * 4044 +
-            b'\x18\x83\xba\x0e\x0c\xe24\x11\xee2,\xe4\x0f\xab\x1fKd'
-            b'{\xa7\xcb\xd7\xca\xd5\xa34H\xb5\xd2I((\t'
+            b'ebakup content data\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n' +
+            b'\x00' * 4005 +
+            b'`{\xafg\x156E\x99*\x05|\x14\xf6fg\xd3\xc4\xde\x80'
+            b'\xa5g\xf1\xa0\xf8\xc28\xe4J9\xd5\xa2-'
             b'\xdd\x20\x20'
             b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
             b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^'
@@ -262,18 +267,22 @@ class TestSimpleDatabase(unittest.TestCase):
         d = FakeDirectory()
         d._add_file(('db', 'main'),
                     b'ebakup database v1\n'
+                    b'edb-blocksize:4096\n'
+                    b'edb-blocksum:sha256\n'
                     b'checksum:sha256\n'
                     b'blocksize:4096\n'
-                    + b'\x00' * 4014 +
-                    b'\nF\xf5TM\xa2)SR\x02\xd8\\K$\x99\xcaw\xd7\x10\xa9\xd2"'
-                    b'a\x17\xa6$\xed\x11\xbe"M`')
+                    + b'\x00' * 3975 +
+                    b'M\x99\xa2a!\xb7\xb0,\xd1\xcc^\xc4\xfb\xb4|bV\x9b'
+                    b'm\x915\xc9\x02\x16\xfa\xb6\xf9\xbb\x87\x12\xad"')
         d._add_file(('db', '2005', '04-03T10:46'),
                     b'ebakup backup data\n'
+                    b'edb-blocksize:4096\n'
+                    b'edb-blocksum:sha256\n'
                     b'start:2005-04-03T10:46:06\n'
                     b'end:2005-04-03T10:47:59\n'
-                    + b'\x00' * 3995 +
-                    b'\xfe\xfb\x08\x1cz\xdc\xb0\xd9\xca\x0f\xf8'
-                    b'\xf5\x96\xea#7\x18*vm\xe9\x7f\xde\xbf\x9e\xb4(\xd5\xa5VA>'
+                    + b'\x00' * 3956 +
+                    b'\xc9*\xe3N\xf8i\xbf\xdb\xf1C\xf4)\x81\x10\x14\xab`'
+                    b'\x08\x95\xe6\x8f\xb8;\xb8\xefb\x84\n\xab\x04\x8f$'
                     b'\x90\x08\x00\x04path'
                     b'\x90\x09\x08\x02to'
                     b'\x91\x09\x04file\x20'
@@ -289,10 +298,12 @@ class TestSimpleDatabase(unittest.TestCase):
                     b'\xdb\\oqU\x8eGHmxv\xc9\xdb\x15'
                     )
         d._add_file(('db', 'content'),
-            b'ebakup content data\n' +
-            b'\x00' * 4044 +
-            b'\x18\x83\xba\x0e\x0c\xe24\x11\xee2,\xe4\x0f\xab\x1fKd'
-            b'{\xa7\xcb\xd7\xca\xd5\xa34H\xb5\xd2I((\t')
+            b'ebakup content data\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n' +
+            b'\x00' * 4005 +
+            b'`{\xafg\x156E\x99*\x05|\x14\xf6fg\xd3\xc4\xde'
+            b'\x80\xa5g\xf1\xa0\xf8\xc28\xe4J9\xd5\xa2-')
         db = database.Database(d, ('db',))
         self.assertEqual(
             None,
