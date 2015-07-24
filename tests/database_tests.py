@@ -127,7 +127,7 @@ class TestSimpleDatabase(unittest.TestCase):
             b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
             info.contentid)
         self.assertEqual(
-            datetime.datetime(2015, 2, 20, 12, 53, 22),
+            datetime.datetime(2015, 2, 20, 12, 53, 22, 765430),
             info.mtime)
         self.assertEqual(765430000, info.mtime_nsec)
         backup = db.get_oldest_backup()
@@ -487,7 +487,7 @@ class TestWriteDatabase(unittest.TestCase):
         self.assertNotEqual(None, filedata)
         self.assertEqual(2323, filedata.size)
         self.assertEqual(
-            datetime.datetime(2015, 4, 13, 13, 0, 0), filedata.mtime)
+            datetime.datetime(2015, 4, 13, 13, 0, 0, 397261), filedata.mtime)
         self.assertEqual(397261917, filedata.mtime_nsec)
         contentinfo = db.get_content_info(filedata.contentid)
         self.assertNotEqual(None, contentinfo)
@@ -963,7 +963,8 @@ class TestWriteDatabase(unittest.TestCase):
             datetime.datetime(2015, 4, 14, 21, 36, 12), bk.get_start_time())
         tests = (
             (('file1',), datetime.datetime(2014, 9, 12, 11, 9, 15), 0),
-            (('file2',), datetime.datetime(2014, 1, 12, 11, 9, 15), 682246552),
+            (('file2',),
+             datetime.datetime(2014, 1, 12, 11, 9, 15, 682246), 682246552),
             (('file3',), datetime.datetime(2014, 2, 28, 11, 9, 15), 0),
             (('file4',), datetime.datetime(2014, 3, 1, 11, 9, 15), 0),
             (('file5',), datetime.datetime(2012, 2, 28, 11, 9, 15), 0),
@@ -1042,36 +1043,42 @@ class TestDBUtils(unittest.TestCase):
             (b'\x01\x00\x00\x00\x00\x00\x01\x00\x00',
              datetime.datetime(1, 1, 1, 0, 0, 0), 64),
             (b'\x01\x00\x00\x00\x00\x00\x20\x00\x00',
-             datetime.datetime(1, 1, 1, 0, 0, 0), 1<<11),
+             datetime.datetime(1, 1, 1, 0, 0, 0, (1<<11) // 1000), 1<<11),
             (b'\x01\x00\x00\x00\x00\x00\x80\x00\x00',
-             datetime.datetime(1, 1, 1, 0, 0, 0), 1<<13),
+             datetime.datetime(1, 1, 1, 0, 0, 0, (1<<13) // 1000), 1<<13),
             (b'\x01\x00\x00\x00\x00\x00\x00\x01\x00',
-             datetime.datetime(1, 1, 1, 0, 0, 0), 1<<14),
+             datetime.datetime(1, 1, 1, 0, 0, 0, (1<<14) // 1000), 1<<14),
             (b'\x01\x00\x00\x00\x00\x00\x00\x80\x00',
-             datetime.datetime(1, 1, 1, 0, 0, 0), 1<<21),
+             datetime.datetime(1, 1, 1, 0, 0, 0, (1<<21) // 1000), 1<<21),
             (b'\x01\x00\x00\x00\x00\x00\x00\x00\x01',
-             datetime.datetime(1, 1, 1, 0, 0, 0), 1<<22),
+             datetime.datetime(1, 1, 1, 0, 0, 0, (1<<22) // 1000), 1<<22),
             (b'\x01\x00\x00\x00\x00\x00\x00\x00\x40',
-             datetime.datetime(1, 1, 1, 0, 0, 0), 1<<28),
+             datetime.datetime(1, 1, 1, 0, 0, 0, (1<<28) // 1000), 1<<28),
             (b'\x01\x00\x00\x00\x00\x00\x00\x00\x80',
-             datetime.datetime(1, 1, 1, 0, 0, 0), 1<<29),
+             datetime.datetime(1, 1, 1, 0, 0, 0, (1<<29) // 1000), 1<<29),
         )
         for pair in pairs:
             self.assertEqual(pair[0], encode(pair[1], pair[2]))
             self.assertEqual((pair[1], pair[2]), decode(pair[0]))
         mtime = datetime.datetime(2015, 1, 1, 12, 42, 18)
+        mtime2 = datetime.datetime(2015, 1, 1, 12, 42, 18, 249778)
         nsec = 249778391
         encoded = encode(mtime, nsec)
-        self.assertEqual((mtime, nsec), decode(encoded))
+        self.assertEqual((mtime2, nsec), decode(encoded))
+        encoded = encode(mtime2, nsec)
+        self.assertEqual((mtime2, nsec), decode(encoded))
         mtime = datetime.datetime(2012, 1, 1, 12, 42, 18)
+        mtime2 = datetime.datetime(2012, 1, 1, 12, 42, 18, 249778)
         nsec = 249778391
         encoded = encode(mtime, nsec)
-        self.assertEqual((mtime, nsec), decode(encoded))
+        self.assertEqual((mtime2, nsec), decode(encoded))
         mtime = datetime.datetime(2015, 6, 6, 12, 42, 18)
+        mtime2 = datetime.datetime(2015, 6, 6, 12, 42, 18, 249778)
         nsec = 249778391
         encoded = encode(mtime, nsec)
-        self.assertEqual((mtime, nsec), decode(encoded))
+        self.assertEqual((mtime2, nsec), decode(encoded))
         mtime = datetime.datetime(2012, 6, 6, 12, 42, 18)
+        mtime2 = datetime.datetime(2012, 6, 6, 12, 42, 18, 249778)
         nsec = 249778391
         encoded = encode(mtime, nsec)
-        self.assertEqual((mtime, nsec), decode(encoded))
+        self.assertEqual((mtime2, nsec), decode(encoded))

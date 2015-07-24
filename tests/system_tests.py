@@ -225,7 +225,7 @@ class TestFullSequence(unittest.TestCase):
         self.assertCountEqual(('DSC_1886.JPG', 'DSC_1903.JPG'), files)
         info = bkup.get_file_info(('notes.txt',))
         self.assertEqual(
-            datetime.datetime(1994, 11, 28, 16, 48, 56), info.mtime)
+            datetime.datetime(1994, 11, 28, 16, 48, 56, 394323), info.mtime)
         self.assertEqual(394323854, info.mtime_nsec)
         self.assertEqual(17, info.size)
         self.assertEqual(
@@ -233,7 +233,8 @@ class TestFullSequence(unittest.TestCase):
             b"\xf4J\x83lj\xd86\xad3\x1e\xa2v\xd0\xa4\xb7\x85\x847\t\x1a",
             info.good_checksum)
         info = bkup.get_file_info(('My Pictures', 'DSC_1903.JPG'))
-        self.assertEqual(datetime.datetime(1994, 4, 5, 2, 36, 23), info.mtime)
+        self.assertEqual(
+            datetime.datetime(1994, 4, 5, 2, 36, 23, 34763), info.mtime)
         self.assertEqual(34763519, info.mtime_nsec)
         self.assertEqual(17, info.size)
         self.assertEqual(

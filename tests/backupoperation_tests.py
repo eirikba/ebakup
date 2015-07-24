@@ -129,9 +129,11 @@ class FakeFile(object):
             return override
         return str(self._fileid).encode('utf-8')
 
-    def _override(self, content=None):
+    def _override(self, content=None, mtime_nsec=None):
         if content is not None:
             self._overrides['content'] = content
+        if mtime_nsec is not None:
+            self._overrides['mtime_nsec'] = mtime_nsec
 
     def _change(self):
         global filenum
@@ -147,7 +149,9 @@ class FakeFile(object):
         self._register_access('mtime')
         mtime = (datetime.datetime(2015, 2, 14) +
                  datetime.timedelta(seconds=self._fileid))
-        nanosecond = (999999960 + self._fileid * 7) % 1000000000
+        nanosecond = self._overrides.get('mtime_nsec')
+        if nanosecond is None:
+            nanosecond = (999999960 + self._fileid * 7) % 1000000000
         mtime = mtime.replace(microsecond=nanosecond//1000)
         return mtime, nanosecond
 
@@ -194,6 +198,10 @@ class TestBasicBackup(unittest.TestCase):
         self.sourcetree = sourcetree
         sourcetree._add_files(
             ('home', 'me', 'myfiles'), ('file.txt', 'goodstuff', 'more data'))
+        # Make sure the file used for the "unchanged" test has a non-0
+        # microsecond:
+        filetxt = sourcetree._files[('home', 'me', 'myfiles', 'file.txt')]
+        filetxt._override(mtime_nsec=375468925)
         sourcetree._add_files(
             ('home', 'me', 'myfiles', 'static'), ('one', 'two'))
         sourcetree._add_files(

@@ -89,7 +89,8 @@ def _parse_mtime(data, done):
     assert second >= 0
     assert second < 60
     month, day = _month_and_day_from_day_of_year(year, day)
-    mtime = datetime.datetime(year, month, day, hour, minute, second)
+    mtime = datetime.datetime(
+        year, month, day, hour, minute, second, nsecs//1000)
     return mtime, nsecs
 
 daysofmonth = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -776,6 +777,7 @@ class BackupInfo(object):
             _bytes_to_path_component(name), parentid)
 
     def _add_file(self, parentid, name, contentid, size, mtime, mtime_nsec):
+        assert mtime.microsecond == mtime_nsec // 1000
         self.files.append(
             FileData(
                 _bytes_to_path_component(name), parentid, contentid,
@@ -887,6 +889,9 @@ class BackupInfo(object):
 
         The returned object has (at least) the properties 'contentid',
         'size', 'mtime', 'mtime_nsec'.
+
+        'mtime.microsecond' and 'mtime_nsec' SHALL agree to
+        microsecond precision: mtime.microsecond == mtime_nsec // 1000
         '''
         dirdata = self.directories[0]
         filedata = None
