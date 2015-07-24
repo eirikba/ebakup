@@ -6,7 +6,10 @@
     display: table-row;
 }
 
-.kvlist .item .key {
+.kvlist .item > span {
     display: table-cell;
+}
+
+.kvlist .item .key {
     padding-right: 1em;
 }

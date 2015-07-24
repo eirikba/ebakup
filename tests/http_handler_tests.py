@@ -15,22 +15,22 @@ class TestTemplates(unittest.TestCase):
         ui.start_time = datetime.datetime(2015, 7, 16, 16, 36, 57)
         self.assertEqual(
             b'Started at 2015-07-16 16:36:57!',
-            http._expand_template(b'Started at ${start_time}!'))
+            http._expand_template(b'Started at ${bk.start_time}!'))
         self.assertEqual(
             b'2015-07-16 16:36:57',
-            http._expand_template(b'${start_time}'))
+            http._expand_template(b'${bk.start_time}'))
         self.assertEqual(
             b'at end: 2015-07-16 16:36:57',
-            http._expand_template(b'at end: ${start_time}'))
+            http._expand_template(b'at end: ${bk.start_time}'))
         self.assertEqual(
             b'2015-07-16 16:36:57 at beginning',
-            http._expand_template(b'${start_time} at beginning'))
+            http._expand_template(b'${bk.start_time} at beginning'))
         self.assertEqual(
             b'2015-07-16 16:36:572015-07-16 16:36:57',
-            http._expand_template(b'${start_time}${start_time}'))
+            http._expand_template(b'${bk.start_time}${bk.start_time}'))
         self.assertEqual(
             b'2015-07-16 16:36:57',
-            http._expand_template(b'${start_time}'))
+            http._expand_template(b'${bk.start_time}'))
 
     def test_args_command(self):
         ui = FakeUIState()
@@ -39,33 +39,4 @@ class TestTemplates(unittest.TestCase):
         ui.args.command = 'do something'
         self.assertEqual(
             b'Will do something.',
-            http._expand_template(b'Will ${args_command}.'))
-
-    def test_variable(self):
-        ui = FakeUIState()
-        http = http_handler.HttpHandler(ui)
-        self.assertEqual(
-            b'And x is [UNKNOWN VARIABLE: x]',
-            http._expand_template(b'And x is ${var:x}'))
-        http.add_variable(b'x', 'a string')
-        self.assertEqual(
-            b'And x is a string',
-            http._expand_template(b'And x is ${var:x}'))
-        http.drop_variable(b'x')
-        self.assertEqual(
-            b'And x is [UNKNOWN VARIABLE: x]',
-            http._expand_template(b'And x is ${var:x}'))
-        http.add_variable(b'x', 5)
-        self.assertEqual(
-            b'And x is 5',
-            http._expand_template(b'And x is ${var:x}'))
-        self.assertRaisesRegex(
-            http_handler.TemplateError, 'ariable "x" is already defined',
-            http.add_variable, b'x', 'different')
-
-    def test_invalid_variable_name(self):
-        ui = FakeUIState()
-        http = http_handler.HttpHandler(ui)
-        self.assertRaisesRegex(
-            http_handler.TemplateError, 'Invalid variable name: x y',
-            http.add_variable, b'x y', 5)
+            http._expand_template(b'Will ${bk.args_command}.'))
