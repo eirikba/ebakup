@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
-import mako.template
+try:
+    import mako.template
+except ImportError:
+    mako = None
 import os.path
 import re
 
@@ -58,6 +61,15 @@ class HttpHandler(http_server.NullHandler):
         self.response.send_response_done()
 
     def _send_template_file(self, contenttype, filepath=None):
+        if mako is None:
+            if contenttype.startswith(b'text/'):
+                self._send_static_data(
+                    b'text/plain',
+                    b'Mako is required for generating this data, '
+                    b'and it seems it is not available.\n')
+                return
+            self._send_404()
+            return
         body = self._get_file_content(filepath)
         body = self._expand_template(body)
         self._send_static_data(contenttype, body)
