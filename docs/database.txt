@@ -68,10 +68,6 @@ This identifies the whole directory as being a backup database
 following this specification. The file only has a settings block. The
 currently defined settings are:
 
-  "blocksize": The block size of all files in the backup database
-      where not otherwise given. The value is a decimal
-      number. Default: "4096".
-
   "checksum": The checksum algorithm used everywhere (unless otherwise
       given). Default: "sha256".
 

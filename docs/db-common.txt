@@ -20,10 +20,9 @@ checksum at the end of the block:
   <padding> = 0x00*
   <checksum> = binary checksum of everything before <checksum>
 
-The size of each block and the size and algorithm of the <checksum> is
-not part of the common format, but must be known by other means. (In
-the case of the backup database, the "main" file provides these
-values.)
+The size of each block and the size and algorithm of the <checksum>
+are given by the first block, see "Predefined and reserved settings".
+
 
 
 The first block
@@ -45,6 +44,20 @@ characters. And <setting-key> can not contain any ":" characters.
 Due to the setting block being a single block, the total amount of
 setting data is strictly limited by the block size. In practice, I
 doubt this will be a problem.
+
+
+Predefined and reserved settings
+--------------------------------
+
+Settings with keys that start with "edb-" are reserved to be used by
+the low-level, common file format itself. Currently defined settings
+are:
+
+ - "edb-blocksize": Gives the block size of the file as a base-10
+   ascii representation.
+ - "edb-blocksum": Gives the block checksum algorithm. Currently
+   defined values: "md5", "sha1", "sha256", "sha512", "sha3".
+
 
 
 Data block internal format
