@@ -1,0 +1,5 @@
+This directory contains any tools I've put together quickly without
+much concern for design or maintainability. Most likely, much of what
+ends up in here should really be supported by the main ebakup
+application, but I wasn't ready to do it "properly" at the time. That
+also means that anything in here may stop working at any time.
