@@ -35,7 +35,7 @@ class TestEarlyFormat(unittest.TestCase):
         outf = io.BytesIO()
         dumper = dump.get_dumping_function_for_fileobj(inf)
         self.assertNotEqual(None, dumper)
-        dumper(inf, outf)
+        dump.dump_fileobject(inf, outf, dumper)
         self.assertEqual(
             b'event: dump start\n'
             b'type: ebakup backup data\n'
@@ -55,5 +55,27 @@ class TestEarlyFormat(unittest.TestCase):
             b'c81bc52699e34ce93fda4a0e46de\n'
             b'size: 23\n'
             b'mtime: 2013-07-22 10:00:00\n'
+            b'event: dump complete\n',
+            outf.getvalue())
+
+    def test_main_file(self):
+        main = (b'ebakup database v1\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n'
+            b'checksum:sha256\n' +
+            b'\x00' * 3990 +
+            b'\xfbT\x16=\xf4\xe9j\x9fG\xdf\xbb!\xe0\xc9\xe9\xaa\xe3/'
+            b'\xe9\x8e\xd5\xf5\xe4\xdc\xb1C\xbf\xd6\x03\xf2\xf0\xce')
+        inf = io.BytesIO(main)
+        outf = io.BytesIO()
+        dumper = dump.get_dumping_function_for_fileobj(inf)
+        self.assertNotEqual(None, dumper)
+        dump.dump_fileobject(inf, outf, dumper)
+        self.assertEqual(
+            b'event: dump start\n'
+            b'type: ebakup database v1\n'
+            b'setting: edb-blocksize:4096\n'
+            b'setting: edb-blocksum:sha256\n'
+            b'setting: checksum:sha256\n'
             b'event: dump complete\n',
             outf.getvalue())

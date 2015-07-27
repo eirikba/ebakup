@@ -7,8 +7,41 @@ import re
 class ParseError(Exception): pass
 class MissingFeatureError(Exception): pass
 
+def dump_main_file(inf, outf):
+    inf.seek(0)
+    data = inf.read(10000)
+    inf.seek(0)
+    match = re.search(b'\nedb-blocksize:(\d+)\n', data)
+    if not match:
+        raise ParseError('Failed to find block size')
+    blocksize = int(match.group(1))
+    if blocksize != len(data):
+        raise ParseError('More than a single block')
+    # Thus the next few tests can't possibly fail, but if I ever add a
+    # second block to the main file, the above test will have to be
+    # removed. So better just keep these "pointless" tests.
+    if match.start() >= blocksize:
+        raise ParseError('Block size not in first block')
+    match = re.search(b'\nedb-blocksum:([^\n]+)\n', data)
+    if not match:
+        raise ParseError('Failed to find block checksum')
+    if match.start() >= blocksize:
+        raise ParseError('Block checksum not in first block')
+    if match.group(1) == b'sha256':
+        sumalgo = hashlib.sha256
+    else:
+        raise MissingFeatureError(
+            'Unknown checksum algorithm: ' + match.group(1).decode('utf-8'))
+    sumsize = sumalgo().digest_size
+    datasize = blocksize - sumsize
+    data = inf.read(datasize)
+    blocksum = inf.read(sumsize)
+    if sumalgo(data).digest() != blocksum:
+        raise ParseError('Non-matching checksum in settings block')
+    _dump_settings_block(data, outf, verify_type=b'ebakup database v1')
+
 def dump_backup_file(inf, outf):
-    outf.write(b'event: dump start\n')
+    inf.seek(0)
     data = inf.read(10000)
     inf.seek(0)
     match = re.search(b'\nedb-blocksize:(\d+)\n', data)
@@ -33,7 +66,7 @@ def dump_backup_file(inf, outf):
     blocksum = inf.read(sumsize)
     if sumalgo(data).digest() != blocksum:
         raise ParseError('Non-matching checksum in settings block')
-    _dump_settings_block(data, outf)
+    _dump_settings_block(data, outf, verify_type=b'ebakup backup data')
 
     data = inf.read(datasize)
     blocksum = inf.read(sumsize)
@@ -46,9 +79,7 @@ def dump_backup_file(inf, outf):
         data = inf.read(datasize)
         blocksum = inf.read(sumsize)
 
-    outf.write(b'event: dump complete\n')
-
-def _dump_settings_block(data, outf):
+def _dump_settings_block(data, outf, verify_type=None):
     end = data.find(b'\x00')
     if end >= 0:
         if data[end:].strip(b'\x00') != b'':
@@ -58,6 +89,9 @@ def _dump_settings_block(data, outf):
     if data[end-1] != 10: # b'\n'
         raise ParseError('Last entry in first block does not end with LF')
     settings = data[:end-1].split(b'\n')
+    if verify_type is not None and settings[0] != verify_type:
+        raise ParseError(
+            'Wrong type: ' + str(settings[0]) + ' vs ' + str(verify_type))
     outf.write(b'type: ' + settings[0] + b'\n')
     for setting in settings[1:]:
         key, value = setting.split(b':', 1)

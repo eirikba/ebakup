@@ -27,7 +27,13 @@ def get_dumping_function_for(fn):
         return get_dumping_function_for_fileobj(f)
 
 def get_dumping_function_for_fileobj(f):
-    return dump_early_format.dump_backup_file
+    f.seek(0)
+    data = f.read(100)
+    if data.startswith(b'ebakup database v1'):
+        return dump_early_format.dump_main_file
+    elif data.startswith(b'ebakup backup data'):
+        return dump_early_format.dump_backup_file
+    return None
 
 def dump_file(args, dump_func):
     with open(args.file, 'rb') as inf:
@@ -40,7 +46,9 @@ def dump_file(args, dump_func):
             dump_fileobject(inf, outf, dump_func)
 
 def dump_fileobject(inf, outf, dump_func):
+    outf.write(b'event: dump start\n')
     dump_func(inf, outf)
+    outf.write(b'event: dump complete\n')
 
 if __name__ == '__main__':
     main()

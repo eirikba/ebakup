@@ -36,7 +36,6 @@ class TestSimpleDump(unittest.TestCase):
         outf = io.BytesIO()
         dump.dump_backup_file(inf, outf)
         self.assertEqual(
-            b'event: dump start\n'
             b'type: ebakup backup data\n'
             b'setting: edb-blocksize:4096\n'
             b'setting: edb-blocksum:sha256\n'
@@ -53,8 +52,7 @@ class TestSimpleDump(unittest.TestCase):
             b'cid: 50cd91140b0cd995fbd121e3f305e7d15be6'
             b'c81bc52699e34ce93fda4a0e46de\n'
             b'size: 23\n'
-            b'mtime: 2013-07-22 10:00:00\n'
-            b'event: dump complete\n',
+            b'mtime: 2013-07-22 10:00:00\n',
             outf.getvalue())
 
     def test_failed_settings_checksum(self):
@@ -184,3 +182,21 @@ class TestSimpleDump(unittest.TestCase):
         self.assertRaisesRegex(
             dump.ParseError, 'Trailing garbage in backup block',
             dump.dump_backup_file, inf, outf)
+
+    def test_main_file(self):
+        main = (b'ebakup database v1\n'
+            b'edb-blocksize:4096\n'
+            b'edb-blocksum:sha256\n'
+            b'checksum:sha256\n' +
+            b'\x00' * 3990 +
+            b'\xfbT\x16=\xf4\xe9j\x9fG\xdf\xbb!\xe0\xc9\xe9\xaa\xe3/'
+            b'\xe9\x8e\xd5\xf5\xe4\xdc\xb1C\xbf\xd6\x03\xf2\xf0\xce')
+        inf = io.BytesIO(main)
+        outf = io.BytesIO()
+        dump.dump_main_file(inf, outf)
+        self.assertEqual(
+            b'type: ebakup database v1\n'
+            b'setting: edb-blocksize:4096\n'
+            b'setting: edb-blocksum:sha256\n'
+            b'setting: checksum:sha256\n',
+            outf.getvalue())
