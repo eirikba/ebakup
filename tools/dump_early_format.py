@@ -23,6 +23,13 @@ def dump_backup_file(inf, outf):
     while not helpers.is_final_block_dumped:
         helpers.dump_backup_block()
 
+def dump_content_file(inf, outf):
+    helpers = Helpers(inf, outf)
+    helpers.read_block_settings()
+    helpers.dump_settings_block(verify_type=b'ebakup content data')
+    while not helpers.is_final_block_dumped:
+        helpers.dump_content_block()
+
 class Helpers(object):
     def __init__(self, inf, outf):
         self.inf = inf
@@ -141,6 +148,66 @@ class Helpers(object):
             else:
                 raise ParseError('Unknown data item type: ' + str(data[done]))
 
+    def dump_content_block(self):
+        data = self.inf.read(self.datasize)
+        blocksum = self.inf.read(self.sumsize)
+        if data == b'':
+            self.is_final_block_dumped = True
+            return
+        if len(blocksum) != self.sumsize:
+            raise ParseError('Short read (truncated file?)')
+        if self.sumalgo(data).digest() != blocksum:
+            raise ParseError('Non-matching block checksum')
+        done = 0
+        while done < len(data):
+            if data[done] == 0:
+                if data[done:].strip(b'\x00') != b'':
+                    raise ParseError('Trailing garbage in backup block')
+                return
+            elif data[done] == 0xdd:
+                done += 1
+                cidlen, done = _parse_varuint(data, done)
+                sumlen, done = _parse_varuint(data, done)
+                cslen = max(cidlen, sumlen)
+                cs = data[done:done+cslen]
+                done += cslen
+                first, done = _parse_seconds_after_epoch(data, done)
+                last, done = _parse_seconds_after_epoch(data, done)
+                self.outf.write(b'cid: ' + _hexbytes(cs[:cidlen]) + b'\n')
+                self.outf.write(b'checksum: ')
+                if sumlen == cidlen:
+                    self.outf.write(b'*')
+                else:
+                    self.outf.write(_hexbytes(cs[:sumlen]))
+                self.outf.write(b'\nfirst: ')
+                self.outf.write(
+                    _tobytes(first) + b'\nlast: ' + _tobytes(last) + b'\n')
+                while data[done] in (0xa0, 0xa1):
+                    has_sum = data[done] == 0xa1
+                    done += 1
+                    checksum = None
+                    if has_sum:
+                        checksum = data[done:done+sumlen]
+                        done += sumlen
+                        self.outf.write(b'changed: ' + _hexbytes(checksum))
+                    else:
+                        self.outf.write(b'restored')
+                    first, done = _parse_seconds_after_epoch(data, done)
+                    last, done = _parse_seconds_after_epoch(data, done)
+                    self.outf.write(b'\nfirst: ')
+                    self.outf.write(
+                        _tobytes(first) + b'\nlast: ' + _tobytes(last) + b'\n')
+            elif data[done] == 0xd0:
+                raise NotTestedError('Update entries not implemented yet')
+            else:
+                raise ParseError('Unknown data item type: ' + str(data[done]))
+
+def _tobytes(obj):
+    return str(obj).encode('utf-8')
+
+def _hexbytes(binary):
+    return ''.join('{:02x}'.format(x) for x in binary).encode('utf-8')
+
 def _parse_varuint(data, done):
     if data[done] < 0x80:
         return data[done], done+1
@@ -196,3 +263,9 @@ def _month_and_day_from_day_of_year(year, day):
             return month+1, day+1
         day -= days
     assert False
+
+def _parse_seconds_after_epoch(data, done):
+    seconds = (
+        data[done] + data[done+1] * 256 +
+        data[done+2] * 0x10000 + data[done+3] * 0x1000000)
+    return datetime.datetime.utcfromtimestamp(seconds), done + 4

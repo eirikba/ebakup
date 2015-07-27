@@ -198,6 +198,7 @@ expected_tests = set((
     'tool_dump_early_format_tests.TestSimpleDump.test_trailing_garbage_in_data_block',
     'tool_dump_early_format_tests.TestSimpleDump.test_trailing_garbage_in_settings_block',
     'tool_dump_early_format_tests.TestSimpleDump.test_main_file',
+    'tool_dump_early_format_tests.TestSimpleDump.test_content_file',
     'webui_tests.TestWebUI.test_basic_404',
 ))
 expected_test_count = len(expected_tests)
