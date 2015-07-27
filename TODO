@@ -1,3 +1,31 @@
+MAJOR FEATURE: Implement sync
+
+I need to implement support for mirroring backups across multiple
+storage locations (aka disks). This is the primary robustness feature,
+and so needs to be done.
+
+---------------------------------------------------------------------------
+
+MAJOR FEATURE: Implement verify-some
+
+I need to implement the necessary verification support to ensure that
+no data in the backup remains unverified for too long. This is a
+primary robustness feature, and so needs to be done. "sync" is more
+important, but it is the combination of "sync" and this one that makes
+the system actually robust.
+
+---------------------------------------------------------------------------
+
+Record access rights and executable status
+
+Currently I only back up the content of each file. For the shadow
+trees, there are good reasons to do that. For example, hard links all
+share the same access rights. However, that information is potentially
+interesting and surely useful for large-scale restore operations. So I
+should at least record this information in the database.
+
+---------------------------------------------------------------------------
+
 Handle files that change during backup
 
 ---------------------------------------------------------------------------
