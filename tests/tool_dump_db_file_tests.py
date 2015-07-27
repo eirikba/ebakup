@@ -33,9 +33,7 @@ class TestEarlyFormat(unittest.TestCase):
             b'\xdb\\oqU\x8eGHmxv\xc9\xdb\x15')
         inf = io.BytesIO(bk)
         outf = io.BytesIO()
-        dumper = dump.get_dumping_function_for_fileobj(inf)
-        self.assertNotEqual(None, dumper)
-        dump.dump_fileobject(inf, outf, dumper)
+        dump.dump_file_object(inf, outf)
         self.assertEqual(
             b'event: dump start\n'
             b'type: ebakup backup data\n'
@@ -68,9 +66,7 @@ class TestEarlyFormat(unittest.TestCase):
             b'\xe9\x8e\xd5\xf5\xe4\xdc\xb1C\xbf\xd6\x03\xf2\xf0\xce')
         inf = io.BytesIO(main)
         outf = io.BytesIO()
-        dumper = dump.get_dumping_function_for_fileobj(inf)
-        self.assertNotEqual(None, dumper)
-        dump.dump_fileobject(inf, outf, dumper)
+        dump.dump_file_object(inf, outf)
         self.assertEqual(
             b'event: dump start\n'
             b'type: ebakup database v1\n'

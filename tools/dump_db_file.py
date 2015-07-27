@@ -15,18 +15,24 @@ def main():
         help='Path to output file (ANY EXISTING FILE WILL BE DESTROYED) '
         'default: print to standard output')
     args = ap.parse_args()
-    dumper = get_dumping_function_for(args.file)
+    with open(args.file, 'rb') as inf:
+        if args.output is None:
+            outf = sys.stdout
+        else:
+            outf = open(args.output, 'wb')
+        with outf:
+            dump_file_object(inf, outf)
+
+def dump_file_object(inf, outf):
+    dumper = get_dumping_function_for_file_object(inf)
     if not dumper:
-        print('Could not find dump function for ' + args.file, file=sys.stderr)
+        print('Could not find dump function', file=sys.stderr)
         return
-    dump_file(args, dumper)
-    print('Dump complete', file=sys.stderr)
+    outf.write(b'event: dump start\n')
+    dumper(inf, outf)
+    outf.write(b'event: dump complete\n')
 
-def get_dumping_function_for(fn):
-    with open(fn, 'rb') as f:
-        return get_dumping_function_for_fileobj(f)
-
-def get_dumping_function_for_fileobj(f):
+def get_dumping_function_for_file_object(f):
     f.seek(0)
     data = f.read(100)
     if data.startswith(b'ebakup database v1'):
@@ -34,21 +40,6 @@ def get_dumping_function_for_fileobj(f):
     elif data.startswith(b'ebakup backup data'):
         return dump_early_format.dump_backup_file
     return None
-
-def dump_file(args, dump_func):
-    with open(args.file, 'rb') as inf:
-        outfn = args.output
-        if outfn is None:
-            outf = sys.stdout
-        else:
-            outf = open(outfn, 'wb')
-        with outf:
-            dump_fileobject(inf, outf, dump_func)
-
-def dump_fileobject(inf, outf, dump_func):
-    outf.write(b'event: dump start\n')
-    dump_func(inf, outf)
-    outf.write(b'event: dump complete\n')
 
 if __name__ == '__main__':
     main()
