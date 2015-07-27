@@ -131,8 +131,7 @@ class Helpers(object):
                         'LF in file names not implemented')
                 self.outf.write(name)
                 self.outf.write(b'\ncid: ')
-                self.outf.write(b''.join(
-                    '{:02x}'.format(x).encode('utf-8') for x in cid))
+                self.outf.write(_hexbytes(cid))
                 self.outf.write(
                     b'\nsize: ' + str(size).encode('utf-8') + b'\nmtime: ')
                 if mtime.microsecond != nsec // 1000:
