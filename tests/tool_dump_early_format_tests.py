@@ -184,7 +184,8 @@ class TestSimpleDump(unittest.TestCase):
             dump.dump_backup_file, inf, outf)
 
     def test_main_file(self):
-        main = (b'ebakup database v1\n'
+        main = (
+            b'ebakup database v1\n'
             b'edb-blocksize:4096\n'
             b'edb-blocksum:sha256\n'
             b'checksum:sha256\n' +

@@ -8,146 +8,138 @@ class ParseError(Exception): pass
 class MissingFeatureError(Exception): pass
 
 def dump_main_file(inf, outf):
+    helpers = Helpers(inf, outf)
+    helpers.read_block_settings()
     inf.seek(0)
-    data = inf.read(10000)
-    inf.seek(0)
-    match = re.search(b'\nedb-blocksize:(\d+)\n', data)
-    if not match:
-        raise ParseError('Failed to find block size')
-    blocksize = int(match.group(1))
-    if blocksize != len(data):
-        raise ParseError('More than a single block')
-    # Thus the next few tests can't possibly fail, but if I ever add a
-    # second block to the main file, the above test will have to be
-    # removed. So better just keep these "pointless" tests.
-    if match.start() >= blocksize:
-        raise ParseError('Block size not in first block')
-    match = re.search(b'\nedb-blocksum:([^\n]+)\n', data)
-    if not match:
-        raise ParseError('Failed to find block checksum')
-    if match.start() >= blocksize:
-        raise ParseError('Block checksum not in first block')
-    if match.group(1) == b'sha256':
-        sumalgo = hashlib.sha256
-    else:
-        raise MissingFeatureError(
-            'Unknown checksum algorithm: ' + match.group(1).decode('utf-8'))
-    sumsize = sumalgo().digest_size
-    datasize = blocksize - sumsize
-    data = inf.read(datasize)
-    blocksum = inf.read(sumsize)
-    if sumalgo(data).digest() != blocksum:
-        raise ParseError('Non-matching checksum in settings block')
-    _dump_settings_block(data, outf, verify_type=b'ebakup database v1')
+    data = inf.read(helpers.datasize + helpers.sumsize + 1)
+    if len(data) != helpers.datasize + helpers.sumsize:
+        raise ParseError('Main file did not contain exactly 1 data block')
+    helpers.dump_settings_block(verify_type=b'ebakup database v1')
 
 def dump_backup_file(inf, outf):
-    inf.seek(0)
-    data = inf.read(10000)
-    inf.seek(0)
-    match = re.search(b'\nedb-blocksize:(\d+)\n', data)
-    if not match:
-        raise ParseError('Failed to find block size')
-    blocksize = int(match.group(1))
-    if match.start() >= blocksize:
-        raise ParseError('Block size not in first block')
-    match = re.search(b'\nedb-blocksum:([^\n]+)\n', data)
-    if not match:
-        raise ParseError('Failed to find block checksum')
-    if match.start() >= blocksize:
-        raise ParseError('Block checksum not in first block')
-    if match.group(1) == b'sha256':
-        sumalgo = hashlib.sha256
-    else:
-        raise MissingFeatureError(
-            'Unknown checksum algorithm: ' + match.group(1).decode('utf-8'))
-    sumsize = sumalgo().digest_size
-    datasize = blocksize - sumsize
-    data = inf.read(datasize)
-    blocksum = inf.read(sumsize)
-    if sumalgo(data).digest() != blocksum:
-        raise ParseError('Non-matching checksum in settings block')
-    _dump_settings_block(data, outf, verify_type=b'ebakup backup data')
+    helpers = Helpers(inf, outf)
+    helpers.read_block_settings()
+    helpers.dump_settings_block(verify_type=b'ebakup backup data')
+    while not helpers.is_final_block_dumped:
+        helpers.dump_backup_block()
 
-    data = inf.read(datasize)
-    blocksum = inf.read(sumsize)
-    while data:
-        if len(blocksum) != sumsize:
-            raise ParseError('Short read (truncated file?)')
-        if sumalgo(data).digest() != blocksum:
-            raise ParseError('Non-matching block checksum')
-        _dump_backup_block(data, outf)
-        data = inf.read(datasize)
-        blocksum = inf.read(sumsize)
+class Helpers(object):
+    def __init__(self, inf, outf):
+        self.inf = inf
+        self.outf = outf
+        # Set to true whenever any block beyond end-of-file is
+        # attempted dumped:
+        self.is_final_block_dumped = False
 
-def _dump_settings_block(data, outf, verify_type=None):
-    end = data.find(b'\x00')
-    if end >= 0:
-        if data[end:].strip(b'\x00') != b'':
-            raise ParseError('Trailing garbage in settings block')
-    else:
-        end = len(data)
-    if data[end-1] != 10: # b'\n'
-        raise ParseError('Last entry in first block does not end with LF')
-    settings = data[:end-1].split(b'\n')
-    if verify_type is not None and settings[0] != verify_type:
-        raise ParseError(
-            'Wrong type: ' + str(settings[0]) + ' vs ' + str(verify_type))
-    outf.write(b'type: ' + settings[0] + b'\n')
-    for setting in settings[1:]:
-        key, value = setting.split(b':', 1)
-        outf.write(b'setting: ' + key + b':' + value + b'\n')
-
-def _dump_backup_block(data, outf):
-    done = 0
-    while done < len(data):
-        if data[done] == 0:
-            if data[done:].strip(b'\x00') != b'':
-                raise ParseError('Trailing garbage in backup block')
-            return
-        elif data[done] == 0x90:
-            done += 1
-            dirid, done = _parse_varuint(data, done)
-            parent, done = _parse_varuint(data, done)
-            namelen, done = _parse_varuint(data, done)
-            name = data[done:done+namelen]
-            done += namelen
-            outf.write(
-                b'dir: (' + str(parent).encode('utf-8') + b'-' +
-                str(dirid).encode('utf-8') + b')')
-            if b'\n' in name:
-                raise MissingFeatureError('LF in file names not implemented')
-            outf.write(name)
-            outf.write(b'\n')
-        elif data[done] == 0x91:
-            done += 1
-            parent, done = _parse_varuint(data, done)
-            namelen, done = _parse_varuint(data, done)
-            name = data[done:done+namelen]
-            done += namelen
-            cidlen, done = _parse_varuint(data, done)
-            cid = data[done:done+cidlen]
-            done += cidlen
-            size, done = _parse_varuint(data, done)
-            mtime, nsec, done = _parse_mtime(data, done)
-            outf.write(b'file: (' + str(parent).encode('utf-8') + b')')
-            if b'\n' in name:
-                raise MissingFeatureError('LF in file names not implemented')
-            outf.write(name)
-            outf.write(b'\ncid: ')
-            outf.write(b''.join(
-                '{:02x}'.format(x).encode('utf-8') for x in cid))
-            outf.write(b'\nsize: ' + str(size).encode('utf-8') + b'\nmtime: ')
-            if mtime.microsecond != nsec // 1000:
-                # Should not happen. _parse_mtime should check this anyway.
-                raise ParseError(
-                    'Last-modified time mismatch between '
-                    'microsecond and nanosecond')
-            outf.write(str(mtime.replace(microsecond=0)).encode('utf-8'))
-            if nsec != 0:
-                outf.write(b'.' + '{:09}'.format(nsec).encode('utf-8'))
-            outf.write(b'\n')
+    def read_block_settings(self):
+        self.inf.seek(0)
+        data = self.inf.read(10000)
+        match = re.search(b'\nedb-blocksize:(\d+)\n', data)
+        if not match:
+            raise ParseError('Failed to find block size')
+        blocksize = int(match.group(1))
+        if match.start() >= blocksize:
+            raise ParseError('Block size not in first block')
+        match = re.search(b'\nedb-blocksum:([^\n]+)\n', data)
+        if not match:
+            raise ParseError('Failed to find block checksum')
+        if match.start() >= blocksize:
+            raise ParseError('Block checksum not in first block')
+        if match.group(1) == b'sha256':
+            self.sumalgo = hashlib.sha256
         else:
-            raise ParseError('Unknown data item type: ' + str(data[done]))
+            raise MissingFeatureError(
+                'Unknown checksum algorithm: ' + match.group(1).decode('utf-8'))
+        self.sumsize = self.sumalgo().digest_size
+        self.datasize = blocksize - self.sumsize
+
+    def dump_settings_block(self, verify_type=None):
+        self.inf.seek(0)
+        data = self.inf.read(self.datasize)
+        blocksum = self.inf.read(self.sumsize)
+        if self.sumalgo(data).digest() != blocksum:
+            raise ParseError('Non-matching checksum in settings block')
+        end = data.find(b'\x00')
+        if end >= 0:
+            if data[end:].strip(b'\x00') != b'':
+                raise ParseError('Trailing garbage in settings block')
+        else:
+            end = len(data)
+        if data[end-1] != 10: # b'\n'
+            raise ParseError('Last entry in first block does not end with LF')
+        settings = data[:end-1].split(b'\n')
+        if verify_type is not None and settings[0] != verify_type:
+            raise ParseError(
+                'Wrong type: ' + str(settings[0]) + ' vs ' + str(verify_type))
+        self.outf.write(b'type: ' + settings[0] + b'\n')
+        for setting in settings[1:]:
+            key, value = setting.split(b':', 1)
+            self.outf.write(b'setting: ' + key + b':' + value + b'\n')
+
+    def dump_backup_block(self):
+        data = self.inf.read(self.datasize)
+        blocksum = self.inf.read(self.sumsize)
+        if data == b'':
+            self.is_final_block_dumped = True
+            return
+        if len(blocksum) != self.sumsize:
+            raise ParseError('Short read (truncated file?)')
+        if self.sumalgo(data).digest() != blocksum:
+            raise ParseError('Non-matching block checksum')
+        done = 0
+        while done < len(data):
+            if data[done] == 0:
+                if data[done:].strip(b'\x00') != b'':
+                    raise ParseError('Trailing garbage in backup block')
+                return
+            elif data[done] == 0x90:
+                done += 1
+                dirid, done = _parse_varuint(data, done)
+                parent, done = _parse_varuint(data, done)
+                namelen, done = _parse_varuint(data, done)
+                name = data[done:done+namelen]
+                done += namelen
+                self.outf.write(
+                    b'dir: (' + str(parent).encode('utf-8') + b'-' +
+                    str(dirid).encode('utf-8') + b')')
+                if b'\n' in name:
+                    raise MissingFeatureError(
+                        'LF in file names not implemented')
+                self.outf.write(name)
+                self.outf.write(b'\n')
+            elif data[done] == 0x91:
+                done += 1
+                parent, done = _parse_varuint(data, done)
+                namelen, done = _parse_varuint(data, done)
+                name = data[done:done+namelen]
+                done += namelen
+                cidlen, done = _parse_varuint(data, done)
+                cid = data[done:done+cidlen]
+                done += cidlen
+                size, done = _parse_varuint(data, done)
+                mtime, nsec, done = _parse_mtime(data, done)
+                self.outf.write(b'file: (' + str(parent).encode('utf-8') + b')')
+                if b'\n' in name:
+                    raise MissingFeatureError(
+                        'LF in file names not implemented')
+                self.outf.write(name)
+                self.outf.write(b'\ncid: ')
+                self.outf.write(b''.join(
+                    '{:02x}'.format(x).encode('utf-8') for x in cid))
+                self.outf.write(
+                    b'\nsize: ' + str(size).encode('utf-8') + b'\nmtime: ')
+                if mtime.microsecond != nsec // 1000:
+                    # Should not happen. _parse_mtime should check this anyway.
+                    raise ParseError(
+                        'Last-modified time mismatch between '
+                        'microsecond and nanosecond')
+                self.outf.write(
+                    str(mtime.replace(microsecond=0)).encode('utf-8'))
+                if nsec != 0:
+                    self.outf.write(b'.' + '{:09}'.format(nsec).encode('utf-8'))
+                self.outf.write(b'\n')
+            else:
+                raise ParseError('Unknown data item type: ' + str(data[done]))
 
 def _parse_varuint(data, done):
     if data[done] < 0x80:
