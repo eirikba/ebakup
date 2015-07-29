@@ -37,6 +37,8 @@ def get_dumping_function_for_file_object(f):
     data = f.read(100)
     if data.startswith(b'ebakup database v1'):
         return dump_early_format.dump_main_file
+    elif data.startswith(b'ebakup content data\n'):
+        return dump_early_format.dump_content_file
     elif data.startswith(b'ebakup backup data'):
         return dump_early_format.dump_backup_file
     return None

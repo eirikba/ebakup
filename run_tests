@@ -191,6 +191,7 @@ expected_tests = set((
     'task_info_tests.TestInfoForFullConfig.test_configured_backups_are_listed',
     'task_info_tests.TestInfoForFullConfig.test_toplevel_blocks',
     'tool_dump_db_file_tests.TestEarlyFormat.test_basic_backup_file',
+    'tool_dump_db_file_tests.TestEarlyFormat.test_content_file',
     'tool_dump_db_file_tests.TestEarlyFormat.test_main_file',
     'tool_dump_early_format_tests.TestSimpleDump.test_basic_backup_file',
     'tool_dump_early_format_tests.TestSimpleDump.test_failed_block_checksum_first_data_block',
