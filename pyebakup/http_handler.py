@@ -16,11 +16,6 @@ class HttpHandler(http_server.NullHandler):
         self._state = state
         maindir = os.path.dirname(os.path.dirname(__file__))
         self._datadir = os.path.join(maindir, 'datafiles').encode('utf-8')
-        self._handlers = {
-            b'/css/main.css': lambda: self._send_static_file(b'text/css'),
-            b'/': lambda: self._send_template_file(
-                b'text/html', filepath=b'frontpage.html'),
-            }
 
     def handle_request_received(self, method, resource):
         self.method = method
@@ -32,7 +27,7 @@ class HttpHandler(http_server.NullHandler):
     def handle_waiting_for_response(self):
         handler = self._handlers.get(self.resource)
         if handler:
-            return handler()
+            return handler[0](self, *handler[1], **handler[2])
         self._send_404()
 
     def _send_404(self):
@@ -79,6 +74,17 @@ class HttpHandler(http_server.NullHandler):
         return template.render(
             bk=TemplateVars(self._state)).encode('utf-8')
 
+def http_static_file(contenttype):
+    return HttpHandler._send_static_file, (contenttype,), {}
+def http_template_file(contenttype, filepath=None):
+    return (HttpHandler._send_template_file,
+            (contenttype,),
+            {'filepath': filepath})
+
+HttpHandler._handlers = {
+    b'/css/main.css': http_static_file(b'text/css'),
+    b'/': http_template_file(b'text/html', filepath=b'frontpage.html'),
+}
 
 class TemplateVars(object):
     def __init__(self, state):
