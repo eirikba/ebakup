@@ -5,6 +5,7 @@ import os
 import re
 import select
 import socket
+import threading
 
 class ParseFailedError(Exception): pass
 
@@ -123,10 +124,20 @@ class NullHandler(object):
         '''
 
     def handle_wakeup(self, what):
-        '''Called once for each handler that has an unfinished response
-        whenever the server's wakeup() method is called.
+        '''Called to handle wakeup() requests.
 
         'what' is the value passed to wakeup().
+
+        This method will only be called on handlers that are in the
+        process of sending a response when the wakeup() call is
+        processed. That is, this method will never be called before
+        handle_response_ready() and never after
+        handle_request_aborted(), send_response_done() or any other
+        method that indicates the end of the response.
+
+        This may be called on a different thread than the normal
+        handle_* methods, but it is always guaranteed that no handle_*
+        method is called while another is running.
         '''
 
     def handle_request_aborted(self):
@@ -159,6 +170,8 @@ class HttpServer(object):
             self._port_high = port_high
         self._handler = handler
         self.port = None
+        self._wakeup_lock = threading.Lock()
+        self._wakeups = []
 
     def stop(self):
         self.running = False
@@ -192,7 +205,7 @@ class HttpServer(object):
                 if pollfd[0] == self._sock_listen.fileno():
                     self._handle_connect()
                 elif pollfd[0] == self._pipe_wakeup[0]:
-                    self._handle_wakeup()
+                    self._handle_wakeups()
                 else:
                     self._handle_communicate(self._sockets[pollfd[0]])
 
@@ -210,21 +223,32 @@ class HttpServer(object):
         socket.write_pending_data()
         socket.read_data()
 
-    def _handle_wakeup(self):
-        what = b''
-        while True:
-            what += os.read(self._pipe_wakeup[0], 4096)
-            events = what.split(b'\n')
-            for event in events[1:]:
-                for sock in self._sockets.values():
-                    sock.handle_wakeup(event)
-            if events[-1] == b'':
-                return
-            what = events[-1]
+    def _handle_wakeups(self):
+        os.read(self._pipe_wakeup[0], 4096)
+        with self._wakeup_lock:
+            wakeups = self._wakeups
+            self._wakeups = []
+        for wakeup in wakeups:
+            for sock in self._sockets.values():
+                sock.handle_wakeup(wakeup)
 
     def wakeup(self, what):
-        assert b'\n' not in what
-        os.write(self._pipe_wakeup[1], what + b'\n')
+        '''All handlers that are in the process of sending a response will
+        have their handle_wakeup() method called with 'what' as
+        argument.
+
+        The handle_wakeup() method may be called from this method, or
+        it might be called on another thread.
+
+        If wakeup() is called twice with the same value for 'what'
+        before the first call has
+
+        '''
+        with self._wakeup_lock:
+            if what in self._wakeups:
+                return
+            self._wakeups.append(what)
+        os.write(self._pipe_wakeup[1], b'X')
 
     def register_for_write(self, socket):
         self._poller.modify(socket.fileno, select.POLLIN | select.POLLOUT)
