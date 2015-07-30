@@ -97,3 +97,7 @@ class TemplateVars(object):
     @property
     def args_command(self):
         return self._state.args.command
+
+    @property
+    def status(self):
+        return self._state.status

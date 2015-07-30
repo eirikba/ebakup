@@ -11,33 +11,49 @@ class InfoTask(object):
         self._logger = self._services['logger']
 
     def execute(self):
+        ui = self._services['uistate']
+        ui.set_status('task-info', 'finding backups')
         backup_names = self._config.get_all_backup_names()
         self._print('Backup definitions:')
         if not backup_names:
             self._print('  No backups defined')
         for name in backup_names:
+            ui.set_status('task-info', 'Printing backup info for ' + name)
             self._print_backup_info(name)
+        ui.set_status('task-info', 'Complete')
 
     def _print_backup_info(self, name):
+        ui = self._services['uistate']
         bkconfig = self._config.get_backup_by_name(name)
         self._print('  backup ' + name)
         for collection in bkconfig.collections:
             self._print_collection_info('    ', collection)
         for source in bkconfig.sources:
+            ui.set_status(
+                'task-info', 'Printing info for source ' + str(source.path))
             tree = source.filesystem
             self._print('    source ' + tree.path_to_full_string(source.path))
 
     def _print_collection_info(self, prefix, collcfg):
+            ui = self._services['uistate']
+            ui.set_status(
+                'task-info',
+                'Printing info for collection ' + str(collcfg.path))
             tree = collcfg.filesystem
             self._print(
                 prefix + 'collection ' + tree.path_to_full_string(collcfg.path))
             opener = self._services['backupcollection.open']
             try:
+                ui.set_status(
+                    'task-info', 'Opening collection ' + str(collcfg.path))
                 coll = opener(tree, collcfg.path, services=self._services)
             except FileNotFoundError:
                 self._print(prefix + '  (Does not exist)')
                 coll = None
             if coll:
+                ui.set_status(
+                    'task-info',
+                    'Summarizing data for collection ' + str(collcfg.path))
                 colldata = CollectionSummarizer(self._args, coll)
                 self._print(
                     prefix + '  Least recently verified: ' +
@@ -54,6 +70,9 @@ class InfoTask(object):
                         self._print(
                             prefix + '  Not verified for ' + t[0] + ': ' +
                             str(t[2]) + ' files')
+            ui.set_status(
+                'task-info',
+                'Done printing info for collection ' + str(collcfg.path))
 
     def _print(self, msg):
         self._logger.print(msg)

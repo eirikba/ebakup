@@ -6,6 +6,17 @@ class UIState(object):
         self._handlers = []
         self._http_handler = None
         self.start_time = None
+        self.status = []
+
+    def set_status(self, key, value):
+        for i in range(len(self.status)):
+            if self.status[i][0] == key:
+                if value is None:
+                    self.status = self.status[:i] + self.status[i+1:]
+                else:
+                    self.status[i][1] = value
+                return
+        self.status.append([key, value])
 
     def set_http_handler(self, http_handler):
         self._http_handler = http_handler

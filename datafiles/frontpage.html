@@ -13,6 +13,9 @@
 <div class="kvlist">
 <div class="item"><span class="key">Started</span><span>${bk.start_time}</span></div>
 <div class="item"><span class="key">Command</span><span>${bk.args_command}</span></div>
+% for key, value in bk.status:
+<div class="item"><span class="key">${key}</span><span id="status">${value}</span></div>
+% endfor
 </div>
 
 </body>

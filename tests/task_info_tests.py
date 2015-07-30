@@ -67,12 +67,17 @@ class FakeSourceConfig(object):
         self.filesystem = filesystem
         self.path = path
 
+class FakeUIState(object):
+    def set_status(self, key, value):
+        pass
+
 class FakeArgs(object):
     def __init__(self, config):
         self._config = config
         self.services = {
             'logger': FakeLogger(),
             'backupcollection.open': FakeCollectionMaker().open_collection,
+            'uistate': FakeUIState(),
             }
 
 class FakeLogger(object):
