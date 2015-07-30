@@ -52,13 +52,8 @@ class Logger(object):
         LOG_CRITICAL: 'CRITICAL',
         }
     def _log_item_added(self, item):
-        if item.severity < self.LOG_NOTICE:
-            return
-        msg = (str(item.when) + ' ' + self.severity_names[item.severity] +
-               ': ' + item.what + ' (' + str(item.which) + ')')
-        if item.comment:
-            msg += ' - ' + item.comment
-        self.print(msg)
+        if item.severity >= self.LOG_NOTICE:
+            self.print(item.message())
 
     def log_info(self, what, which, comment=''):
         self.log(self.LOG_INFO, what, which, comment)
@@ -90,6 +85,13 @@ class LogItem(object):
         if self.comment:
             string += ': ' + self.comment
         return string
+
+    def message(self):
+        msg = (str(self.when) + ' ' + Logger.severity_names[self.severity] +
+               ': ' + self.what + ' (' + str(self.which) + ')')
+        if self.comment:
+            msg += ' - ' + self.comment
+        return msg
 
 class NoLogger(object):
     '''A Logger that discards all the logs.
