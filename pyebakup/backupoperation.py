@@ -18,6 +18,7 @@ class BackupOperation(object):
         if self._logger is None:
             self._logger = logger.Logger(services=services)
         self._ui = services.get('uistate', DevNullUIState())
+        self._files_backed_up = 0
 
     @property
     def logger(self):
@@ -66,6 +67,8 @@ class BackupOperation(object):
             source.tree.path_to_full_string(source.sourcepath))
         for sourcepath, targetpath, how in source.iterate_source_files():
             self._ui.set_status('backup', 'Backing up ' + str(sourcepath))
+            self._ui.set_status('files backed up', str(self._files_backed_up))
+            self._files_backed_up += 1
             assert how in ('static', 'dynamic')
             cid = self._get_cid_if_assumed_unchanged(
                 source.tree, sourcepath, targetpath)
