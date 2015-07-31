@@ -194,6 +194,9 @@ class FakeFile(object):
         self._locked = 0 # 0: unlocked, 1: read locked, True: write locked
         self._writable = False
 
+    def drop_all_cached_data(self):
+        pass
+
     def lock_for_reading(self):
         if self._locked == 1:
             raise AssertionError('Multiple read locks')

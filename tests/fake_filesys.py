@@ -332,6 +332,9 @@ class FakeFile(object):
     def __exit__(self, a, b, c):
         self.close()
 
+    def drop_all_cached_data(self):
+        pass
+
     def lock_for_writing(self):
         if not self._writable:
             raise io.UnsupportedOperationError('write lock')
@@ -384,7 +387,6 @@ class FakeFile(object):
             self._item.lock = 0
             self._lock = 0
         assert self._lock == 0
-        self._item = None
 
 class FakeTempFile(FakeFile):
     def __init__(self, tree, path, item):

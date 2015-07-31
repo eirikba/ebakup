@@ -140,29 +140,28 @@ class BackupCollection(object):
             return None
         return BackupData(self, info)
 
-    def add_content(self, tree, path, now=None):
-        '''Add the content at 'path' in 'tree' to the content store and return
-        its content id. If a suitable item already exists in the
-        content store, nothing is added to the content store and the
-        content id of the existing item is returned.
+    def add_content(self, sourcefile, now=None):
+        '''Add the content of the File object 'sourcefile' to the content
+        store and return its content id. If a suitable item already
+        exists in the content store, nothing is added to the content
+        store and the content id of the existing item is returned.
+
+        NOTE: 'sourcefile' will be opened for reading and closed again.
         '''
         if now is None:
             now = self._utcnow()
-        source = tree.get_item_at_path(path)
-        if source is None:
-            raise FileNotFoundError('No file found at: ' + str(path))
         target = self._tree.create_temporary_file(self._path + ('tmp',))
         checksum_algo = self._db.get_checksum_algorithm()
         checksummer = checksum_algo()
-        size = source.get_size()
+        size = sourcefile.get_size()
         done = 0
         written = 0
         read_size = 1024 * 1024 * 100
         data = b''
         with target:
-            with source:
+            with sourcefile:
                 while done < size:
-                    data = source.get_data_slice(done, done + read_size)
+                    data = sourcefile.get_data_slice(done, done + read_size)
                     done += len(data)
                     checksummer.update(data)
                     if done < size or written > 0:

@@ -70,13 +70,12 @@ class BackupOperation(object):
             self._ui.set_status('files backed up', str(self._files_backed_up))
             self._files_backed_up += 1
             assert how in ('static', 'dynamic')
-            cid = self._get_cid_if_assumed_unchanged(
-                source.tree, sourcepath, targetpath)
             sourcefile = source.tree.get_item_at_path(sourcepath)
+            cid = self._get_cid_if_assumed_unchanged(sourcefile, targetpath)
             size = sourcefile.get_size()
             mtime, mtime_ns = sourcefile.get_mtime()
             if cid is None:
-                cid = self._try_add_content(source.tree, sourcepath)
+                cid = self._try_add_content(sourcefile, sourcepath)
             if cid is None:
                 self._logger.log_error('File not backed up', sourcepath)
             else:
@@ -95,13 +94,12 @@ class BackupOperation(object):
             'backup', 'Backup of ' +
             source.tree.path_to_full_string(source.sourcepath) + ' complete')
 
-    def _get_cid_if_assumed_unchanged(self, tree, path, targetpath):
+    def _get_cid_if_assumed_unchanged(self, sourcefile, targetpath):
         if not self.previous:
             return None
         oldinfo = self.previous.get_file_info(targetpath)
         if not oldinfo:
             return None
-        sourcefile = tree.get_item_at_path(path)
         mtime, mtime_ns = sourcefile.get_mtime()
         if (sourcefile.get_size() == oldinfo.size and
                 mtime == oldinfo.mtime and
@@ -109,11 +107,12 @@ class BackupOperation(object):
             return oldinfo.contentid
         return None
 
-    def _try_add_content(self, tree, path):
+    def _try_add_content(self, sourcefile, sourcepath):
         try:
-            return self._backupcollection.add_content(tree, path)
+            return self._backupcollection.add_content(sourcefile)
         except PermissionError:
-            self._logger.log_error('Permission denied to source file', path)
+            self._logger.log_error(
+                'Permission denied to source file', sourcepath)
         return None
 
     def _get_old_cid_for_path(self, path):

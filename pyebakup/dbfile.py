@@ -496,6 +496,7 @@ class DBFile(object):
 
     def _write_block_to_file(self, index, data):
         offset = index * self._block_size
+        self._write_file.drop_all_cached_data()
         size = self._write_file.get_size()
         if offset > size+1:
             raise DBFileUsageError('Can not skip empty space when adding data')

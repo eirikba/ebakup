@@ -22,6 +22,21 @@ class FileInterface(object):
     files. A "regular" file is primarily a sequence of octets. But it
     also may have some meta-data, such as the time of last
     modification.
+
+    NOTE: The implementation of File is allowed to return stale data
+    about the underlying file. But no more stale than the time at
+    which the File object itself was created. So "worst" case, the
+    File object would read all information about the underlying file
+    when it is constructed, and never look at the file system again.
+
+    So, if you need up-to-date information, either call
+    'drop_all_cached_data()' or obtain a new object for the same file
+    using 'FileSystem.get_item_at_path()' (or
+    'get_modifiable_item_at_path()'), which is guaranteed to create a
+    new File object.
+
+    (However, an implementation is not required to cache any data, and
+    may return up-to-date data at any time.)
     '''
 
     def __enter__(self):
@@ -31,6 +46,16 @@ class FileInterface(object):
     def __exit__(self, a, b, c):
         '''When exiting a File context, close() is called, thus releasing all
         locks and other resources held by the File object.
+        '''
+
+    def drop_all_cached_data(self):
+        '''Forget everything about the underlying file.
+
+        This ensures that any further call to any method of this
+        object will return data that is no more stale than the time at
+        which this method was called. Note that a newly constructed
+        File object does not have any cached data, so this method need
+        not be called in that case.
         '''
 
     def is_regular(self):

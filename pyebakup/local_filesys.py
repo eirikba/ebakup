@@ -37,21 +37,23 @@ class LocalFileSystem(object):
 
     def get_item_at_path(self, path):
         stringpath = self.path_to_string(path)
-        if not os.path.exists(stringpath):
+        f = LocalFile(stringpath)
+        if not f._exists():
             raise FileNotFoundError('No such file or directory: ' + stringpath)
-        if os.path.isdir(stringpath):
+        if f._isdir():
             raise IsADirectoryError('Path is a directory: ' + stringpath)
-        return LocalFile(stringpath)
+        return f
 
     def get_modifiable_item_at_path(self, path):
         stringpath = self.path_to_string(path)
-        if not os.path.exists(stringpath):
+        f = LocalFile(stringpath, writable=True)
+        if not f._exists():
             raise NotTestedError()
             raise FileNotFoundError('No such file or directory: ' + stringpath)
-        if os.path.isdir(stringpath):
+        if f._isdir():
             raise NotTestedError()
             raise IsADirectoryError('Path is a directory: ' + stringpath)
-        return LocalFile(stringpath, writable=True)
+        return f
 
     def is_accessible(self):
         return True
@@ -130,12 +132,21 @@ class LocalFile(object):
         self._stringpath = stringpath
         self._openfile = openfile
         self._writable = writable
+        self._cached_stat = None
 
     def __enter__(self):
         return self
 
     def __exit__(self, a, b, c):
         self.close()
+
+    def _exists(self):
+        s = self._stat()
+        return bool(s)
+
+    def _isdir(self):
+        s = self._stat()
+        return stat.S_ISDIR(s.st_mode)
 
     def _open(self):
         if self._openfile is not None:
@@ -145,16 +156,28 @@ class LocalFile(object):
         else:
             self._openfile = open(self._stringpath, 'rb')
 
+    def drop_all_cached_data(self):
+        self._cached_stat = None
+
     def close(self):
         if self._openfile is not None:
             self._openfile.close()
             self._openfile = None
 
     def get_size(self):
-        return os.path.getsize(self._stringpath)
+        s = self._stat()
+        return s.st_size
+
+    def _stat(self):
+        if self._cached_stat is None:
+            try:
+                self._cached_stat = os.stat(self._stringpath)
+            except FileNotFoundError:
+                self._cached_stat = False
+        return self._cached_stat
 
     def get_mtime(self):
-        s = os.stat(self._stringpath)
+        s = self._stat()
         mtime_ns = s.st_mtime_ns % 1000000000
         mtime = datetime.datetime.utcfromtimestamp(s.st_mtime_ns // 1000000000)
         mtime = mtime.replace(microsecond=mtime_ns//1000)

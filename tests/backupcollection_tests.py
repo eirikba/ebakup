@@ -401,7 +401,7 @@ class TestBasicBackup(unittest.TestCase):
             datetime.datetime(2015, 2, 14, 19, 55, 32, 328629))
         with backup:
             cid = bc.add_content(
-                sourcetree, ('home', 'me', 'file.txt'),
+                sourcetree.get_item_at_path(('home', 'me', 'file.txt')),
                 now=datetime.datetime(2015, 2, 14, 19, 56, 7))
             self.cid1 = cid
             self.checksum1 = sourcetree._get_checksum(
@@ -409,23 +409,24 @@ class TestBasicBackup(unittest.TestCase):
             backup.add_file(
                 ('homedir', 'file.txt'), cid, 127,
                 datetime.datetime(2014, 9, 11, 9, 3, 54), 759831036)
-            cid = bc.add_content(sourcetree, ('otherfile',))
+            cid = bc.add_content(sourcetree.get_item_at_path(('otherfile',)))
             self.cid2 = cid
             self.checksum2 = sourcetree._get_checksum(('otherfile',))
             backup.add_file(
                 ('homedir', 'other.txt'), cid, 7029,
                 datetime.datetime(2015, 2, 1, 22, 43, 34), 51746409)
-            cid = bc.add_content(sourcetree, ('home', 'me', 'deep', 'data'))
+            cid = bc.add_content(
+                sourcetree.get_item_at_path(('home', 'me', 'deep', 'data')))
             self.cid3 = cid
             backup.add_file(
                 ('outside', 'store', 'deep', 'data'), cid, 5028,
                 datetime.datetime(2014, 4, 21, 8, 29, 46), 826447)
-            cid = bc.add_content(sourcetree, ('4',))
+            cid = bc.add_content(sourcetree.get_item_at_path(('4',)))
             self.cid4 = cid
             backup.add_file(
                 ('toplevel',), cid, 21516,
                 datetime.datetime(2014, 10, 17, 15, 33, 2), 781606397)
-            cid = bc.add_content(sourcetree, ('copy',))
+            cid = bc.add_content(sourcetree.get_item_at_path(('copy',)))
             self.cid5 = cid
             backup.add_file(
                 ('homedir', 'copy'), cid, 127,
@@ -526,7 +527,7 @@ class TestBasicBackup(unittest.TestCase):
 
     def test_add_duplicate_content(self):
         contentid = self.backupcollection.add_content(
-            self.sourcetree, ('home', 'me', 'file.txt'),
+            self.sourcetree.get_item_at_path(('home', 'me', 'file.txt')),
             now=datetime.datetime(2015, 2, 18, 5, 27, 43))
         self.assertEqual(self.cid1, contentid)
 
@@ -639,7 +640,7 @@ class TestTwoBackups(unittest.TestCase):
             datetime.datetime(2015, 2, 14, 19, 55, 32, 328629))
         with backup:
             cid = bc.add_content(
-                sourcetree, ('home', 'me', 'file.txt'),
+                sourcetree.get_item_at_path(('home', 'me', 'file.txt')),
                 now=datetime.datetime(2015, 2, 14, 19, 56, 7))
             self.cid1 = cid
             self.checksum1 = sourcetree._get_checksum(
@@ -647,23 +648,24 @@ class TestTwoBackups(unittest.TestCase):
             backup.add_file(
                 ('homedir', 'file.txt'), cid, 127,
                 datetime.datetime(2014, 9, 11, 9, 3, 54), 759831036)
-            cid = bc.add_content(sourcetree, ('otherfile',))
+            cid = bc.add_content(sourcetree.get_item_at_path(('otherfile',)))
             self.cid2 = cid
             self.checksum2 = sourcetree._get_checksum(('otherfile',))
             backup.add_file(
                 ('homedir', 'other.txt'), cid, 7029,
                 datetime.datetime(2015, 2, 1, 22, 43, 34), 51746409)
-            cid = bc.add_content(sourcetree, ('home', 'me', 'deep', 'data'))
+            cid = bc.add_content(
+                sourcetree.get_item_at_path(('home', 'me', 'deep', 'data')))
             self.cid3 = cid
             backup.add_file(
                 ('outside', 'store', 'deep', 'data'), cid, 5028,
                 datetime.datetime(2014, 4, 21, 8, 29, 46), 826447)
-            cid = bc.add_content(sourcetree, ('4',))
+            cid = bc.add_content(sourcetree.get_item_at_path(('4',)))
             self.cid4 = cid
             backup.add_file(
                 ('toplevel',), cid, 21516,
                 datetime.datetime(2014, 10, 17, 15, 33, 2), 781606397)
-            cid = bc.add_content(sourcetree, ('copy',))
+            cid = bc.add_content(sourcetree.get_item_at_path(('copy',)))
             self.cid5 = cid
             backup.add_file(
                 ('homedir', 'copy'), cid, 127,
@@ -678,7 +680,7 @@ class TestTwoBackups(unittest.TestCase):
             datetime.datetime(2015, 4, 20, 17, 0, 22, 737955))
         with backup:
             cid = bc.add_content(
-                sourcetree, ('home', 'me', 'file.txt'),
+                sourcetree.get_item_at_path(('home', 'me', 'file.txt')),
                 now=datetime.datetime(2015, 4, 20, 17, 0, 24))
             self.cid1b = cid
             self.checksum1 = sourcetree._get_checksum(
@@ -686,29 +688,30 @@ class TestTwoBackups(unittest.TestCase):
             backup.add_file(
                 ('homedir', 'file.txt'), cid, 127,
                 datetime.datetime(2014, 9, 11, 9, 3, 54), 759831036)
-            cid = bc.add_content(sourcetree, ('otherfile',))
+            cid = bc.add_content(sourcetree.get_item_at_path(('otherfile',)))
             self.cid2b = cid
             self.checksum2 = sourcetree._get_checksum(('otherfile',))
             backup.add_file(
                 ('homedir', 'other.txt'), cid, 7029,
                 datetime.datetime(2015, 2, 1, 22, 43, 34), 51746409)
-            cid = bc.add_content(sourcetree, ('home', 'me', 'deep', 'data'))
+            cid = bc.add_content(
+                sourcetree.get_item_at_path(('home', 'me', 'deep', 'data')))
             self.cid3b = cid
             backup.add_file(
                 ('outside', 'store', 'deep', 'data'), cid, 5028,
                 datetime.datetime(2014, 4, 21, 8, 29, 46), 826447)
-            cid = bc.add_content(sourcetree, ('4',))
+            cid = bc.add_content(sourcetree.get_item_at_path(('4',)))
             self.cid4b = cid
             backup.add_file(
                 ('toplevel',), cid, 21516,
                 datetime.datetime(2014, 10, 17, 15, 33, 2), 781606397)
-            cid = bc.add_content(sourcetree, ('copy',))
+            cid = bc.add_content(sourcetree.get_item_at_path(('copy',)))
             self.cid5b = cid
             backup.add_file(
                 ('homedir', 'copy'), cid, 9,
                 datetime.datetime(2015, 3, 13, 5, 21, 52), 918249193)
             cid = bc.add_content(
-                sourcetree, ('home', 'me', 'newfile.txt'),
+                sourcetree.get_item_at_path(('home', 'me', 'newfile.txt')),
                 now=datetime.datetime(2015, 4, 20, 17, 0, 27))
             self.cid6b = cid
             self.checksum1 = sourcetree._get_checksum(
@@ -766,7 +769,7 @@ class TestSingleStuff(unittest.TestCase):
         after_backup_started = datetime.datetime.utcnow()
         with backup:
             cid = bc.add_content(
-                sourcetree, ('home', 'me', 'file.txt'),
+                sourcetree.get_item_at_path(('home', 'me', 'file.txt')),
                 now=datetime.datetime(2015, 2, 14, 19, 56, 7))
             backup.add_file(
                 ('homedir', 'file.txt'), cid, 127,
@@ -816,7 +819,8 @@ class TestBrokenUsage(unittest.TestCase):
         backup = bc.start_backup(
             datetime.datetime(2015, 2, 14, 19, 55, 32, 328629))
         with backup:
-            cid = bc.add_content(sourcetree, ('home', 'me', 'file.txt'))
+            cid = bc.add_content(
+                sourcetree.get_item_at_path(('home', 'me', 'file.txt')))
             backup.add_file(
                 ('homedir', 'file.txt'), cid, 127,
                 datetime.datetime(2014, 9, 11, 9, 3, 54), 759831036)
@@ -825,7 +829,7 @@ class TestBrokenUsage(unittest.TestCase):
                 backup.add_file,
                 ('homedir', 'file.txt'), cid, 127,
                 datetime.datetime(2014, 9, 11, 9, 3, 54), 759831036)
-            cid = bc.add_content(sourcetree, ('otherfile',))
+            cid = bc.add_content(sourcetree.get_item_at_path(('otherfile',)))
             self.assertRaisesRegex(
                 FileExistsError, 'already exists.*file\\.txt',
                 backup.add_file,

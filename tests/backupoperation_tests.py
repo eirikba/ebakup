@@ -24,8 +24,8 @@ class FakeBackupCollection(object):
             return None
         return self._backups[-1]
 
-    def add_content(self, tree, path):
-        data = tree._files[path]._get_content()
+    def add_content(self, sourcefile):
+        data = sourcefile._get_content()
         self._content_add_count[data] = self._content_add_count.get(data, 0) + 1
         if data not in self._content:
             self._content[data] = b'content' + data
