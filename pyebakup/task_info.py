@@ -35,44 +35,44 @@ class InfoTask(object):
             self._print('    source ' + tree.path_to_full_string(source.path))
 
     def _print_collection_info(self, prefix, collcfg):
-            ui = self._services['uistate']
+        ui = self._services['uistate']
+        ui.set_status(
+            'task-info',
+            'Printing info for collection ' + str(collcfg.path))
+        tree = collcfg.filesystem
+        self._print(
+            prefix + 'collection ' + tree.path_to_full_string(collcfg.path))
+        opener = self._services['backupcollection.open']
+        try:
+            ui.set_status(
+                'task-info', 'Opening collection ' + str(collcfg.path))
+            coll = opener(tree, collcfg.path, services=self._services)
+        except FileNotFoundError:
+            self._print(prefix + '  (Does not exist)')
+            coll = None
+        if coll:
             ui.set_status(
                 'task-info',
-                'Printing info for collection ' + str(collcfg.path))
-            tree = collcfg.filesystem
+                'Summarizing data for collection ' + str(collcfg.path))
+            colldata = CollectionSummarizer(self._args, coll)
             self._print(
-                prefix + 'collection ' + tree.path_to_full_string(collcfg.path))
-            opener = self._services['backupcollection.open']
-            try:
-                ui.set_status(
-                    'task-info', 'Opening collection ' + str(collcfg.path))
-                coll = opener(tree, collcfg.path, services=self._services)
-            except FileNotFoundError:
-                self._print(prefix + '  (Does not exist)')
-                coll = None
-            if coll:
-                ui.set_status(
-                    'task-info',
-                    'Summarizing data for collection ' + str(collcfg.path))
-                colldata = CollectionSummarizer(self._args, coll)
+                prefix + '  Least recently verified: ' +
+                str(colldata.least_recently_verified_timestamp))
+            self._print(
+                prefix + '  Total number of content files: ' +
+                str(colldata.total_number_of_cids))
+            if colldata.verified_in_the_future > 0:
                 self._print(
-                    prefix + '  Least recently verified: ' +
-                    str(colldata.least_recently_verified_timestamp))
-                self._print(
-                    prefix + '  Total number of content files: ' +
-                    str(colldata.total_number_of_cids))
-                if colldata.verified_in_the_future > 0:
+                    prefix + '  Verified in the future: ' +
+                    str(colldata.verified_in_the_future) + ' files')
+            for t in colldata.time_verify_stats:
+                if t[2] > 0:
                     self._print(
-                        prefix + '  Verified in the future: ' +
-                        str(colldata.verified_in_the_future) + ' files')
-                for t in colldata.time_verify_stats:
-                    if t[2] > 0:
-                        self._print(
-                            prefix + '  Not verified for ' + t[0] + ': ' +
-                            str(t[2]) + ' files')
-            ui.set_status(
-                'task-info',
-                'Done printing info for collection ' + str(collcfg.path))
+                        prefix + '  Not verified for ' + t[0] + ': ' +
+                        str(t[2]) + ' files')
+        ui.set_status(
+            'task-info',
+            'Done printing info for collection ' + str(collcfg.path))
 
     def _print(self, msg):
         self._logger.print(msg)
