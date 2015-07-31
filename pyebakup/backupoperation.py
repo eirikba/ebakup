@@ -207,6 +207,7 @@ class BackupSource(object):
             how = self._how_should_path_be_handled(path)
             if how != 'ignore':
                 yield self.sourcepath + path, self.targetpath + path, how
+        del files
         for d in dirs:
             dpath = subtree + (d,)
             if not self._is_whole_subtree_ignored(dpath):
