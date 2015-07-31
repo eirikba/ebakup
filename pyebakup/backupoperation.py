@@ -4,6 +4,10 @@ import collections
 
 import logger
 
+class DevNullUIState(object):
+    def set_status(self, key, value):
+        pass
+
 class BackupOperation(object):
     def __init__(self, backupcollection, services=None):
         self._backupcollection = backupcollection
@@ -13,6 +17,7 @@ class BackupOperation(object):
         self._logger = services.get('logger')
         if self._logger is None:
             self._logger = logger.Logger(services=services)
+        self._ui = services.get('uistate', DevNullUIState())
 
     @property
     def logger(self):
@@ -38,18 +43,29 @@ class BackupOperation(object):
         '''Perform the backup operation. Make the necessary copies and update
         the necessary databases.
         '''
+        self._ui.set_status('backup', 'Starting backup operation')
         self._added_static_contentids = set()
+        self._ui.set_status('backup', 'Getting previous backup')
         self.previous = self._backupcollection.get_most_recent_backup()
+        self._ui.set_status('backup', 'Creating new backup')
         backup = self._backupcollection.start_backup()
         with backup:
             for source in self._sources:
                 self._backup_single_source(source, backup)
+            self._ui.set_status('backup', 'Finishing backup')
             backup.commit()
+        self._ui.set_status('backup', 'Checking for removed static files')
         self._check_removed_static_files(
             self._backupcollection.get_most_recent_backup())
+        self._ui.set_status('backup', 'Complete')
 
     def _backup_single_source(self, source, backup):
+        self._ui.set_status(
+            'backup',
+            'Starting backup of ' +
+            source.tree.path_to_full_string(source.sourcepath))
         for sourcepath, targetpath, how in source.iterate_source_files():
+            self._ui.set_status('backup', 'Backing up ' + str(sourcepath))
             assert how in ('static', 'dynamic')
             cid = self._get_cid_if_assumed_unchanged(
                 source.tree, sourcepath, targetpath)
@@ -72,6 +88,9 @@ class BackupOperation(object):
                         self._logger.log(
                             self._logger.LOG_ERROR,
                             'static file changed', targetpath)
+        self._ui.set_status(
+            'backup', 'Backup of ' +
+            source.tree.path_to_full_string(source.sourcepath) + ' complete')
 
     def _get_cid_if_assumed_unchanged(self, tree, path, targetpath):
         if not self.previous:

@@ -92,6 +92,9 @@ class FakeTree(object):
             self._files[folder + (name,)] = FakeFile(filenum)
             filenum += 1
 
+    def path_to_full_string(self, path):
+        return 'faketree:' + str(path)
+
     def get_directory_listing(self, path):
         self._listed_directories.add(path)
         pathlen = len(path)

@@ -42,6 +42,9 @@ class FakeTree(object):
     def is_accessible(self):
         return True
 
+    def path_to_full_string(self, path):
+        return 'faketree:' + str(path)
+
 class FakeCollectionData(object):
     def __init__(self, filesystem, path):
         self.filesystem = filesystem
@@ -103,6 +106,10 @@ class FakeBackupTree(object):
     def set_backup_handlers(self, handlers):
         self._handlers = handlers
 
+class FakeUIState(object):
+    def set_status(self, key, value):
+        pass
+
 class FakeArgs(object):
     def __init__(self, config):
         self._config = config
@@ -113,6 +120,7 @@ class FakeArgs(object):
             'database.create': 'argdbcreate',
             'database.open': 'argdbopen',
             'logger': 'arglogger',
+            'uistate': FakeUIState(),
             'utcnow': 'argutcnow',
             }
         self.create = False
