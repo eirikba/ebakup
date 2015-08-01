@@ -61,7 +61,6 @@ expected_tests = set((
     'config_tests.TestSimpleConfig.test_backup_home_source_subtree_handler_iterator',
     'config_tests.TestVarious.test_read_non_existing_file',
     'config_tests.TestVarious.test_read_two_simple_files',
-    'database_tests.TestDBUtils.test_mtime_to_db_codec',
     'database_tests.TestSimpleDatabase.test_get_out_of_range_backups',
     'database_tests.TestSimpleDatabase.test_read_simple_database',
     'database_tests.TestWriteDatabase.test_create_database_in_existing_directory_fails',
@@ -200,6 +199,7 @@ expected_tests = set((
     'tool_dump_early_format_tests.TestSimpleDump.test_trailing_garbage_in_settings_block',
     'tool_dump_early_format_tests.TestSimpleDump.test_main_file',
     'tool_dump_early_format_tests.TestSimpleDump.test_content_file',
+    'valuecodecs_tests.TestCodecs.test_mtime_to_db_codec',
     'webui_tests.TestWebUI.test_basic_404',
 ))
 expected_test_count = len(expected_tests)

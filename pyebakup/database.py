@@ -6,6 +6,7 @@ import hashlib
 import re
 
 import dbfile
+import valuecodecs
 
 def create_database(directory, path):
     '''Create a new, empty database at 'path' in 'directory'.
@@ -22,121 +23,6 @@ def create_database(directory, path):
     content.create(b'ebakup content data', 4096, hashlib.sha256)
     content.commit()
     return Database(directory, path)
-
-def _parse_uint32(data, done):
-    return (data[done] + data[done+1] * 256 +
-            data[done+2] * 0x10000 + data[done+3] * 0x1000000)
-
-def _make_uint32(value):
-    if value < 0:
-        raise ValueError('Can not make uint32 from negative number')
-    if value > 0xffffffff:
-        raise ValueError('Value too big for uint32: ' + str(value))
-    return bytes((
-        value & 0xff, (value >> 8) & 0xff,
-        (value >> 16) & 0xff, (value >> 24) & 0xff))
-
-def _parse_varuint(data, done):
-    if data[done] < 0x80:
-        return data[done], done+1
-    if data[done+1] < 0x80:
-        return (data[done] & 0x7f) + (data[done+1] << 7), done+2
-    if data[done+2] < 0x80:
-        return (data[done] & 0x7f) + ((data[done+1] & 0x7f) << 7) + (data[done+2] << 14), done+3
-    value = 0
-    shift = 0
-    while True:
-        value += (data[done] & 0x7f) << shift
-        shift += 7
-        if data[done] < 0x80:
-            return value, done + 1
-        done += 1
-
-def _make_varuint(value):
-    if value < 0:
-        raise ValueError('Can not make varuint from negative number')
-    if value == 0:
-        return b'\x00'
-    data = []
-    while value > 0x7f:
-        data.append((value & 0x7f) | 0x80)
-        value >>= 7
-    data.append(value)
-    return bytes(data)
-
-def _parse_mtime(data, done):
-    year = data[done] + (data[done+1] << 8)
-    secs = (data[done+2] + (data[done+3] << 8) + (data[done+4] << 16) +
-            ((data[done+5] & 0x80) << 17))
-    nsecs = ((data[done+5] & 0x3f) + (data[done+6] << 6) +
-             (data[done+7] << 14) + (data[done+8] << 22))
-    assert year != 0 or (secs == 0 and nsecs == 0)
-    assert nsecs >= 0
-    assert nsecs < 1000000000
-    day = secs // 86400
-    assert day >= 0
-    assert day < 366
-    left = secs - day * 86400
-    hour = left // 3600
-    assert hour >= 0
-    assert hour < 24
-    left = left - hour * 3600
-    minute = left // 60
-    assert minute >= 0
-    assert minute < 60
-    second = left - minute * 60
-    assert second >= 0
-    assert second < 60
-    month, day = _month_and_day_from_day_of_year(year, day)
-    mtime = datetime.datetime(
-        year, month, day, hour, minute, second, nsecs//1000)
-    return mtime, nsecs
-
-daysofmonth = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-def _month_and_day_from_day_of_year(year, day):
-    leap_year= year % 400 == 0 or (year % 4 == 0 and year % 100 != 0)
-    if not leap_year and day >= 59:
-        # skip February 29
-        day += 1
-    for month, days in enumerate(daysofmonth):
-        if day < days:
-            return month+1, day+1
-        day -= days
-    assert False
-
-def _make_mtime_with_nsec(mtime, nsec):
-    assert mtime.microsecond == 0 or mtime.microsecond == nsec//1000
-    if nsec < 0 or nsec >= 1000000000:
-        raise ValueError('nsec out of range: ' + str(nsec))
-    year = mtime.year
-    assert year > 0
-    assert year < 65536
-    day = _day_of_year_from_datetime(mtime)
-    sec = day * 86400 + mtime.hour * 3600 + mtime.minute * 60 + mtime.second
-    data = ( year & 0xff, year >> 8,
-             sec & 0xff, (sec >> 8) & 0xff, (sec >> 16) & 0xff,
-             ((sec >> 17) & 0x80) | (nsec & 0x3f),
-             (nsec >> 6) & 0xff, (nsec >> 14) & 0xff, nsec >> 22 )
-    return bytes(data)
-
-def _day_of_year_from_datetime(mtime):
-    day = 0
-    for month in range(mtime.month-1):
-        day += daysofmonth[month]
-    day += mtime.day
-    year = mtime.year
-    leap_year= year % 400 == 0 or (year % 4 == 0 and year % 100 != 0)
-    if not leap_year and day >= 60:
-        day -= 1
-    return day - 1
-
-def _bytes_to_path_component(component):
-    return component.decode('utf-8', errors='surrogateescape')
-
-def _path_component_to_bytes(component):
-    if isinstance(component, bytes):
-        return component
-    return component.encode('utf-8', errors='surrogateescape')
 
 class Database(object):
     def __init__(self, directory, path):
@@ -374,15 +260,15 @@ class ContentInfoFile(object):
                 assert data[done:] == b'\x00' * (len(data) - done)
                 return
             if data[done] == 0xdd:
-                cidlen, done = _parse_varuint(data, done + 1)
-                checklen, done = _parse_varuint(data, done)
+                cidlen, done = valuecodecs.parse_varuint(data, done + 1)
+                checklen, done = valuecodecs.parse_varuint(data, done)
                 contentid = data[done:done+cidlen]
                 checksum = data[done:done+checklen]
                 done += max(cidlen, checklen)
-                first = _parse_uint32(data, done)
+                first = valuecodecs.parse_uint32(data, done)
                 first = datetime.datetime.utcfromtimestamp(first)
                 done += 4
-                last = _parse_uint32(data, done)
+                last = valuecodecs.parse_uint32(data, done)
                 last = datetime.datetime.utcfromtimestamp(last)
                 done += 4
                 timeline = [ ContentChecksum(checksum, first, last, True) ]
@@ -394,10 +280,10 @@ class ContentInfoFile(object):
                     else:
                         check = data[done:done+checklen]
                         done += checklen
-                    first = _parse_uint32(data, done)
+                    first = valuecodecs.parse_uint32(data, done)
                     first = datetime.datetime.utcfromtimestamp(first)
                     done += 4
-                    last = _parse_uint32(data, done)
+                    last = valuecodecs.parse_uint32(data, done)
                     last = datetime.datetime.utcfromtimestamp(last)
                     done += 4
                     timeline.append(
@@ -431,7 +317,7 @@ class ContentInfoFile(object):
         '''
         timestamp = int((when - datetime.datetime(1970, 1, 1)) /
                         datetime.timedelta(seconds=1))
-        timestamp32 = _make_uint32(timestamp)
+        timestamp32 = valuecodecs.make_uint32(timestamp)
         current = set(
             x.get_contentid() for x in
             self.get_all_content_infos_with_checksum(checksum))
@@ -446,8 +332,8 @@ class ContentInfoFile(object):
         assert contentid.startswith(checksum)
         entry = b''.join((
             b'\xdd',
-            _make_varuint(len(contentid)),
-            _make_varuint(len(checksum)),
+            valuecodecs.make_varuint(len(contentid)),
+            valuecodecs.make_varuint(len(checksum)),
             contentid,
             timestamp32,
             timestamp32))
@@ -480,8 +366,8 @@ class ContentInfoFile(object):
         while done < len(block) and block[done] != 0:
             if block[done] == 0xdd:
                 done += 1
-                cidlen, done = _parse_varuint(block, done)
-                cklen, done = _parse_varuint(block, done)
+                cidlen, done = valuecodecs.parse_varuint(block, done)
+                cklen, done = valuecodecs.parse_varuint(block, done)
                 done += max(cidlen, cklen) + 8
                 while (done < len(block) and
                        (block[done] == 0xa0 or block[done] == 0xa1)):
@@ -641,16 +527,16 @@ class BackupInfoBuilder(object):
         for i in range(1, len(path)):
             dirid = self.add_directory(path[:i])
         name = path[-1]
-        component = _path_component_to_bytes(name)
+        component = valuecodecs.path_component_to_bytes(name)
         entry = b''.join(
             (b'\x91',
-             _make_varuint(dirid),
-             _make_varuint(len(component)),
+             valuecodecs.make_varuint(dirid),
+             valuecodecs.make_varuint(len(component)),
              component,
-             _make_varuint(len(contentid)),
+             valuecodecs.make_varuint(len(contentid)),
              contentid,
-             _make_varuint(size),
-             _make_mtime_with_nsec(mtime, mtime_nsec)))
+             valuecodecs.make_varuint(size),
+             valuecodecs.make_mtime_with_nsec(mtime, mtime_nsec)))
         self._add_data_entry(entry)
 
     def _add_data_entry(self, entry):
@@ -688,12 +574,12 @@ class BackupInfoBuilder(object):
         dirid = self._next_dirid
         self._next_dirid += 1
         self._directories[path] = dirid
-        component = _path_component_to_bytes(name)
+        component = valuecodecs.path_component_to_bytes(name)
         entry = b''.join((
             b'\x90',
-            _make_varuint(dirid),
-            _make_varuint(parentid),
-            _make_varuint(len(component)),
+            valuecodecs.make_varuint(dirid),
+            valuecodecs.make_varuint(parentid),
+            valuecodecs.make_varuint(len(component)),
             component))
         self._add_data_entry(entry)
         return dirid
@@ -743,24 +629,24 @@ class BackupInfo(object):
                 return
             elif data[done] == 0x90:
                 done += 1
-                dirid, done = _parse_varuint(data, done)
-                parentid, done = _parse_varuint(data, done)
+                dirid, done = valuecodecs.parse_varuint(data, done)
+                parentid, done = valuecodecs.parse_varuint(data, done)
                 assert parentid == 0 or parentid > 7
-                namelen, done = _parse_varuint(data, done)
+                namelen, done = valuecodecs.parse_varuint(data, done)
                 name = data[done:done+namelen]
                 done += namelen
                 self._add_directory(parentid, dirid, name)
             elif data[done] == 0x91:
                 done += 1
-                parentid, done = _parse_varuint(data, done)
-                namelen, done = _parse_varuint(data, done)
+                parentid, done = valuecodecs.parse_varuint(data, done)
+                namelen, done = valuecodecs.parse_varuint(data, done)
                 name = data[done:done+namelen]
                 done += namelen
-                cidlen, done = _parse_varuint(data, done)
+                cidlen, done = valuecodecs.parse_varuint(data, done)
                 contentid = data[done:done+cidlen]
                 done += cidlen
-                size, done = _parse_varuint(data, done)
-                mtime, mtime_nsec = _parse_mtime(data, done)
+                size, done = valuecodecs.parse_varuint(data, done)
+                mtime, mtime_nsec = valuecodecs.parse_mtime(data, done)
                 done += 9
                 self._add_file(
                     parentid, name, contentid, size, mtime, mtime_nsec)
@@ -773,13 +659,13 @@ class BackupInfo(object):
     def _add_directory(self, parentid, dirid, name):
         assert dirid not in self.directories
         self.directories[dirid] = DirectoryData(
-            _bytes_to_path_component(name), parentid)
+            valuecodecs.bytes_to_path_component(name), parentid)
 
     def _add_file(self, parentid, name, contentid, size, mtime, mtime_nsec):
         assert mtime.microsecond == mtime_nsec // 1000
         self.files.append(
             FileData(
-                _bytes_to_path_component(name), parentid, contentid,
+                valuecodecs.bytes_to_path_component(name), parentid, contentid,
                 size, mtime, mtime_nsec))
 
     def _build_tree(self):
