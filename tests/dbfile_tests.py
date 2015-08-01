@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-import dbfile
-
 import hashlib
 import io
 import unittest
+
+import dbfile
 
 class FileData(object):
     def __init__(self, tree, content):

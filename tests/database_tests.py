@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
+import datetime
+import unittest
+
 import database
 
 from dbfile_tests import FileData, FakeDirectory, FakeFile
-
-import datetime
-import unittest
 
 class TestSimpleDatabase(unittest.TestCase):
     def test_read_simple_database(self):

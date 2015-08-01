@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
-
-import dbfile
-
 import collections
 import datetime
 import hashlib
 import re
+
+import dbfile
 
 def create_database(directory, path):
     '''Create a new, empty database at 'path' in 'directory'.
