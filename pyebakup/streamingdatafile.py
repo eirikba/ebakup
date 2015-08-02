@@ -5,6 +5,7 @@ import hashlib
 import valuecodecs
 
 class InvalidDataError(Exception): pass
+class InternalError(Exception): pass
 
 class Item(object):
     def __init__(self, kind):
@@ -27,6 +28,14 @@ def ItemDirectory(dirid, parent, name):
     item.parent = parent
     item.name = name
     return item
+
+def _get_checksum_by_name(name):
+    if name == b'sha256':
+        return hashlib.sha256
+    if name == b'md5':
+        return hashlib.md5
+    raise NotImplementedError(
+        'Unknown block checksum: ' + repr(name))
 
 class StreamingReader(object):
     def __init__(self, tree, path):
@@ -74,13 +83,7 @@ class StreamingReader(object):
             raise InvalidDataError(
                 'End of block checksum not found in ' + self._path_for_print())
         self._blocksumname = self._data[sumstart:sumend]
-        if self._blocksumname == b'sha256':
-            self._blocksum = hashlib.sha256
-        elif self._blocksumname == b'md5':
-            self._blocksum = hashlib.md5
-        else:
-            raise NotImplementedError(
-                'Unknown block checksum: ' + repr(self._blocksumname))
+        self._blocksum = _get_checksum_by_name(self._blocksumname)
         self._blocksumsize = self._blocksum().digest_size
         self._blockdatasize = self._blocksize - self._blocksumsize
 
@@ -217,7 +220,7 @@ class StreamingReader(object):
                 (self._data[pos+5] & 0x3f) + self._data[pos+6] * 0x40 +
                 self._data[pos+7] * 0x4000 + self._data[pos+8] * 0x400000)
             self._pos = pos + 9
-            if self._pos >= self._current_block_end:
+            if self._pos > self._current_block_end:
                 raise InvalidDataError(
                     'File item overran block end at ' + str(self._pos))
             return item
@@ -269,3 +272,222 @@ class StreamingReader(object):
             return item
         else:
             raise InvalidDataError('Data not recognized at ' + str(self._pos))
+
+
+class StreamingWriter(object):
+    def __init__(self, tree, path):
+        self._tree = tree
+        self._path = path
+        target_file = tree.create_regular_file(path)
+        temp_path = self._path[:-1] + (self._path[-1] + '.new',)
+        temp_file = self._tree.create_regular_file(temp_path)
+        target_file.lock_for_writing()
+        temp_file.lock_for_writing()
+        target_file.drop_all_cached_data()
+        temp_file.drop_all_cached_data()
+        if target_file.get_size() != 0 or temp_file.get_size() != 0:
+            target_file.unlock()
+            temp_file.unlock()
+            raise NotTestedError('Database file non-empty after creation')
+        self._target_file = target_file
+        self._temp_path = temp_path
+        self._file = temp_file
+        self._pendingdata = []
+        self._pendingdatasize = 0
+        self._current_block = 0
+        self._blocksize = None
+        self._blocksumname = None
+        self._blocksumsize = None
+        self._blockdatasize = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, a, b, c):
+        self.close()
+
+    def write(self, item):
+        if self._current_block == 0:
+            self._write_magic_or_setting(item)
+            return
+        self._write_data_item_by_filetype(item)
+
+    def _write_magic_or_setting(self, item):
+        if item.kind == 'magic':
+            if self._pendingdata:
+                raise InvalidDataError(
+                    '"magic" must be the first item in a file')
+            self._set_filetype_from_magic(item.value)
+            self._pendingdata.append(item.value + b'\n')
+            return
+        if not self._pendingdata:
+            raise InvalidDataError(
+                'The first item in a file must be a "magic" item')
+        if item.kind != 'setting':
+            self._end_current_block()
+            self.write(item)
+            return
+        self._handle_setting(item.key, item.value)
+        data = item.key + b':' + item.value + b'\n'
+        self._pendingdata.append(data)
+        self._pendingdatasize += len(data)
+
+    def _set_filetype_from_magic(self, magic):
+        if magic == b'ebakup database v1':
+            self._write_data_item_by_filetype = self._write_data_item_none
+        elif magic == b'ebakup content data':
+            self._write_data_item_by_filetype = self._write_data_item_content
+        elif magic == b'ebakup backup data':
+            self._write_data_item_by_filetype = self._write_data_item_backup
+        else:
+            raise InvalidDataError('Unknown file type: ' + str(magic))
+
+    def _handle_setting(self, key, value):
+        if key == b'edb-blocksize':
+            size = int(value, 10)
+            if size <= 0:
+                raise InvalidDataError(
+                    'Block size must be positive (not ' + str(value) + ')')
+            if self._blocksize is not None:
+                raise InvalidDataError(
+                    'Block size set twice (' + str(self._blocksize) + ' and ' +
+                    str(size) + ')')
+            self._blocksize = size
+        if key == b'edb-blocksum':
+            if not value:
+                raise InvalidDataError('Block checksum can not be empty')
+            if self._blocksumname is not None:
+                raise InvalidDataError(
+                    'Block checksum set twice (' + str(self._blocksumname) +
+                    ' and ' + str(value) + ')')
+            self._blocksum = _get_checksum_by_name(value)
+            self._blocksumname = value
+
+    def _write_data_item_none(self, item):
+        raise InvalidDataError('Unknown data item type: ' + item.kind)
+
+    def _write_data_item_content(self, item):
+        if item.kind == 'content':
+            if len(item.cid) > len(item.checksum):
+                cs = item.cid
+            else:
+                cs = item.checksum
+            if not cs.startswith(item.cid) or not cs.startswith(item.checksum):
+                raise InvalidDataError('Content id and checksum do not match')
+            data = [
+                b'\xdd',
+                valuecodecs.make_varuint(len(item.cid)),
+                valuecodecs.make_varuint(len(item.checksum)),
+                cs,
+                valuecodecs.make_uint32(item.first),
+                valuecodecs.make_uint32(item.last) ]
+            for update in item.updates:
+                if update.kind == 'changed':
+                    tag = b'\xa1'
+                    checksum = update.checksum
+                elif update.kind == 'restored':
+                    tag = b'\xa0'
+                    checksum = b''
+                else:
+                    raise InvalidDataError(
+                        'Unknown update type: ' + update.kind)
+                data += [
+                    tag,
+                    checksum,
+                    valuecodecs.make_uint32(update.first),
+                    valuecodecs.make_uint32(update.last) ]
+            data = b''.join(data)
+        else:
+            raise InvalidDataError('Unknown data item type: ' + item.kind)
+        if self._pendingdata_size + len(data) > self._blockdatasize:
+            if not self._pendingdata:
+                raise InvalidDataError('Item too large for a single block')
+            self._end_current_block()
+        self._pendingdata.append(data)
+        self._pendingdata_size += len(data)
+
+    def _write_data_item_backup(self, item):
+        if item.kind == 'directory':
+            data = b''.join([
+                b'\x90',
+                valuecodecs.make_varuint(item.dirid),
+                valuecodecs.make_varuint(item.parent),
+                valuecodecs.make_varuint(len(item.name)),
+                item.name ])
+        elif item.kind == 'file':
+            year = item.mtime_year
+            second = item.mtime_second
+            ns = item.mtime_ns
+            if year < 1000 or year > 9999:
+                raise InvalidDataError(
+                    'Unreasonable last-modified year: ' + str(year))
+            if second < 0 or second > 31622399:
+                # Not checking for December 32 in non-leap years
+                raise InvalidDataError(
+                    'Unreasonable last-modifed second of year: ' + str(second))
+            if ns < 0 or ns > 999999999:
+                raise InvalidDataError(
+                    'Unreasonable last-modified nanosecond: ' + str(ns))
+            mtime = bytes((
+                item.mtime_year & 0xff, (item.mtime_year >> 8),
+                item.mtime_second & 0xff, (item.mtime_second >> 8) & 0xff,
+                (item.mtime_second >> 16) & 0xff,
+                ((item.mtime_second >> 17) & 0x80) + (item.mtime_ns & 0x3f),
+                (item.mtime_ns >> 6) & 0xff, (item.mtime_ns >> 14) & 0xff,
+                item.mtime_ns >> 22))
+            data = b''.join([
+                b'\x91',
+                valuecodecs.make_varuint(item.parent),
+                valuecodecs.make_varuint(len(item.name)),
+                item.name,
+                valuecodecs.make_varuint(len(item.cid)),
+                item.cid,
+                valuecodecs.make_varuint(item.size),
+                mtime ])
+        else:
+            raise InvalidDataError('Unknown data item type: ' + item.kind)
+        if self._pendingdata_size + len(data) > self._blockdatasize:
+            if not self._pendingdata:
+                raise InvalidDataError('Item too large for a single block')
+            self._end_current_block()
+        self._pendingdata.append(data)
+        self._pendingdata_size += len(data)
+
+    def _end_current_block(self):
+        if self._blocksize < 0:
+            raise InvalidDataError('No block size is set')
+        if not self._blocksum:
+            raise InvalidDataError('No block checksum is set')
+        if self._blocksumsize is None:
+            self._blocksumsize = self._blocksum().digest_size
+            self._blockdatasize = self._blocksize - self._blocksumsize
+        if not self._pendingdata:
+            raise InternalError('Tried to flush empty block')
+        data = b''.join(self._pendingdata)
+        if len(data) > self._blockdatasize:
+            raise InternalError(
+                'Tried to flush too much data in a single block')
+        self._pendingdata = []
+        self._pendingdata_size = 0
+        data += b'\x00' * (self._blockdatasize - len(data))
+        pos = self._file.write_data_slice(
+            self._current_block * self._blocksize, data)
+        pos = self._file.write_data_slice(
+            pos, self._blocksum(data).digest())
+        self._current_block += 1
+        if pos != self._current_block * self._blocksize:
+            raise InternalError(
+                'Error when writing data. Ended up at position ' + str(pos) +
+                ' instead of ' + str(self._current_block * self._blocksize))
+
+    def close(self):
+        if self._pendingdata:
+            self._end_current_block()
+        self._file.close()
+        self._file = None
+        self._target_file.drop_all_cached_data()
+        if self._target_file.get_size() != 0:
+            raise NotTestedError('Data file not empty at commit time!')
+        self._tree.rename_and_overwrite(self._temp_path, self._path)
+        self._target_file.close()
+        self._target_file = None
