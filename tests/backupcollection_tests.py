@@ -360,10 +360,14 @@ class TestUtilities(unittest.TestCase):
             storetree, ('path', 'to', 'store'), services=services)
         mkpath = bc._make_path_from_contentid
 
-        self.assertEqual(('00', '01', '0203'), mkpath(b'\x00\x01\x02\x03'))
-        self.assertEqual(('61', '62', '63646566676869'), mkpath(b'abcdefghi'))
         self.assertEqual(
-            ('6c', 'a4',
+            ('path', 'to', 'store', 'content', '00', '01', '0203'),
+            mkpath(b'\x00\x01\x02\x03'))
+        self.assertEqual(
+            ('path', 'to', 'store', 'content', '61', '62', '63646566676869'),
+            mkpath(b'abcdefghi'))
+        self.assertEqual(
+            ('path', 'to', 'store', 'content', '6c', 'a4',
              '98884051015ba8bba86e70ffea620166e65ef7c86d4e94dfdb340a7364d2'),
             mkpath(b'l\xa4\x98\x88@Q\x01[\xa8\xbb\xa8np\xff\xeab\x01f'
                    b'\xe6^\xf7\xc8mN\x94\xdf\xdb4\nsd\xd2'))

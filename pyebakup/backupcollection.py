@@ -94,7 +94,6 @@ class BackupCollection(object):
 
     def _make_shadow_copy(self, path, contentid):
         contentpath = self._make_path_from_contentid(contentid)
-        contentpath = self._path + ('content',) + contentpath
         shadowpath = self._path + path
         self._tree.make_cheap_copy(contentpath, shadowpath)
 
@@ -184,8 +183,7 @@ class BackupCollection(object):
             assert written == size
             contentid = self._db.add_content_item(now, checksum)
             target_path = self._make_path_from_contentid(contentid)
-            target.rename_without_overwrite_on_close(
-                self._tree, self._path + ('content',) + target_path)
+            target.rename_without_overwrite_on_close(self._tree, target_path)
         return contentid
 
     def _find_duplicate_content_of_data(self, data, checksum):
@@ -193,8 +191,7 @@ class BackupCollection(object):
         datalen = len(data)
         for cand in self._db.get_all_content_infos_with_checksum(checksum):
             candpath = self._make_path_from_contentid(cand.get_contentid())
-            with self._tree.get_item_at_path(
-                    self._path + ('content',) + candpath) as candfile:
+            with self._tree.get_item_at_path(candpath) as candfile:
                 if candfile.get_size() != datalen:
                     continue
                 done = 0
@@ -215,8 +212,7 @@ class BackupCollection(object):
         datalen = datafile.get_size()
         for cand in self._db.get_all_content_infos_with_checksum(checksum):
             candpath = self._make_path_from_contentid(cand.get_contentid())
-            with self._tree.get_item_at_path(
-                    self._path + ('content',) + candpath) as candfile:
+            with self._tree.get_item_at_path(candpath) as candfile:
                 if candfile.get_size() != datalen:
                     continue
                 done = 0
@@ -241,7 +237,7 @@ class BackupCollection(object):
         first = hexify(contentid[0:1])
         second = hexify(contentid[1:2])
         rest = hexify(contentid[2:])
-        return first, second, rest
+        return self._path + ('content',) + (first, second, rest)
 
     def list_contentids_for_checksum(self, checksum):
         '''Return a list of all content ids that represent content items
@@ -306,8 +302,7 @@ class BackupCollection(object):
         content item.
         '''
         path = self._make_path_from_contentid(contentid)
-        return ContentReader(
-            self._tree.get_item_at_path(self._path + ('content',) + path))
+        return ContentReader(self._tree.get_item_at_path(path))
 
 class ContentInfo(object):
     '''Provides information about a content item.

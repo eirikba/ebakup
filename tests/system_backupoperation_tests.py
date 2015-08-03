@@ -188,7 +188,6 @@ class TestSimpleBackup(unittest.TestCase):
                 ):
             cid = backup.get_file_info(path).contentid
             contentpath = self.collection2._make_path_from_contentid(cid)
-            contentpath = contentroot + contentpath
             self.assertTrue(
                 tree._is_cheap_copy(contentpath, shadowroot + path),
                 msg='Not a cheap copy: ' + str(path))
