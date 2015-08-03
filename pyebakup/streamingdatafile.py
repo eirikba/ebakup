@@ -195,7 +195,7 @@ class StreamingReader(object):
             namelen, pos = valuecodecs.parse_varuint(self._data, pos)
             name = self._data[pos:pos+namelen]
             self._pos = pos+namelen
-            if self._pos >= self._current_block_end:
+            if self._pos > self._current_block_end:
                 raise InvalidDataError(
                     'Directory item overran block end at ' + str(self._pos))
             return ItemDirectory(dirid, parent, name)
@@ -244,7 +244,7 @@ class StreamingReader(object):
                 self._data[pos+2] * 0x10000 + self._data[pos+3] * 0x1000000)
             pos += 4
             item.updates = []
-            if pos >= self._current_block_end:
+            if pos > self._current_block_end:
                 raise InvalidDataError(
                     'Content item overran block end at ' + str(pos))
             while self._data[pos] in (0xa0, 0xa1):
@@ -266,7 +266,7 @@ class StreamingReader(object):
                     self._data[pos+2] * 0x10000 + self._data[pos+3] * 0x1000000)
                 pos += 4
             self._pos = pos
-            if self._pos >= self._current_block_end:
+            if self._pos > self._current_block_end:
                 raise InvalidDataError(
                     'Content item overran block end at ' + str(self._pos))
             return item
