@@ -26,6 +26,11 @@ should at least record this information in the database.
 
 ---------------------------------------------------------------------------
 
+Missing test: BackupCollection._find_duplicate_content_of_file() is
+not tested at all.
+
+---------------------------------------------------------------------------
+
 Handle files that change during backup
 
 ---------------------------------------------------------------------------
