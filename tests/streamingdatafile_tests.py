@@ -532,3 +532,27 @@ class TestWriteFiles(unittest.TestCase):
             FileExistsError, 'File.*exists:.*path.*to.*new.*dbfile',
             StreamingWriter, tree, ('path', 'to', 'new', 'dbfile'))
         self.assertEqual(set(), tree._modified)
+
+    def test_write_backup_with_path_not_matching_start_time_fails(self):
+        item_data = (
+            { 'kind':'magic', 'value':b'ebakup backup data' },
+            { 'kind':'setting', 'key':b'edb-blocksize', 'value':b'4096' },
+            { 'kind':'setting', 'key':b'edb-blocksum', 'value':b'sha256' },
+            )
+        tree = FakeFileSystem()
+        writer = StreamingWriter(
+            tree, ('path', 'to', 'bk', '2015', '04-03T10:44'))
+        for data in item_data:
+            item = Item(data['kind'])
+            for key, value in data.items():
+                if key == 'kind':
+                    pass
+                else:
+                    setattr(item, key, value)
+            writer.write(item)
+        startitem = Item('setting')
+        startitem.key = b'start'
+        startitem.value = b'2015-04-03T10:46:06'
+        self.assertRaisesRegex(
+            InvalidDataError, 'name and start time do not match.*10:44',
+            writer.write, startitem)

@@ -333,6 +333,7 @@ class StreamingWriter(object):
         self._pendingdatasize += len(data)
 
     def _set_filetype_from_magic(self, magic):
+        self._magic = magic
         if magic == b'ebakup database v1':
             self._write_data_item_by_filetype = self._write_data_item_none
         elif magic == b'ebakup content data':
@@ -362,6 +363,13 @@ class StreamingWriter(object):
                     ' and ' + str(value) + ')')
             self._blocksum = _get_checksum_by_name(value)
             self._blocksumname = value
+        if key == b'start' and self._magic == b'ebakup backup data':
+            if (value[:-3] !=
+                    (self._path[-2] + '-' + self._path[-1]).encode('utf-8')):
+                raise InvalidDataError(
+                    'Backup name and start time do not match: ' +
+                    self._path[-2] + '-' + self._path[-1] + ' vs ' +
+                    value.decode('utf-8'))
 
     def _write_data_item_none(self, item):
         raise InvalidDataError('Unknown data item type: ' + item.kind)
