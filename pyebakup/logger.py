@@ -58,6 +58,12 @@ class Logger(object):
     def log_info(self, what, which, comment=''):
         self.log(self.LOG_INFO, what, which, comment)
 
+    def log_notice(self, what, which, comment=''):
+        self.log(self.LOG_NOTICE, what, which, comment)
+
+    def log_warning(self, what, which, comment=''):
+        self.log(self.LOG_WARNING, what, which, comment)
+
     def log_error(self, what, which, comment=''):
         self.log(self.LOG_ERROR, what, which, comment)
 

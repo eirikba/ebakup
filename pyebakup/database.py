@@ -7,6 +7,7 @@ import re
 
 import dbfile
 import valuecodecs
+import streamingdatafile
 
 def create_database(directory, path):
     '''Create a new, empty database at 'path' in 'directory'.
@@ -46,6 +47,118 @@ class Database(object):
         if name == 'sha256':
             return hashlib.sha256
         raise AssertionError('Unknown checksum algorithm: ' + str(check_name))
+
+    _re_backup_file = re.compile(r'^\d\d-\d\dT\d\d:\d\d$')
+    def get_all_backup_names(self, order_by=None):
+        '''Obtain a list of the names of all backups.
+
+        Every backup has a name. This method returns a sequence
+        containing the name of every backup.
+
+        The name of a backup is a string representation of the time
+        when the backup was started. You should not rely on the exact
+        format of the string, but you can rely on the strings only
+        depending on the starting time of the backup, and that the
+        strings will sort chronologically.
+
+        The list is ordered according to 'order_by':
+          None - The list is unordered.
+          'starttime' - The list is sorted on the time the backup
+              started, oldest first.
+
+        '''
+        if order_by not in (None, 'starttime'):
+            raise AssertionError('Unexpected order_by: ' + str(order_by))
+        years = []
+        dirs, files = self._directory.get_directory_listing(self._path)
+        for name in dirs:
+            try:
+                num = int(name)
+                if 2000 < num < 9999:
+                    years.append(name)
+            except ValueError:
+                pass
+        if order_by == 'starttime':
+            years.sort()
+        backups = []
+        for year in years:
+            dirs, files = self._directory.get_directory_listing(
+                self._path + (year,))
+            for name in files:
+                if self._re_backup_file.match(name):
+                    backups.append(year + '-' + name)
+                else:
+                    self._logger.log_warning(
+                        'unexpected file', (year, name))
+        if order_by == 'starttime':
+            backups.sort()
+        return backups
+
+    def get_streaming_backup_reader_for_name(self, name):
+        '''Obtain a streaming reader for the backup named 'name'.
+
+        WARNING: This method may change behaviour or go away in the
+        (near) future. I'm still considering whether this is a good
+        idea.
+
+        The streaming reader is an iterator, so can be used with
+        next() and for-in. Each next() will provide the next item in
+        the backup. See the description of 'item' in
+        get_streaming_backup_writer() for details about those objects.
+        '''
+        path = tuple(name.split('-', 1))
+        return streamingdatafile.StreamingReader(
+            self._directory, self._path + path)
+
+    def get_streaming_backup_writer_for_name(self, name):
+        '''Obtain a streaming writer for a backup.
+
+        This will create a new backup according to whatever data it is
+        fed.
+
+        The returned object has a write(item) method to add something
+        to the backup. And a close() method to commit the backup to
+        the database.
+
+        The 'item' argument to write(item) must have a 'kind'
+        attribute (a string) that specifies what kind of item it is
+        and what other attributes it has:
+
+        'magic' : MUST occur as the first item.
+            value: The "magic" identifier of the file (a bytes object,
+                not including the final LF)
+
+        'setting': May only occur after 'magic' or other 'setting'
+                items.
+            key: The setting's key (a bytes object)
+            value: The setting's value (a bytes object)
+
+        'directory': Describes a directory entry.
+            dirid: The identifier for the directory (an integer). Note
+                that some values are predefined (most importantly 0 is
+                the root directory).
+            parent: The identifier for the parent directory (an
+                integer)
+            name: The name of the directory (a bytes object that may
+                potentially be a utf-8 encoded string)
+
+        'file': Describes a file entry.
+            parent: The identifier for the parent directory (an
+                integer)
+            name: The name of the file (a bytes object that may
+                potentially be a utf-8 encoded string)
+            size: The size of the files (an integer, in octets)
+            mtime_year: The year of the last-modified time (an
+                integer)
+            mtime_second: The second relative to the start of the year
+                of the last-modified time (an integer)
+            mtime_ns: The nanosecond of the last-modified time
+                (an integer).
+            contentid: The content id of the file (a bytes object)
+        '''
+        path = tuple(name.split('-', 1))
+        return streamingdatafile.StreamingWriter(
+            self._directory, self._path + path)
 
     def get_most_recent_backup(self):
         '''Obtain the data for the most recent backup according to the

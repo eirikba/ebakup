@@ -18,6 +18,10 @@ class FakeFileSystem(object):
     def _set_utcnow(self, utcnow):
         self._utcnow = utcnow
 
+    def _clear_all_access_rules(self):
+        self._access = {}
+        self._treeaccess = {}
+
     def _allow_full_access_to_subtree(self, path):
         self._treeaccess[path] = (
             'mkdir', 'create', 'stat', 'read', 'write', 'listdir', 'delete')

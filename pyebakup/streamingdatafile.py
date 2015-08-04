@@ -317,6 +317,8 @@ class StreamingWriter(object):
             if self._pendingdata:
                 raise InvalidDataError(
                     '"magic" must be the first item in a file')
+            # _set_filetype also, as a side effect, verifies that the
+            # magic value is valid.
             self._set_filetype_from_magic(item.value)
             self._pendingdata.append(item.value + b'\n')
             return
@@ -327,6 +329,11 @@ class StreamingWriter(object):
             self._end_current_block()
             self.write(item)
             return
+        # Strictly speaking, there are more restrictions on valid
+        # settings, but these are the ones that really matters.
+        assert b'\n' not in item.key
+        assert b'\n' not in item.value
+        assert b':' not in item.key
         self._handle_setting(item.key, item.value)
         data = item.key + b':' + item.value + b'\n'
         self._pendingdata.append(data)

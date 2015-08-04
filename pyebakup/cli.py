@@ -17,6 +17,7 @@ import ui_state
 from config import Config
 from task_backup import BackupTask
 from task_info import InfoTask
+from task_sync import SyncTask
 from task_webui import WebUITask
 
 class UnknownCommandError(Exception): pass
@@ -60,6 +61,13 @@ def parse_commandline(commandline=None, msgfile=None):
     backupparser.add_argument('backups', nargs='+', help='Which backups to run')
     infoparser = subparsers.add_parser(
         'info', help='Display information about the state of the backups')
+    syncparser = subparsers.add_parser(
+        'sync', help='Synchronize multiple collections for the same backup set')
+    syncparser.add_argument(
+        '--create', action='store_true',
+        help='Create any missing backup collections')
+    syncparser.add_argument(
+        'backups', nargs='*', help='Which backups to sync (default:all)')
     webuiparser = subparsers.add_parser(
         'webui',
         help='Run the web ui. By default, the web ui is always started '
@@ -70,6 +78,7 @@ def parse_commandline(commandline=None, msgfile=None):
         backupparser._overridden_output_file = msgfile
         infoparser._overridden_output_file = msgfile
         webuiparser._overridden_output_file = msgfile
+        syncparser._overridden_output_file = msgfile
     if commandline is None:
         args = parser.parse_args()
     else:
@@ -144,6 +153,9 @@ def make_tasks_from_args(args):
         tasks.append(task)
     elif args.command == 'webui':
         pass
+    elif args.command == 'sync':
+        task = SyncTask(config, args)
+        tasks.append(task)
     else:
         raise UnknownCommandError('Unknown command: ' + args.command)
     return tasks
