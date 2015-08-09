@@ -1,6 +1,9 @@
 Ebakup - a backup maintenance system
 ====================================
 
+The official site for ebakup is on
+[eirikba.org](http://eirikba.org/projects/ebakup).
+
 ebakup is a simple backup system based on my personal wishes for what
 the backup system I want to use should provide:
 
@@ -23,7 +26,7 @@ implement support for it):
 Status
 ------
 
-(As of 2015-07-27)
+(As of 2015-08-09)
 
 The backup system makes backups successfully. I'm using it myself for
 that purpose (though that's not a very strong endorsement, given that
@@ -34,10 +37,8 @@ backup storage. Since I am relying on this stuff now, I will have to
 make tools to upgrade (and verify correctness of upgrade) in that
 case.
 
-I'm still missing the primary robustness features: synchronization
-(keeping multiple mirrors of the backup storage) and scheduled
-verification (make sure all data has been checked for corruption
-"recently").
+The main missing piece now is verification (make sure all data has
+been checked for corruption "recently"). And better UI.
 
 The current python code is painfully slow at decoding the database
 files. I need to do something about that.
