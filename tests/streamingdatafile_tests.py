@@ -302,7 +302,7 @@ class TestWriteFiles(unittest.TestCase):
             { 'kind': 'setting', 'key':b'edb-blocksum', 'value':b'sha256' },
         ]
         tree = FakeFileSystem()
-        writer = StreamingWriter(tree, ('path', 'to', 'new', 'dbfile'))
+        writer = StreamingWriter.create(tree, ('path', 'to', 'new', 'dbfile'))
         for data in item_data:
             item = Item(data['kind'])
             for key, value in data.items():
@@ -365,7 +365,7 @@ class TestWriteFiles(unittest.TestCase):
                     'first':0x5517b191, 'last':0x551d1200 }, ) },
             )
         tree = FakeFileSystem()
-        writer = StreamingWriter(tree, ('path', 'to', 'new', 'content'))
+        writer = StreamingWriter.create(tree, ('path', 'to', 'new', 'content'))
         for data in item_data:
             item = Item(data['kind'])
             for key, value in data.items():
@@ -431,7 +431,7 @@ class TestWriteFiles(unittest.TestCase):
               'mtime_year':2013, 'mtime_second':17488800, 'mtime_ns':0 },
             )
         tree = FakeFileSystem()
-        writer = StreamingWriter(
+        writer = StreamingWriter.create(
             tree, ('path', 'to', 'bk', '2015', '04-03T10:46'))
         for data in item_data:
             item = Item(data['kind'])
@@ -494,7 +494,7 @@ class TestWriteFiles(unittest.TestCase):
               'mtime_year':2013, 'mtime_second':17488800,
               'mtime_ns':(0x42 << 22) })  # To get the last octet set to 0x42
         tree = FakeFileSystem()
-        writer = StreamingWriter(
+        writer = StreamingWriter.create(
             tree, ('path', 'to', 'bk', '2015', '04-03T10:46'))
         for data in item_data:
             item = Item(data['kind'])
@@ -540,7 +540,7 @@ class TestWriteFiles(unittest.TestCase):
         tree._files[('path', 'to', 'new', 'dbfile')] = b'hello'
         self.assertRaisesRegex(
             FileExistsError, 'File.*exists:.*path.*to.*new.*dbfile',
-            StreamingWriter, tree, ('path', 'to', 'new', 'dbfile'))
+            StreamingWriter.create, tree, ('path', 'to', 'new', 'dbfile'))
         self.assertEqual(set(), tree._modified)
 
     def test_write_backup_with_path_not_matching_start_time_fails(self):
@@ -550,7 +550,7 @@ class TestWriteFiles(unittest.TestCase):
             { 'kind':'setting', 'key':b'edb-blocksum', 'value':b'sha256' },
             )
         tree = FakeFileSystem()
-        writer = StreamingWriter(
+        writer = StreamingWriter.create(
             tree, ('path', 'to', 'bk', '2015', '04-03T10:44'))
         for data in item_data:
             item = Item(data['kind'])
@@ -569,7 +569,7 @@ class TestWriteFiles(unittest.TestCase):
 
     def test_write_header(self):
         tree = FakeFileSystem()
-        writer = StreamingWriter(
+        writer = StreamingWriter.create(
             tree, ('path', 'to', 'bk', '2015', '04-03T10:44'))
         writer.write_header(b'ebakup backup data', 4096, b'sha256')
         writer.close()
@@ -584,7 +584,7 @@ class TestWriteFiles(unittest.TestCase):
 
     def test_write_magic_and_settings(self):
         tree = FakeFileSystem()
-        writer = StreamingWriter(
+        writer = StreamingWriter.create(
             tree, ('path', 'to', 'bk', '2015', '04-03T10:44'))
         writer.write_magic(b'ebakup backup data')
         writer.write_setting(b'edb-blocksize', b'4096')

@@ -16,10 +16,11 @@ def create_database(tree, path):
     '''
     if tree.does_path_exist(path):
         raise FileExistsError('Path already exists: ' + str(path))
-    with streamingdatafile.StreamingWriter(tree, path + ('main',)) as main:
+    with streamingdatafile.StreamingWriter.create(
+            tree, path + ('main',)) as main:
         main.write_header(b'ebakup database v1', 4096, b'sha256')
         main.write_setting(b'checksum', b'sha256')
-    with streamingdatafile.StreamingWriter(
+    with streamingdatafile.StreamingWriter.create(
             tree, path + ('content',)) as content:
         content.write_header(b'ebakup content data', 4096, b'sha256')
     return Database(tree, path)
@@ -158,7 +159,7 @@ class Database(object):
             contentid: The content id of the file (a bytes object)
         '''
         path = tuple(name.split('-', 1))
-        return streamingdatafile.StreamingWriter(
+        return streamingdatafile.StreamingWriter.create(
             self._tree, self._path + path)
 
     def get_most_recent_backup(self):

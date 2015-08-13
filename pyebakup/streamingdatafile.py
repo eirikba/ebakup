@@ -286,20 +286,9 @@ class StreamingWriter(object):
     def __init__(self, tree, path):
         self._tree = tree
         self._path = path
-        target_file = tree.create_regular_file(path)
-        temp_path = self._path[:-1] + (self._path[-1] + '.new',)
-        temp_file = self._tree.create_regular_file(temp_path)
-        target_file.lock_for_writing()
-        temp_file.lock_for_writing()
-        target_file.drop_all_cached_data()
-        temp_file.drop_all_cached_data()
-        if target_file.get_size() != 0 or temp_file.get_size() != 0:
-            target_file.unlock()
-            temp_file.unlock()
-            raise NotTestedError('Database file non-empty after creation')
-        self._target_file = target_file
-        self._temp_path = temp_path
-        self._file = temp_file
+        self._read_file = None
+        self._write_path = None
+        self._write_file = None
         self._pendingdata = []
         self._pendingdatasize = 0
         self._current_block = 0
@@ -307,6 +296,25 @@ class StreamingWriter(object):
         self._blocksumname = None
         self._blocksumsize = None
         self._blockdatasize = None
+
+    @staticmethod
+    def create(tree, path):
+        read_file = tree.create_regular_file(path)
+        write_path = path[:-1] + (path[-1] + '.new',)
+        write_file = tree.create_regular_file(write_path)
+        read_file.lock_for_writing()
+        write_file.lock_for_writing()
+        read_file.drop_all_cached_data()
+        write_file.drop_all_cached_data()
+        if read_file.get_size() != 0 or write_file.get_size() != 0:
+            read_file.unlock()
+            write_file.unlock()
+            raise NotTestedError('Database file non-empty after creation')
+        writer = StreamingWriter(tree, path)
+        writer._read_file = read_file
+        writer._write_path = write_path
+        writer._write_file = write_file
+        return writer
 
     def __enter__(self):
         return self
@@ -504,9 +512,9 @@ class StreamingWriter(object):
         self._pendingdata = []
         self._pendingdata_size = 0
         data += b'\x00' * (self._blockdatasize - len(data))
-        pos = self._file.write_data_slice(
+        pos = self._write_file.write_data_slice(
             self._current_block * self._blocksize, data)
-        pos = self._file.write_data_slice(
+        pos = self._write_file.write_data_slice(
             pos, self._blocksum(data).digest())
         self._current_block += 1
         if pos != self._current_block * self._blocksize:
@@ -517,11 +525,11 @@ class StreamingWriter(object):
     def close(self):
         if self._pendingdata:
             self._end_current_block()
-        self._file.close()
-        self._file = None
-        self._target_file.drop_all_cached_data()
-        if self._target_file.get_size() != 0:
+        self._write_file.close()
+        self._write_file = None
+        self._read_file.drop_all_cached_data()
+        if self._read_file.get_size() != 0:
             raise NotTestedError('Data file not empty at commit time!')
-        self._tree.rename_and_overwrite(self._temp_path, self._path)
-        self._target_file.close()
-        self._target_file = None
+        self._tree.rename_and_overwrite(self._write_path, self._path)
+        self._read_file.close()
+        self._read_file = None
