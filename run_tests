@@ -176,6 +176,8 @@ expected_tests = set((
     'streamingdatafile_tests.TestWriteFiles.test_simple_backup_file',
     'streamingdatafile_tests.TestWriteFiles.test_simple_content_file',
     'streamingdatafile_tests.TestWriteFiles.test_write_backup_with_path_not_matching_start_time_fails',
+    'streamingdatafile_tests.TestWriteFiles.test_write_header',
+    'streamingdatafile_tests.TestWriteFiles.test_write_magic_and_settings',
     'streamingdatafile_tests.TestWriteFiles.test_write_multi_block_file',
     'system_cli_tests.TestFullSequenceOfOperations.test_everything',
     'system_backupoperation_tests.TestSimpleBackup.test_backed_up_files_have_correct_checksum',

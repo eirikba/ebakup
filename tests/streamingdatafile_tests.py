@@ -285,6 +285,16 @@ class TestReadSimpleDatabase(unittest.TestCase):
 
 class TestWriteFiles(unittest.TestCase):
 
+    def assertReaderItemsEqual(self, item_data, reader):
+        count = 0
+        for expected in item_data:
+            item = next(reader)
+            count += 1
+            for key, value in expected.items():
+                self.assertEqual(value, getattr(item, key), msg='key=' + key)
+        self.assertEqual(len(item_data), count)
+        self.assertRaises(StopIteration, next, reader)
+
     def test_create_empty_main_file(self):
         item_data = [
             { 'kind': 'magic', 'value':b'ebakup database v1' },
@@ -556,3 +566,37 @@ class TestWriteFiles(unittest.TestCase):
         self.assertRaisesRegex(
             InvalidDataError, 'name and start time do not match.*10:44',
             writer.write, startitem)
+
+    def test_write_header(self):
+        tree = FakeFileSystem()
+        writer = StreamingWriter(
+            tree, ('path', 'to', 'bk', '2015', '04-03T10:44'))
+        writer.write_header(b'ebakup backup data', 4096, b'sha256')
+        writer.close()
+        item_data = (
+            { 'kind':'magic', 'value':b'ebakup backup data' },
+            { 'kind':'setting', 'key':b'edb-blocksize', 'value':b'4096' },
+            { 'kind':'setting', 'key':b'edb-blocksum', 'value':b'sha256' },
+            )
+        reader = StreamingReader(
+            tree, ('path', 'to', 'bk', '2015', '04-03T10:44'))
+        self.assertReaderItemsEqual(item_data, reader)
+
+    def test_write_magic_and_settings(self):
+        tree = FakeFileSystem()
+        writer = StreamingWriter(
+            tree, ('path', 'to', 'bk', '2015', '04-03T10:44'))
+        writer.write_magic(b'ebakup backup data')
+        writer.write_setting(b'edb-blocksize', b'4096')
+        writer.write_setting(b'edb-blocksum', b'sha256')
+        writer.write_setting(b'extrasetting', b'extra value')
+        writer.close()
+        item_data = (
+            { 'kind':'magic', 'value':b'ebakup backup data' },
+            { 'kind':'setting', 'key':b'edb-blocksize', 'value':b'4096' },
+            { 'kind':'setting', 'key':b'edb-blocksum', 'value':b'sha256' },
+            { 'kind':'setting', 'key':b'extrasetting', 'value':b'extra value' },
+            )
+        reader = StreamingReader(
+            tree, ('path', 'to', 'bk', '2015', '04-03T10:44'))
+        self.assertReaderItemsEqual(item_data, reader)

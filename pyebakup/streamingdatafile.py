@@ -306,6 +306,17 @@ class StreamingWriter(object):
     def __exit__(self, a, b, c):
         self.close()
 
+    def write_header(self, magic, blocksize, blocksum):
+        self.write_magic(magic)
+        self.write_setting(b'edb-blocksize', str(blocksize).encode('utf-8'))
+        self.write_setting(b'edb-blocksum', blocksum)
+
+    def write_magic(self, magic):
+        self.write(ItemMagic(magic))
+
+    def write_setting(self, key, value):
+        self.write(ItemSetting(key, value))
+
     def write(self, item):
         if self._current_block == 0:
             self._write_magic_or_setting(item)
