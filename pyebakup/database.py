@@ -9,27 +9,27 @@ import dbfile
 import valuecodecs
 import streamingdatafile
 
-def create_database(directory, path):
-    '''Create a new, empty database at 'path' in 'directory'.
+def create_database(tree, path):
+    '''Create a new, empty database at 'path' in 'tree'.
 
     A Database object for the new database is returned.
     '''
-    if directory.does_path_exist(path):
+    if tree.does_path_exist(path):
         raise FileExistsError('Path already exists: ' + str(path))
-    main = dbfile.DBFile(directory, path + ('main',))
+    main = dbfile.DBFile(tree, path + ('main',))
     with main.create(b'ebakup database v1', 4096, hashlib.sha256):
         main.set_setting('checksum', 'sha256')
         main.commit()
-    content = dbfile.DBFile(directory, path + ('content',))
+    content = dbfile.DBFile(tree, path + ('content',))
     content.create(b'ebakup content data', 4096, hashlib.sha256)
     content.commit()
-    return Database(directory, path)
+    return Database(tree, path)
 
 class Database(object):
-    def __init__(self, directory, path):
-        self._directory = directory
+    def __init__(self, tree, path):
+        self._tree = tree
         self._path = path
-        self._main = dbfile.DBFile(directory, path + ('main',))
+        self._main = dbfile.DBFile(tree, path + ('main',))
         self._content = ContentInfoFile(self)
 
     def _get_block_size(self):
@@ -70,7 +70,7 @@ class Database(object):
         if order_by not in (None, 'starttime'):
             raise AssertionError('Unexpected order_by: ' + str(order_by))
         years = []
-        dirs, files = self._directory.get_directory_listing(self._path)
+        dirs, files = self._tree.get_directory_listing(self._path)
         for name in dirs:
             try:
                 num = int(name)
@@ -82,7 +82,7 @@ class Database(object):
             years.sort()
         backups = []
         for year in years:
-            dirs, files = self._directory.get_directory_listing(
+            dirs, files = self._tree.get_directory_listing(
                 self._path + (year,))
             for name in files:
                 if self._re_backup_file.match(name):
@@ -108,7 +108,7 @@ class Database(object):
         '''
         path = tuple(name.split('-', 1))
         return streamingdatafile.StreamingReader(
-            self._directory, self._path + path)
+            self._tree, self._path + path)
 
     def get_streaming_backup_writer_for_name(self, name):
         '''Obtain a streaming writer for a backup.
@@ -158,7 +158,7 @@ class Database(object):
         '''
         path = tuple(name.split('-', 1))
         return streamingdatafile.StreamingWriter(
-            self._directory, self._path + path)
+            self._tree, self._path + path)
 
     def get_most_recent_backup(self):
         '''Obtain the data for the most recent backup according to the
@@ -179,7 +179,7 @@ class Database(object):
 
     def _get_backup_year_list(self):
         years = []
-        dirs, files = self._directory.get_directory_listing(self._path)
+        dirs, files = self._tree.get_directory_listing(self._path)
         for name in dirs:
             try:
                 name_as_num = int(name)
@@ -191,7 +191,7 @@ class Database(object):
 
     def _get_backup_paths_for_year(self, year):
         year_name = str(year)
-        dirs, files = self._directory.get_directory_listing(
+        dirs, files = self._tree.get_directory_listing(
             self._path + (year_name,))
         assert not dirs
         names = [ (year_name, x) for x in files ]
@@ -345,7 +345,7 @@ ContentChecksum = collections.namedtuple(
 class ContentInfoFile(object):
     def __init__(self, db):
         self._db = db
-        self._dbfile = dbfile.DBFile(db._directory, db._path + ('content',))
+        self._dbfile = dbfile.DBFile(db._tree, db._path + ('content',))
         self._read_file()
 
     def _read_file(self):
@@ -588,7 +588,7 @@ class BackupInfoBuilder(object):
         self._block_data = b''
         self._next_dirid = 8
         self._directories = { (): 0 }
-        self._dbfile = dbfile.DBFile(self._db._directory, self._path)
+        self._dbfile = dbfile.DBFile(self._db._tree, self._path)
         self._dbfile.create(b'ebakup backup data', 4096, hashlib.sha256)
         try:
             self._dbfile.set_setting(
@@ -712,7 +712,7 @@ class BackupInfo(object):
     def __init__(self, db, path):
         self._db = db
         self._path = path
-        self._dbfile = dbfile.DBFile(self._db._directory, self._path)
+        self._dbfile = dbfile.DBFile(self._db._tree, self._path)
         self._read_whole_file()
 
     def _read_whole_file(self):
