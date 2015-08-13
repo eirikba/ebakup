@@ -44,17 +44,6 @@ class Database(object):
                 if item.key == b'checksum':
                     self._content_checksum_name = item.value.decode('utf-8')
 
-    def _get_block_size(self):
-        with self._main.open_for_reading():
-            return int(self._main.get_single_setting('blocksize'))
-
-    def _get_block_checksum_algorithm_name(self):
-        return self.get_checksum_algorithm_name()
-
-    def _get_block_checksum_algorithm(self):
-        return self._get_checksum_algorithm_from_name(
-            self.get_checksum_algorithm_name())
-
     def _get_checksum_algorithm_from_name(self, name):
         if name == 'sha256':
             return hashlib.sha256
