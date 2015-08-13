@@ -340,75 +340,72 @@ class Database(object):
 
 ContentData = collections.namedtuple(
     'ContentData', ('contentid', 'checksum', 'timeline'))
-ContentChecksum = collections.namedtuple(
-    'ContentChecksum', ('checksum', 'first', 'last', 'restored'))
+
+class ContentChecksum(object):
+    def __init__(self, checksum, first, last, restored):
+        self.checksum = checksum
+        self.first_sec = first
+        self.last_sec = last
+        self.restored = restored
+        self._first = None
+        self._last = None
+
+    @property
+    def first(self):
+        if self._first is None:
+            self._first = datetime.datetime.utcfromtimestamp(self.first_sec)
+        return self._first
+
+    @property
+    def last(self):
+        if self._last is None:
+            self._last = datetime.datetime.utcfromtimestamp(self.last_sec)
+        return self._last
+
 class ContentInfoFile(object):
     def __init__(self, db):
         self._db = db
         self._dbfile = dbfile.DBFile(db._tree, db._path + ('content',))
-        self._read_file()
+        self._read_file(db._tree, db._path + ('content',))
 
-    def _read_file(self):
+    def _read_file(self, tree, path):
         self.contentdata = ContentInfoDict()
-        with self._dbfile.open_for_reading():
-            if self._dbfile.get_magic() != b'ebakup content data':
-                raise NotTestedError(
-                    'Unexpected magic: ' + str(self._dbfile.get_magic()))
-            for key in self._dbfile.get_setting_keys():
-                raise NotTestedError('Unknown setting: ' + str(key))
-            blockidx = 1
-            data = self._dbfile.get_block(blockidx)
-            while data is not None:
-                self._add_data_from_block(data)
-                blockidx += 1
-                data = self._dbfile.get_block(blockidx)
-
-    def _add_data_from_block(self, data):
-        done = 0
-        while True:
-            if done >= len(data):
-                # Not supposed to happen
-                return
-            if data[done] == 0:
-                assert data[done:] == b'\x00' * (len(data) - done)
-                return
-            if data[done] == 0xdd:
-                cidlen, done = valuecodecs.parse_varuint(data, done + 1)
-                checklen, done = valuecodecs.parse_varuint(data, done)
-                contentid = data[done:done+cidlen]
-                checksum = data[done:done+checklen]
-                done += max(cidlen, checklen)
-                first = valuecodecs.parse_uint32(data, done)
-                first = datetime.datetime.utcfromtimestamp(first)
-                done += 4
-                last = valuecodecs.parse_uint32(data, done)
-                last = datetime.datetime.utcfromtimestamp(last)
-                done += 4
-                timeline = [ ContentChecksum(checksum, first, last, True) ]
-                while data[done] == 0xa0 or data[done] == 0xa1:
-                    restored = data[done] == 0xa0
-                    done += 1
-                    if restored:
-                        check = checksum
+        with streamingdatafile.StreamingReader(tree, path) as f:
+            item = next(f)
+            if item.kind != 'magic':
+                raise AssertionError('First item of content is not magic')
+            if item.value != b'ebakup content data':
+                raise AssertionError('Wrong magic in content file')
+            for item in f:
+                if item.kind == 'setting':
+                    if item.key in (b'edb-blocksize', b'edb-blocksum'):
+                        pass
                     else:
-                        check = data[done:done+checklen]
-                        done += checklen
-                    first = valuecodecs.parse_uint32(data, done)
-                    first = datetime.datetime.utcfromtimestamp(first)
-                    done += 4
-                    last = valuecodecs.parse_uint32(data, done)
-                    last = datetime.datetime.utcfromtimestamp(last)
-                    done += 4
-                    timeline.append(
-                        ContentChecksum(check, first, last, restored) )
-                if contentid in self.contentdata:
-                    raise NotTestedError(
-                        'Multiple entries for content id ' + repr(contentid))
-                self.contentdata[contentid] = ContentData(
-                    contentid, checksum, tuple(timeline))
+                        raise NotTestedError(
+                            'Unknown setting: ' + str(item.key))
+                elif item.kind == 'content':
+                    self._add_content_item(item)
+                else:
+                    raise AssertionError(
+                        'Unexpected item kind: ' + str(item.kind))
+
+    def _add_content_item(self, item):
+        timeline = [
+            ContentChecksum(item.checksum, item.first, item.last, True) ]
+        for update in item.updates:
+            if update.kind == 'restored':
+                checksum = item.checksum
+                restored = True
+            elif update.kind == 'changed':
+                checksum = update.checksum
+                restored = False
             else:
-                raise NotTestedError(
-                    'Unknown content entry type: ' + str(data[done]))
+                raise AssertionError(
+                    'Unexpected update kind: ' + str(update.kind))
+            timeline.append(
+                ContentChecksum(checksum, update.first, update.last, restored))
+        self.contentdata[item.cid] = ContentData(
+            item.cid, item.checksum, tuple(timeline))
 
     def get_all_content_infos_with_checksum(self, checksum):
         '''Return a sequence of ContentInfo objects for all the content items
