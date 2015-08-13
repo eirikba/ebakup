@@ -51,6 +51,14 @@ class StreamingReader(object):
             self._data = f.get_data_slice(0, size)
         self._prepare_for_reading()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, a, b, c):
+        pass
+        # No close() needed yet
+        #self.close()
+
     def _path_for_print(self):
         return self._tree.path_to_full_string(self._path)
 

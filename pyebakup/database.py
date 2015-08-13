@@ -28,8 +28,21 @@ class Database(object):
     def __init__(self, tree, path):
         self._tree = tree
         self._path = path
-        self._main = dbfile.DBFile(tree, path + ('main',))
+        self._read_main(tree, path + ('main',))
         self._content = ContentInfoFile(self)
+
+    def _read_main(self, tree, path):
+        with streamingdatafile.StreamingReader(tree, path) as main:
+            item = next(main)
+            if item.kind != 'magic':
+                raise AssertionError('First item in main is not magic')
+            if item.value != b'ebakup database v1':
+                raise AssertionError('Wrong file type in database')
+            for item in main:
+                if item.kind != 'setting':
+                    raise AssertionError('Non-setting in database main file')
+                if item.key == b'checksum':
+                    self._content_checksum_name = item.value.decode('utf-8')
 
     def _get_block_size(self):
         with self._main.open_for_reading():
@@ -295,8 +308,7 @@ class Database(object):
         '''Return the name of the checksum algorithm used to identify file
         contents.
         '''
-        with self._main.open_for_reading():
-            return self._main.get_single_setting('checksum')
+        return self._content_checksum_name
 
     def get_checksum_algorithm(self):
         '''Return the checksum algorithm used to identify file contents.

@@ -194,6 +194,12 @@ class FakeFile(object):
         self._locked = 0 # 0: unlocked, 1: read locked, True: write locked
         self._writable = False
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, a, b, c):
+        self.close()
+
     def drop_all_cached_data(self):
         pass
 
