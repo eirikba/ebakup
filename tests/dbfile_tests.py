@@ -242,6 +242,7 @@ class FakeFile(object):
             raise AssertionError('Unexpected write to ' + str(self._path))
         old = self._data.content
         self._data.content = old[:start] + data + old[start+len(data):]
+        return start + len(data)
 
     def close(self):
         if self._locked == 1:
