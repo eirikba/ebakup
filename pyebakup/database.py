@@ -16,13 +16,12 @@ def create_database(tree, path):
     '''
     if tree.does_path_exist(path):
         raise FileExistsError('Path already exists: ' + str(path))
-    main = dbfile.DBFile(tree, path + ('main',))
-    with main.create(b'ebakup database v1', 4096, hashlib.sha256):
-        main.set_setting('checksum', 'sha256')
-        main.commit()
-    content = dbfile.DBFile(tree, path + ('content',))
-    content.create(b'ebakup content data', 4096, hashlib.sha256)
-    content.commit()
+    with streamingdatafile.StreamingWriter(tree, path + ('main',)) as main:
+        main.write_header(b'ebakup database v1', 4096, b'sha256')
+        main.write_setting(b'checksum', b'sha256')
+    with streamingdatafile.StreamingWriter(
+            tree, path + ('content',)) as content:
+        content.write_header(b'ebakup content data', 4096, b'sha256')
     return Database(tree, path)
 
 class Database(object):
