@@ -256,3 +256,33 @@ command: info
 
 Prints some basic information about the configured backups. Not very
 useful. May change at some point.
+
+
+Some notes
+==========
+
+Backup size
+-----------
+
+This design is not optimized for small backups. For one thing, no
+compression is done. Not even delta-compression between "similar"
+files. This is mainly to protect against "small corruptions cause big
+damage" effects. But it is also a way to make the design simpler.
+
+I have considered my own needs, and decided that with 4TB external
+disks being available at reasonable cost, I have actually space enough
+to back up a lot. There is space for everything that's really
+important to me as well as quite a bit of less important things that
+would probably be hard to find again. And I can probably cram several
+years of these backups onto a single such disk. And bigger disks are
+already available. And in a pinch, I can split the sources into
+multiple backups.
+
+
+Optimizations
+-------------
+
+When backing up files, any file that has the same size and
+last-modified time as the last time it was backed up is assumed to be
+unchanged. This is a huge time saver when backing up 10 000 000
+files. And I think it extremely unlikely to have false positives.
