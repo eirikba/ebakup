@@ -1,0 +1,258 @@
+======
+Ebakup
+======
+
+ebakup is a backup maintenance system. Its basic requirements are:
+
+- (Semi-)automatic backups of a designated set of files
+- Content added to the backup remain in the backup
+- Redundancy (protection against corruption of the backup)
+- Detection of corruptions
+- Off-site backups
+- Resilience against corruptions (small corruptions of the backup
+  should not cause large corruptions of the backed-up data)
+
+Non-requirements (things I don't particularly try to support) include:
+
+- Restoring disks to the backed-up state. (This seems to be the
+  traditional requirement for a backup system)
+
+
+Basic design
+============
+
+The elements of the system are:
+
+- The configuration
+- The source files
+- The backup storage areas
+
+A "backup storage" is where a collection of backups are
+stored. Technically, it is just a directory somewhere. A simple setup
+would have some external hard drives and put one backup storage on
+each drive.
+
+A "backup storage" contains:
+
+- A "content store"
+- A "database"
+- A collection of "shadow trees"
+
+When a backup is made, a new file is added to the database describing
+the particular backup. For every file that is backed up, the content
+of the file is copied to the content store, unless there already is a
+copy there. Then a description of that file is added to the backup
+description file. This description says which item in the content
+store contains the content of the file, what the original path to the
+file was, as well as some other meta-data such as the last-modified
+time, owner, access restrictions and any other information that is
+being backed up.
+
+Also, a "shadow tree" can optionally be created for any backup. This
+is just a tree that matches the source tree, but where all the files
+are hard links to the relevant items in the content store. The shadow
+trees are only for simpler access to the backed up data, and can be
+fully recreated from the content store and the database.
+
+
+Layout of a backup storage
+==========================
+
+A backup storage directory contains:
+
+- db/main - The "main" file of the database. Contains global
+  information about the backup storage.
+
+- db/content - Describes each item in the content store, including
+  when it was last checked for corruptions.
+
+- db/YYYY/MM-DDThh:mm - Describes a single backup. The file is named
+  after the time when the backup started. The file describes all the
+  files that were backed up, including its path, content,
+  last-modified time, access restrictions and any other information
+  that is backed up.
+
+- content - The content store. The content of every backed up file is
+  stored in this directory, named after a digest of the content. The
+  exact digest and naming conventions used are configurable.
+
+- YYYY/MM-DDThh:mm - The shadow tree for the backup that started at
+  the time corresponding to the name of the directory. The shadow tree
+  is a tree that matches the source tree, but all the files are hard
+  links to the content store. The shadow tree is just for the user's
+  convenience and can be deleted with impunity (assuming the backup's
+  data in both the database and the content store are intact, of
+  course).
+
+The details of these files are described in the technical documentation.
+
+
+Configuration
+=============
+
+The configuration of the backup system is found in the standard
+configuration directory (typically ~/.config/ebakup/config). For
+details, see [configuration.txt], but here is an example showing some
+of the basic possibilities:
+
+--- config -------------------------------------------------
+backup main
+  source local:/home/eirik/
+    targetpath eirik
+    path mine
+      path photos
+        static
+    paths tmp .cache
+      ignore
+    path boring stuff
+      ignore
+    path-globs mnt-*
+      ignore
+  source local:/etc
+    targetpath etc
+  collection local:/backup-1/backup
+  collection local:/backup-2/backup
+  collection local:/backup-3/backup
+------------------------------------------------------------
+
+This configuration declares a single "backup" called "main". It has
+two source trees that it will back up (/home/eirik and /etc) and three
+backup storage areas where the backups shall be stored.
+
+The "targetpath" settings indicate how the files will be renamed when
+they are backed up. In this case, a file like
+/home/eirik/mine/notes.txt will be backed up as if it was really
+/eirik/mine/notes.txt. If there had been no "targetpath" setting at
+all, it would have been backed up as /mine/notes.txt. In this
+configuration, the targetpath settings are set up to separate the
+files from /home/eirik and /etc in separate directories.
+
+The "path", "paths", "path-glob" and "path-globs" sections provide
+different settings for different parts of the source tree. In the
+example, the files in /home/eirik/mine/photos are marked as "static",
+while "/home/eirik/tmp", "/home/eirik/.cache" and "/home/eirik/boring
+stuff" are "ignored". And any path starting with "mnt-" in the
+directory "/home/eirik" are also ignored.
+
+The difference between the four lie in how the argument is
+interpreted. The arguments of the plurals ("paths" and "path-globs")
+are split on whitespace into multiple items, while the singulars have
+the whole argument as a single item. For the "path" and "paths"
+sections these items are quite simply paths, while for "path-glob" and
+"path-globs" the items are globs ("*", "?", "[...]" and "[!...]" are
+supported).
+
+The three "collection" settings point to three directories where
+backups are stored. The three directories shall typically contain the
+same data.
+
+
+Commands
+========
+
+All commands are executed by running the "ebakup" application with the
+proper arguments. The basic usage is:
+
+ebakup --help
+ebakup <global-options> <command> <command-options>
+
+The commands are:
+
+- "backup" - Make a backup. Copy all new data into the content store
+  and create a new backup description file that describes the current
+  state of the source files.
+
+- "sync" - Make sure all available backup storages contain the same
+  data.
+
+- "verify" - Check the backups for corruptions.
+
+- "webui" - Start an interactive user interface.
+
+- "info" - Print some general information about the existing backups.
+
+
+Example commands
+================
+
+ebakup --config stuff/ebakup.cfg backup myfiles
+
+   Read configuration from "stuff/ebakup.cfg" and make a new backup
+   for the backup configuration named "myfiles".
+
+ebakup sync
+
+   Synchronize all backup storages in the default config.
+
+
+Global options
+==============
+
+--config <path>
+
+   Use <path> as the configuration file instead of the default
+   configuration files.
+
+
+command: backup
+===============
+
+   ebakup backup <backupnames...>
+
+Make a new backup for the backups named <backupnames...>.
+
+The current implementation makes the new backup to the first
+collection that is available. This may change.
+
+
+command: sync
+=============
+
+   ebakup sync [<backupnames...>]
+
+Synchronize the backup collections for the backups named
+<backupnames...>. If no backup names are given, all backups in the
+configuration will be synchronized.
+
+For each backup, the synchronization consists of copying all backup
+descriptions to any collections where they are missing. And copying
+all missing content items referenced by those backup descriptions as
+well.
+
+
+command: verify
+===============
+
+Not implemented yet.
+
+This will check for corruptions in the backup descriptions, content
+database and content items. The backup descriptions and content
+database has embedded checksums, and every content item has its
+checksum in the content database.
+
+There will be various alternatives for verification, where the
+standard verification will check some of the items that have not been
+verified for a long time. Over time aiming for having all items
+checked within a suitably long time frame.
+
+
+command: webui
+==============
+
+   ebakup webui
+
+Not really implemented yet.
+
+This starts the web UI. Point your browser to localhost:4950 to get
+the UI. (Or :4951, :4952 or whatever). This is intended to provide an
+interactive UI where most operations can be performed, as well as
+investigating old backups.
+
+
+command: info
+=============
+
+   ebakup info
+
+Prints some basic information about the configured backups. Not very
+useful. May change at some point.
