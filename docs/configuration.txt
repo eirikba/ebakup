@@ -1,0 +1,201 @@
+====================
+Ebakup configuration
+====================
+
+The configuration of ebakup is in one or more files. By default it is
+found in the "standard" locations, /etc/ebakup and
+~/.config/ebakup/config.
+
+The configuration file is a simple text file, example:
+
+--- config -------------------------------------------------
+backup mystuff
+  source local:/home/me
+    path mine
+      static
+  collection local:/backup-1/backup
+------------------------------------------------------------
+
+The configuration is divided into sections and subsections etc.,
+depending on the indentation level. So in the above example, there is
+one section on the top level "backup mystuff". This section has two
+subsections, one "source" section and one "collection" section. The
+"source" section further contains a "path" section that again contains
+a "static" section.
+
+
+Section summary
+===============
+
+The possible sections in the configuration files are:
+
+backup <name> - Describes the backup named <name>. Which files to back
+    up. Where to store the backup. Etc.
+  parent: -
+  children: source collection
+
+source <full-path> - Describes sources to be backed up.
+  parent: backup
+  children: path*
+
+collection <full-path> - Describes a place to store backups.
+  parent: backup
+  children: -
+
+targetpath <relpath> - Describes where the source files shall be
+    copied to within the backup.
+  parent: source
+  children: -
+
+path <relpath>
+paths <relpaths...>
+path-glob <glob>
+path-globs <globs...>
+    Partitions out a sub-tree, typically of the "source" tree.
+  parent: source path*
+  children: path* ignore dynamic static
+
+ignore - The sub-tree shall be ignored and not be backed up.
+  parent: source path*
+  children: -
+
+static - The sub-tree shall be backed up, and the files are expected
+    never to change. If a backup operation discovers that any of these
+    files have changed or disappeared, a warning is raised.
+  parent: source path*
+  children: -
+
+dynamic - The sub-tree shall be backed up.
+  parent: source path*
+  children: -
+
+
+Section: backup
+===============
+
+  backup <name>
+
+  parent: -
+  children: source collection
+
+This section describes everything about a backup. It describes which
+files should be backed up, how they should be organized, how they
+should be treated and where they should be backed up to.
+
+
+Section: source
+===============
+
+  source <full-path>
+
+  parent: backup
+  children: path*
+
+This section describes the files that should be backed up.
+
+
+Section: collection
+===================
+
+  collection <full-path>
+
+  parent: backup
+  children: -
+
+This section describes a directory to store backed up data into.
+
+
+Section: targetpath
+===================
+
+  targetpath <relpath>
+
+  parent: source
+  children: -
+
+This section describes the mapping between source paths and backed up
+paths. The <full-path> of the "source" section is mapped to the
+<relpath> of the targetpath section, relative to the root of the
+back-up tree. By default the targetpath is empty.
+
+
+Section: path*
+==============
+
+  path <relpath>
+  paths <relpaths...>
+  path-glob <glob>
+  path-globs <globs...>
+
+  parent: source path*
+  children: path* ignore dynamic static
+
+These sections apply their content to a part of the tree(s)
+established by the parent section.
+
+All the different forms provide one or more paths relative to the
+parent section.
+
+<relpath> is a simple relative path, while <relpaths...> are one or
+more <relpath> elements separated by spaces. This means that none of
+the paths of "paths" can contain spaces while the single path of
+"path" can.
+
+<glob> is a glob and the section applies to all paths that matches
+that glob relative to the parent section. Similar to the
+"path"/"paths" difference, <globs...> are one or more globs separated
+by spaces (and so each one can not contain spaces).
+
+The globs support the following special patterns:
+
+  "*" : Matches zero or more characters, which can be anything.
+  "?" : Matches exactly one character, which can be anything.
+  "[<chars>]" : Matches exactly one character that must be one of the
+      characters in <chars>. (But see below)
+  "[!<chars>]" : Matches exactly one character that must be one of the
+      characters NOT in <chars>. (But see below)
+
+For the character class matchers ([<chars>] and [!<chars>]) there are
+some special behaviours. The character "-" represents every character
+"between" the characters on either side of it. This only works for
+characters that are part of some well-defined sequence. There are
+currently only three such sequences defined: 0 through 9, a through z
+and A through Z. In order to match either "-" or "]", they must occur
+first in <chars>. If both are to be matched, "]" must come before "-".
+
+
+Section: ignore
+===============
+
+  ignore
+
+  parent: source path*
+  children: -
+
+The source files described by the parent section shall be ignored and
+not backed up.
+
+
+Section: static
+===============
+
+  static
+
+  parent: source path*
+  children: -
+
+The source files described by the parent section shall be backed
+up. Furthermore, these files are expected to never change. So if they
+change or disappear, a warning should be raised.
+
+
+Section: dynamic
+================
+
+  dynamic
+
+  parent: source path*
+  children: -
+
+The source files described by the parent section shall be backed
+up. This is the default.
