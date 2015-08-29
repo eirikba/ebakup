@@ -1,0 +1,86 @@
+========================
+Guide to the source code
+========================
+
+Top level
+=========
+
+The top level directory contains:
+
+- pyebakup/ - The python source code for ebakup
+- tests/ - The test code for the python sources
+- ebakup - The main application entry point
+- run_tests - Runs all the python tests
+- doc/ - Documentation
+- datafiles/ - Data files used by ebakup, e.g. html templates
+- hacks/ - Random, hacked-together tools
+- tools/ - Less random, less hacky tools
+
+
+Python sources
+==============
+
+Main applications
+-----------------
+
+'ebakup' is the main ebakup application. But it only delegates
+everything to cli.py.
+
+'run_tests' runs all the automatic tests for the ebakup python code.
+
+
+tests/
+------
+
+The "tests" directory contains all the test code for ebakup.
+
+Most of the tests are unit tests. The files containing these tests are
+named the same as the files containing the code under test, but with
+"_tests" added.
+
+There are a few system tests as well. These are named
+system_*_tests.py. Of particular note is system_live_tests.py, which
+contains the tests that actually touch a real disk. All other tests
+use test doubles for all file access.
+
+There is also a "settings.py" which holds settings for the test system
+itself, and fake_filesys.py which implements a mostly complete test
+double for the file system.
+
+
+pyebakup/
+---------
+
+The "pyebakup" directory contains the python sources for ebakup. Some
+of the most important parts are:
+
+cli.py - Contains the command-line based interface. Command line
+    arguments are parsed, services are created and tasks are run.
+
+task_*.py - Contains the code that orchestrates each different task
+    (e.g. backup, info, sync).
+
+backupcollection.py - Handles all the data stored in a single backup
+    collection. Delegates any operations on the database to
+    database.py.
+
+database.py - Handles the database of a backup collection. Can store
+    and retrieve information about backups and content items. Does not
+    handle the content items themselves.
+
+datafile.py - Handles reading and writing the files of the
+    database. Not fully implemented yet.
+
+dbfile.py - Handles reading and writing the files of the
+    database. Will be replaced by datafile.py.
+
+streamingdatafile.py - Alternative to dbfile.py for reading and
+    writing the files of the database. Will also be replaced by
+    datafile.py.
+
+backupoperation.py - The code that carries out the actual backup
+    operation.
+
+filesys.py - Describes the interface of the file system classes. Also
+    contains the "get_file_system()" method that should always be used
+    to obtain a FileSystem object.
