@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import hashlib
 import unittest
 
 import datafile
@@ -175,4 +176,86 @@ class TestDataFile(unittest.TestCase):
         self.assertRaisesRegex(
             datafile.InvalidDataError, 'hecksum mismatch',
             datafile.open_main, tree, ('path', 'to', 'db'))
+        self.assertCountEqual((), tree._files_modified)
+
+    def test_raw_create_main_with_non_default_block_size(self):
+        tree = FakeTree()
+        tree._add_directory(('path', 'to'))
+        main = datafile.DataFile(tree, ('path', 'to', 'db', 'main'))
+        main.create_and_lock()
+        main.append_item(datafile.ItemMagic(b'ebakup database v1'))
+        main.append_item(datafile.ItemSetting(b'edb-blocksize', b'1387'))
+        main.append_item(datafile.ItemSetting(b'edb-blocksum', b'sha256'))
+        main.append_item(datafile.ItemSetting(b'checksum', b'sha256'))
+        main.close()
+        self.assertCountEqual(
+            (('path', 'to', 'db'), ('path', 'to', 'db', 'main')),
+            tree._files_modified)
+        data = test_data.dbfiledata('main-1')[:1355].replace(
+            b'blocksize:4096', b'blocksize:1387')
+        self.assertEqual(
+            data + hashlib.sha256(data).digest(),
+            tree._files[('path', 'to', 'db', 'main')].content)
+
+    def test_raw_create_main_with_non_default_block_sum(self):
+        tree = FakeTree()
+        tree._add_directory(('path', 'to'))
+        main = datafile.DataFile(tree, ('path', 'to', 'db', 'main'))
+        main.create_and_lock()
+        main.append_item(datafile.ItemMagic(b'ebakup database v1'))
+        main.append_item(datafile.ItemSetting(b'edb-blocksize', b'4096'))
+        main.append_item(datafile.ItemSetting(b'edb-blocksum', b'md5'))
+        main.append_item(datafile.ItemSetting(b'checksum', b'sha256'))
+        main.close()
+        self.assertCountEqual(
+            (('path', 'to', 'db'), ('path', 'to', 'db', 'main')),
+            tree._files_modified)
+        data = test_data.dbfiledata('main-1')[:4064].replace(
+            b'blocksum:sha256', b'blocksum:md5') + b'\x00' * 19
+        self.assertEqual(
+            data + hashlib.md5(data).digest(),
+            tree._files[('path', 'to', 'db', 'main')].content)
+
+    def test_read_main_with_non_default_block_size(self):
+        data = test_data.dbfiledata('main-1')[:1355].replace(
+            b'blocksize:4096', b'blocksize:1387')
+        data += hashlib.sha256(data).digest()
+        tree = FakeTree()
+        tree._add_file(
+            ('path', 'to', 'db', 'main'),
+            data)
+        main = datafile.open_main(tree, ('path', 'to', 'db'))
+        expect = (
+            {'kind': 'magic', 'value': b'ebakup database v1'},
+            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'1387'},
+            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
+            {'kind': 'setting', 'key': b'checksum', 'value': b'sha256'} )
+        for x in expect:
+            item = next(main)
+            for key, value in x.items():
+                self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertRaises(StopIteration, next, main)
+        main.close()
+        self.assertCountEqual((), tree._files_modified)
+
+    def test_read_main_with_non_default_block_sum(self):
+        tree = FakeTree()
+        data = test_data.dbfiledata('main-1')[:4064].replace(
+            b'blocksum:sha256', b'blocksum:md5') + b'\x00' * 19
+        data += hashlib.md5(data).digest()
+        tree._add_file(
+            ('path', 'to', 'db', 'main'),
+            data)
+        main = datafile.open_main(tree, ('path', 'to', 'db'))
+        expect = (
+            {'kind': 'magic', 'value': b'ebakup database v1'},
+            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
+            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'md5'},
+            {'kind': 'setting', 'key': b'checksum', 'value': b'sha256'} )
+        for x in expect:
+            item = next(main)
+            for key, value in x.items():
+                self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertRaises(StopIteration, next, main)
+        main.close()
         self.assertCountEqual((), tree._files_modified)
