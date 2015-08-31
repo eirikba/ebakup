@@ -4,7 +4,7 @@ import hashlib
 import unittest
 
 import datafile
-import test_data
+import testdata
 
 class FakeTree(object):
     def __init__(self):
@@ -128,14 +128,14 @@ class TestDataFile(unittest.TestCase):
             (('path', 'to', 'db'), ('path', 'to', 'db', 'main')),
             tree._files_modified)
         self.assertEqual(
-            test_data.dbfiledata('main-1'),
+            testdata.dbfiledata('main-1'),
             tree._files[('path', 'to', 'db', 'main')].content)
 
     def test_read_typical_main(self):
         tree = FakeTree()
         tree._add_file(
             ('path', 'to', 'db', 'main'),
-            test_data.dbfiledata('main-1'))
+            testdata.dbfiledata('main-1'))
         main = datafile.open_main(tree, ('path', 'to', 'db'))
         expect = (
             {'kind': 'magic', 'value': b'ebakup database v1'},
@@ -167,7 +167,7 @@ class TestDataFile(unittest.TestCase):
 
     def test_main_with_non_matching_checksum(self):
         tree = FakeTree()
-        dbdata = test_data.dbfiledata('main-1')
+        dbdata = testdata.dbfiledata('main-1')
         self.assertEqual(4096, len(dbdata))
         dbdata = dbdata[:-3] + b'xxx'
         tree._add_file(
@@ -191,7 +191,7 @@ class TestDataFile(unittest.TestCase):
         self.assertCountEqual(
             (('path', 'to', 'db'), ('path', 'to', 'db', 'main')),
             tree._files_modified)
-        data = test_data.dbfiledata('main-1')[:1355].replace(
+        data = testdata.dbfiledata('main-1')[:1355].replace(
             b'blocksize:4096', b'blocksize:1387')
         self.assertEqual(
             data + hashlib.sha256(data).digest(),
@@ -210,14 +210,14 @@ class TestDataFile(unittest.TestCase):
         self.assertCountEqual(
             (('path', 'to', 'db'), ('path', 'to', 'db', 'main')),
             tree._files_modified)
-        data = test_data.dbfiledata('main-1')[:4064].replace(
+        data = testdata.dbfiledata('main-1')[:4064].replace(
             b'blocksum:sha256', b'blocksum:md5') + b'\x00' * 19
         self.assertEqual(
             data + hashlib.md5(data).digest(),
             tree._files[('path', 'to', 'db', 'main')].content)
 
     def test_read_main_with_non_default_block_size(self):
-        data = test_data.dbfiledata('main-1')[:1355].replace(
+        data = testdata.dbfiledata('main-1')[:1355].replace(
             b'blocksize:4096', b'blocksize:1387')
         data += hashlib.sha256(data).digest()
         tree = FakeTree()
@@ -240,7 +240,7 @@ class TestDataFile(unittest.TestCase):
 
     def test_read_main_with_non_default_block_sum(self):
         tree = FakeTree()
-        data = test_data.dbfiledata('main-1')[:4064].replace(
+        data = testdata.dbfiledata('main-1')[:4064].replace(
             b'blocksum:sha256', b'blocksum:md5') + b'\x00' * 19
         data += hashlib.md5(data).digest()
         tree._add_file(

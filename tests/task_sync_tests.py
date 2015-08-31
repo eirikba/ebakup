@@ -6,7 +6,7 @@ import re
 import unittest
 
 import task_sync
-import test_data
+import testdata
 
 hexits = '0123456789abcdef'
 def hexstr(data):
@@ -376,7 +376,7 @@ class TestSync(unittest.TestCase):
         coll = FakeCollection(('backup', 'first'))
         coll._add_backup(
             datetime.datetime(2014, 6, 10, 14, 16, 7, 30092),
-            files=test_data.files()[:16])
+            files=testdata.files()[:16])
         coll.set_immutable()
         coll2 = FakeCollection(('backup', 'second'))
         tree = FakeTree()
@@ -415,7 +415,7 @@ class TestSync(unittest.TestCase):
         self.assertEqual(
             datetime.datetime(2014, 6, 10, 14, 16, 7),
             bk._start_time)
-        for testfile in test_data.files()[:16]:
+        for testfile in testdata.files()[:16]:
             info = bk._get_file_info(testfile.path)
             self.assertNotEqual(None, info, msg='file: ' + str(testfile.path))
             content = coll2._content[info.cid]
@@ -430,7 +430,7 @@ class TestSync(unittest.TestCase):
                 info.mtime_ns, testfile.mtime_ns,
                 msg='file: ' + str(testfile.path))
         testfiles = {}
-        for testfile in test_data.files()[:16]:
+        for testfile in testdata.files()[:16]:
             testfiles[testfile.path] = testfile
         bkpaths = bk._get_all_file_paths()
         self.assertCountEqual(bkpaths, testfiles.keys())
@@ -457,7 +457,7 @@ class TestSync(unittest.TestCase):
     def test_sync_with_common_backups(self):
         self.coll2._add_backup(
             datetime.datetime(2014, 6, 10, 14, 16, 7, 30092),
-            files=test_data.files()[:16])
+            files=testdata.files()[:16])
         sync = task_sync.SyncTask(self.config, self.args)
         sync.execute()
         self.assertCollectionsEqual(self.coll, self.coll2)
@@ -465,12 +465,12 @@ class TestSync(unittest.TestCase):
     def test_sync_with_new_backup_and_existing_content(self):
         self.coll2._add_backup(
             datetime.datetime(2014, 6, 10, 14, 16, 7, 30092),
-            files=test_data.files()[:16])
+            files=testdata.files()[:16])
         contentcount = len(self.coll._content)
         self.coll.set_immutable(False)
         self.coll._add_backup(
             datetime.datetime(2014, 6, 18, 4, 16, 24, 437668),
-            files=test_data.files()[:16])
+            files=testdata.files()[:16])
         self.coll.set_immutable()
         self.coll.expect_no_reading_content()
         self.assertEqual(contentcount, len(self.coll._content))
@@ -483,7 +483,7 @@ class TestSync(unittest.TestCase):
         self.coll.set_immutable(False)
         self.coll._add_backup(
             datetime.datetime(2014, 6, 18, 4, 16, 24, 437668),
-            files=test_data.files()[:16])
+            files=testdata.files()[:16])
         self.coll.set_immutable()
         self.assertEqual(contentcount, len(self.coll._content))
         sync = task_sync.SyncTask(self.config, self.args)
