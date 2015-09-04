@@ -259,3 +259,192 @@ class TestDataFile(unittest.TestCase):
         self.assertRaises(StopIteration, next, main)
         main.close()
         self.assertCountEqual((), tree._files_modified)
+
+    def test_read_typical_content_db(self):
+        tree = FakeTree()
+        tree._add_file(
+            ('path', 'to', 'db', 'content'),
+            testdata.dbfiledata('content-1'))
+        content = datafile.open_content(tree, ('path', 'to', 'db'))
+        expect = (
+            {'kind': 'magic', 'value': b'ebakup content data'},
+            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
+            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
+            { 'kind':'content',
+              'cid':b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y'
+                  b'\x00\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
+              'checksum':b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y'
+                  b'\x00\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
+              'first':0x55154078, 'last':0x55216909,
+              'updates':() },
+            { 'kind':'content',
+              'cid':b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
+                  b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
+              'checksum':b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
+                  b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
+              'first':0x55154078, 'last':0x55154078,
+              'updates': (
+                  { 'kind':'changed',
+                    'checksum':b'k\x8c\xba\x8b\x17\x8b\rL\x13\xde\xc9$<\x90\x04'
+                        b'\xeb\xc3\x03\xcbJ\xaf\xe93\x0c\x8d\x12^.\x94yS\xae',
+                    'first':0x55183045, 'last':0x551bea4b },
+                  { 'kind':'restored',
+                    'first':0x551beb3b, 'last':0x55216909 } ) },
+            { 'kind':'content',
+              'cid':b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
+                  b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98\x37\x73",
+              'checksum':b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
+                  b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98",
+              'first':0x5513d6d1, 'last':0x55168fac,
+              'updates': (
+                  { 'kind':'changed',
+                    'checksum':b'\x01\xfa\x04^\x9c\x11\xd5\x8d\xfe\x19]}\xd1(('
+                       b'\x0c\x00h\xad0\x13\xa3(\xb5\xe8\xb3\xac\xa3\x9e_\xfbb',
+                    'first':0x5517b191, 'last':0x551d1200 }, ) },
+            )
+        for x in expect:
+            item = next(content)
+            for key, value in x.items():
+                if key == 'updates':
+                    self.assertEqual(len(item.updates), len(value))
+                    for itemupd, expectupd in zip(item.updates, value):
+                        for upkey, upvalue in expectupd.items():
+                            self.assertEqual(
+                                upvalue, getattr(itemupd, upkey),
+                                msg='key:' + upkey)
+                else:
+                    self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertRaises(StopIteration, next, content)
+        content.close()
+        self.assertCountEqual((), tree._files_modified)
+
+    def test_create_content_db(self):
+        tree = FakeTree()
+        tree._add_directory(('path', 'to', 'db'))
+        content = datafile.create_content(tree, ('path', 'to', 'db'))
+        cid1 = b'010----hhhh'
+        content.append_item(
+            datafile.ItemContent(cid1, cid1, 1417658340, 1417658340))
+        cid2 = b'0200000000000000000000a'
+        cksum2 = b'0200000000000000000000'
+        item = datafile.ItemContent(cid2, cksum2, 1405569942, 1410763215)
+        cksum3 = b'030abcdefghijklmnopqrs'
+        item.content_changed(1411788080, 1415631138, cksum3)
+        item.content_restored(1419507674, 1419507674)
+        content.append_item(item)
+        cid3 = b'040xxxxxx'
+        item = datafile.ItemContent(cid3, cid3, 1402958556, 1427582355)
+        content.append_item(item)
+        content.close()
+        self.assertCountEqual(
+            (('path', 'to', 'db', 'content'),),
+            tree._files_modified)
+        tree._files_modified = []
+        self.assertEqual(
+            8192,
+            len(tree._files[('path', 'to', 'db', 'content')].content))
+        content = datafile.open_content(tree, ('path', 'to', 'db'))
+        self.assertEqual('magic', next(content).kind)
+        item = next(content)
+        while item.kind == 'setting':
+            item = next(content)
+        self.assertEqual('content', item.kind)
+        self.assertEqual(cid1, item.cid)
+        self.assertEqual(cid1, item.checksum)
+        self.assertEqual(1417658340, item.first)
+        self.assertEqual(1417658340, item.last)
+        self.assertEqual([], item.updates)
+        item = next(content)
+        self.assertEqual('content', item.kind)
+        self.assertEqual(cid2, item.cid)
+        self.assertEqual(cksum2, item.checksum)
+        self.assertEqual(1405569942, item.first)
+        self.assertEqual(1410763215, item.last)
+        self.assertEqual(2, len(item.updates))
+        update = item.updates[0]
+        self.assertEqual('changed', update.kind)
+        self.assertEqual(cksum3, update.checksum)
+        self.assertEqual(1411788080, update.first)
+        self.assertEqual(1415631138, update.last)
+        update = item.updates[1]
+        self.assertEqual('restored', update.kind)
+        self.assertFalse(hasattr(update, 'checksum'))
+        self.assertEqual(1419507674, update.first)
+        self.assertEqual(1419507674, update.last)
+        item = next(content)
+        self.assertEqual('content', item.kind)
+        self.assertEqual(cid3, item.cid)
+        self.assertEqual(cid3, item.checksum)
+        self.assertEqual(1402958556, item.first)
+        self.assertEqual(1427582355, item.last)
+        self.assertEqual([], item.updates)
+        self.assertRaises(StopIteration, next, content)
+        content.close()
+        self.assertCountEqual((), tree._files_modified)
+
+    def test_create_multi_block_content_db(self):
+        tree = FakeTree()
+        tree._add_directory(('path', 'to', 'db'))
+        content = datafile.create_content(tree, ('path', 'to', 'db'))
+        # This item is sized so that the first data block is exactly filled.
+        content.append_item(
+            datafile.ItemContent(b'000000', b'000000', 1403044159, 1412770688))
+        cid1 = b'010----x'
+        for i in range(500):
+            item = datafile.ItemContent(cid1, cid1, 1417658340, 1417658340)
+            content.append_item(item)
+        content.close()
+        self.assertCountEqual(
+            (('path', 'to', 'db', 'content'),),
+            tree._files_modified)
+        tree._files_modified = []
+        self.assertEqual(
+            4 * 4096,
+            len(tree._files[('path', 'to', 'db', 'content')].content))
+        content = datafile.open_content(tree, ('path', 'to', 'db'))
+        self.assertEqual('magic', next(content).kind)
+        item = next(content)
+        while item.kind == 'setting':
+            item = next(content)
+        self.assertEqual('content', item.kind)
+        self.assertEqual(b'000000', item.cid)
+        self.assertEqual(b'000000', item.checksum)
+        self.assertEqual(1403044159, item.first)
+        self.assertEqual(1412770688, item.last)
+        self.assertEqual([], item.updates)
+        for i in range(500):
+            item = next(content)
+            self.assertEqual('content', item.kind)
+            self.assertEqual(cid1, item.cid)
+            self.assertEqual(cid1, item.checksum)
+            self.assertEqual(1417658340, item.first)
+            self.assertEqual(1417658340, item.last)
+            self.assertEqual([], item.updates)
+        self.assertRaises(StopIteration, next, content)
+        content.close()
+        self.assertCountEqual((), tree._files_modified)
+        data = tree._files[('path', 'to', 'db', 'content')].content
+        self.assertEqual(
+            b'ebakup content data\nedb-blocksize:4096\n', data[:39])
+        # Check that the first data block starts with the first item
+        # (which is different from the others so it is identifiable).
+        self.assertEqual(
+            b'\xdd\x06\x06000000\x3f\xc1\xa0\x53\x80\x2b\x35\x54',
+            data[4096:4113])
+        # Check that the first data block is exactly filled.
+        self.assertEqual(
+            b'\xdd\x08\x08' + cid1 + b'\xe4\xbf\x7f\x54\xe4\xbf\x7f\x54',
+            data[4096+4045:4096+4064])
+        # Check that the second data block has its last item in the
+        # expected place...
+        self.assertEqual(
+            b'\xdd\x08\x08' + cid1 + b'\xe4\xbf\x7f\x54\xe4\xbf\x7f\x54',
+            data[8192+4028:8192+4047])
+        # ... followed by correct padding
+        self.assertEqual(b'\x00' * 17, data[8192+4047:8192+4064])
+        # Check that the final item is in the expected place...
+        self.assertEqual(
+            b'\xdd\x08\x08' + cid1 + b'\xe4\xbf\x7f\x54\xe4\xbf\x7f\x54',
+            data[12288 + 73 * 19 : 12288 + 74 * 19])
+        # ... followed by correct padding
+        self.assertEqual(b'\x00' * 2658, data[12288 + 74 * 19 : 12288 + 4064])

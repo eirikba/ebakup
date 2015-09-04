@@ -2,6 +2,8 @@
 
 import hashlib
 
+import valuecodecs
+
 class InvalidDataError(Exception): pass
 class InternalError(Exception): pass
 class ItemNotFoundError(Exception): pass
@@ -27,6 +29,28 @@ def ItemDirectory(dirid, parent, name):
     item.parent = parent
     item.name = name
     return item
+
+class ItemContent(object):
+    def __init__(self, cid, checksum, first, last):
+        self.kind = 'content'
+        self.cid = cid
+        self.checksum = checksum
+        self.first = first
+        self.last = last
+        self.updates = []
+
+    def content_changed(self, first, last, checksum):
+        update = Item('changed')
+        update.first = first
+        update.last = last
+        update.checksum = checksum
+        self.updates.append(update)
+
+    def content_restored(self, first, last):
+        update = Item('restored')
+        update.first = first
+        update.last = last
+        self.updates.append(update)
 
 def _get_checksum_by_name(name):
     if name == b'sha256':
@@ -60,6 +84,12 @@ def create_content(tree, dbpath):
     ebakup database open at the same time, you need to hold a lock on
     "main" as long as you have locked any of the other files.
     '''
+    f = DataFile(tree, dbpath + ('content',))
+    f.create_and_lock()
+    f.append_item(ItemMagic(b'ebakup content data'))
+    f.append_item(ItemSetting(b'edb-blocksize', b'4096'))
+    f.append_item(ItemSetting(b'edb-blocksum', b'sha256'))
+    return f
 
 def create_backup(tree, dbpath, starttime):
     '''Create a "backup" data file for a backup starting at 'starttime' in
@@ -97,6 +127,12 @@ def open_content(tree, dbpath, writable=False):
     ebakup database open at the same time, you need to hold a lock on
     "main" as long as you have locked any of the other files.
     '''
+    f = DataFile(tree, dbpath + ('content',))
+    if writable:
+        raise NotImplementedError()
+    else:
+        f.open_and_lock_readonly()
+    return f
 
 def open_backup(tree, dbpath, starttime, writable=False):
     '''Open the backup file for the backup started at 'starttime' in the
@@ -218,13 +254,7 @@ class DataFile(object):
         for idx, block in self._blocks.items():
             if block.modified:
                 block.modifed = False
-                data = block.encode()
-                if len(data) > self._blockdatasize:
-                    raise AssertionError('Final block data too big!')
-                data += b'\x00' * (self._blockdatasize - len(data))
-                assert len(data) == self._blockdatasize
-                cksum = self._blocksum(data).digest()
-                self._file.write_data_slice(idx * self._blocksize, data + cksum)
+                self._write_block(idx, block)
 
     def sync(self):
         '''Ensure all changes are written to the physical medium.
@@ -332,6 +362,7 @@ class DataFile(object):
             block.append_item(item)
             return
         if self._last_block_index == 0:
+            self._flush_block(0)
             self._create_block()
         last_block = self._load_block(self._last_block_index)
         if last_block.try_append(item):
@@ -473,18 +504,44 @@ class DataFile(object):
 
     def _create_block_0(self):
         assert 0 not in self._blocks
+        assert self._last_block_index is None
         block = Block0(b'', self._blockdatasize)
         self._blocks[0] = block
         block.modified = True
+
+    def _create_block(self):
+        assert self._last_block_index >= 0
+        block = self._itemcodec.create_empty_block(self._blockdatasize)
+        self._last_block_index += 1
+        self._blocks[self._last_block_index] = block
+        block.modified = True
+        return block
 
     def _check_correct_file_opened(self):
         # TODO: Implement this (check that self._tree:self._path is
         # the same file as self._file)
         return True
 
+    def _flush_block(self, idx):
+        block = self._blocks.get(idx)
+        if block.modified:
+            block.modifed = False
+            self._write_block(idx, block)
+
+    def _write_block(self, idx, block):
+        data = block.encode()
+        if len(data) > self._blockdatasize:
+            raise AssertionError('Final block data too big!')
+        data += b'\x00' * (self._blockdatasize - len(data))
+        assert len(data) == self._blockdatasize
+        cksum = self._blocksum(data).digest()
+        self._file.write_data_slice(idx * self._blocksize, data + cksum)
+
     def _handle_magic(self, value):
         if value == b'ebakup database v1':
             self._itemcodec = MainHandler()
+        elif value == b'ebakup content data':
+            self._itemcodec = ContentHandler()
         else:
             raise NotImplementedError('Unhandled magic')
 
@@ -593,3 +650,118 @@ class Block0(object):
 
 class MainHandler(object):
     pass
+
+class ContentBlock(object):
+    def __init__(self):
+        self.modified = False
+        self._items = [] # [ (data, item) ]
+        self._datasize = 0
+        self._blockdatasize = None
+
+    def set_blockdatasize(self, size):
+        assert self._blockdatasize is None
+        if self._datasize > size:
+            raise BlockFullError('Block is over the new size limit')
+        self._blockdatasize = size
+
+    def get_item(self, index):
+        assert index >= 0
+        if index >= len(self._items):
+            raise ItemNotFoundError('Item ' + str(index) + ' not found')
+        return self._items[index][1]
+
+    def try_append(self, item):
+        if item.kind == 'content':
+            data = [ b'\xdd' ]
+            data.append(valuecodecs.make_varuint(len(item.cid)))
+            data.append(valuecodecs.make_varuint(len(item.checksum)))
+            if item.cid.startswith(item.checksum):
+                data.append(item.cid)
+            else:
+                if not item.checksum.startswith(item.cid):
+                    raise InvalidDataError('cid and checksum mismatch')
+                data.append(item.checksum)
+            data.append(valuecodecs.make_uint32(item.first))
+            data.append(valuecodecs.make_uint32(item.last))
+            for update in item.updates:
+                if update.kind == 'changed':
+                    data.append(b'\xa1')
+                    data.append(update.checksum)
+                elif update.kind == 'restored':
+                    data.append(b'\xa0')
+                else:
+                    raise InvalidDataError(
+                        'Unknown update type: ' + update.kind)
+                data.append(valuecodecs.make_uint32(update.first))
+                data.append(valuecodecs.make_uint32(update.last))
+            data = b''.join(data)
+            if (self._blockdatasize is not None and
+                    self._datasize + len(data) > self._blockdatasize):
+                return False
+            self._items.append((data, item))
+            self._datasize += len(data)
+            return True
+        raise InvalidDataError('Unknown item type: ' + item.kind)
+
+    def encode(self):
+        return b''.join(x[0] for x in self._items)
+
+class ContentHandler(object):
+    def decode_block(self, data, size):
+        if size > len(data):
+            size = len(data)
+        done = 0
+        block = ContentBlock()
+        while done < size:
+            start = done
+            if data[done] == 0xdd:
+                cidlen, done = valuecodecs.parse_varuint(data, done+1)
+                sumlen, done = valuecodecs.parse_varuint(data, done)
+                cid = data[done:done+cidlen]
+                cksum = data[done:done+sumlen]
+                done += max(cidlen, sumlen)
+                first = (
+                    data[done] + data[done+1] * 0x100 +
+                    data[done+2] * 0x10000 + data[done+3] * 0x1000000)
+                done += 4
+                last = (
+                    data[done] + data[done+1] * 0x100 +
+                    data[done+2] * 0x10000 + data[done+3] * 0x1000000)
+                done += 4
+                item = ItemContent(cid, cksum, first, last)
+                if done > size:
+                    raise InvalidDataError(
+                        'Content item overran block end at ' + str(done))
+                while data[done] in (0xa0, 0xa1):
+                    done += 1
+                    checksum = None
+                    if data[done-1] == 0xa1:
+                        checksum = data[done:done+sumlen]
+                        done += sumlen
+                    first = (
+                        data[done] + data[done+1] * 0x100 +
+                        data[done+2] * 0x10000 + data[done+3] * 0x1000000)
+                    done += 4
+                    last = (
+                        data[done] + data[done+1] * 0x100 +
+                        data[done+2] * 0x10000 + data[done+3] * 0x1000000)
+                    done += 4
+                    if checksum is None:
+                        item.content_restored(first, last)
+                    else:
+                        item.content_changed(first, last, checksum)
+                if done > size:
+                    raise InvalidDataError(
+                        'Content item overran block end at ' + str(done))
+                block._items.append((data[start:done], item))
+                block._datasize += done - start
+            elif data[done] == 0:
+                done = size
+            else:
+                raise InvalidDataError('Unknown data item: ' + str(data[done]))
+        return block
+
+    def create_empty_block(self, blockdatasize):
+        block = ContentBlock()
+        block.set_blockdatasize(blockdatasize)
+        return block
