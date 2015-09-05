@@ -91,11 +91,27 @@ def create_content(tree, dbpath):
     f.append_item(ItemSetting(b'edb-blocksum', b'sha256'))
     return f
 
-def create_backup(tree, dbpath, starttime):
+def replace_content(tree, dbpath):
+    '''Rewrite the "content" file for the ebakup database at tree:dbpath.
+
+    This method returns a pair (old, new). 'old' is the old "content"
+    file opened and locked read-only. 'new' is the new, empty
+    "content" file, opened and locked for writing. 'new' is opened in
+    "replace" mode (which means you need to call commit_and_close()
+    instead of close() to make the replacement permanent.)
+
+    Remember that if you want to hold more than one file from the same
+    ebakup database open at the same time, you need to hold a lock on
+    "main" as long as you have locked any of the other files.
+    '''
+
+def create_backup_in_replace_mode(tree, dbpath, starttime):
     '''Create a "backup" data file for a backup starting at 'starttime' in
     the ebakup database at tree:dbpath.
 
-    The file is opened and locked for writing.
+    The file is opened and locked for writing, in "replace" mode
+    (which means you need to call commit_and_close() instead of
+    close() to make the replacement permanent.)
 
     Remember that if you want to hold more than one file from the same
     ebakup database open at the same time, you need to hold a lock on
@@ -193,7 +209,9 @@ class DataFile(object):
 
     def __exit__(self, a, b, c):
         '''Using a DataFile as a context will ensure that close() is called
-        when the context is exited.
+        when the context is exited. Note that in some cases this will
+        abort any changes made, while in other cases it will commit
+        them. (See close() for details.)
         '''
         self.close()
 
@@ -230,10 +248,23 @@ class DataFile(object):
             raise AssertionError('File already open')
         raise NotImplementedError()
 
+    def commit_and_close(self):
+        '''Commit any changes, drop all locks and close the file.
+
+        This is equivalent to close() for DataFile objects that
+        directly modify the "real" file. However, for DataFile objects
+        in the "replace" mode, close() will discard all the changes
+        while commit_and_close() will make the changes live.
+        '''
+        raise NotImplementedError()
+
     def close(self):
         '''Drop all locks and close the file.
 
-        This will also flush any unwritten data.
+        This will also flush any unwritten data. However, if the
+        DataFile object is in "replace" mode, it will abort all the
+        changes. If that's not what you want, use commit_and_close()
+        instead.
 
         It is safe to call close() at any time. If the file is not
         open, close() will have no effect.
