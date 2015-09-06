@@ -136,12 +136,18 @@ class TestDataFile(unittest.TestCase):
     def test_create_typical_main(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to'))
-        main = datafile.create_main(tree, ('path', 'to', 'db'))
+        main = datafile.create_main_in_replace_mode(tree, ('path', 'to', 'db'))
         main.append_item(datafile.ItemSetting(b'checksum', b'sha256'))
-        main.close()
         self.assertCountEqual(
-            (('path', 'to', 'db'), ('path', 'to', 'db', 'main')),
+            (('path', 'to', 'db', 'main.new'), ('path', 'to', 'db')),
             tree._files_modified)
+        main.commit_and_close()
+        self.assertCountEqual(
+            (('path', 'to', 'db'),
+             ('path', 'to', 'db', 'main'),
+             ('path', 'to', 'db', 'main.new')),
+            tree._files_modified)
+        self.assertNotIn(('path', 'to', 'db', 'main.new'), tree._files)
         self.assertEqual(
             testdata.dbfiledata('main-1'),
             tree._files[('path', 'to', 'db', 'main')].content)
@@ -170,7 +176,7 @@ class TestDataFile(unittest.TestCase):
         tree._add_directory(('path', 'to', 'db'))
         self.assertRaisesRegex(
             FileExistsError, 'exists.*path.*to.*db',
-            datafile.create_main, tree, ('path', 'to', 'db'))
+            datafile.create_main_in_replace_mode, tree, ('path', 'to', 'db'))
         self.assertEqual([], tree._files_modified)
 
     def test_open_main_does_not_exist(self):
@@ -336,7 +342,8 @@ class TestDataFile(unittest.TestCase):
     def test_create_content_db(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to', 'db'))
-        content = datafile.create_content(tree, ('path', 'to', 'db'))
+        content = datafile.create_content_in_replace_mode(
+            tree, ('path', 'to', 'db'))
         cid1 = b'010----hhhh'
         content.append_item(
             datafile.ItemContent(cid1, cid1, 1417658340, 1417658340))
@@ -350,9 +357,13 @@ class TestDataFile(unittest.TestCase):
         cid3 = b'040xxxxxx'
         item = datafile.ItemContent(cid3, cid3, 1402958556, 1427582355)
         content.append_item(item)
-        content.close()
         self.assertCountEqual(
-            (('path', 'to', 'db', 'content'),),
+            (('path', 'to', 'db', 'content.new'),),
+            tree._files_modified)
+        content.commit_and_close()
+        self.assertCountEqual(
+            (('path', 'to', 'db', 'content.new'),
+             ('path', 'to', 'db', 'content')),
             tree._files_modified)
         tree._files_modified = []
         self.assertEqual(
@@ -400,7 +411,8 @@ class TestDataFile(unittest.TestCase):
     def test_create_multi_block_content_db(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to', 'db'))
-        content = datafile.create_content(tree, ('path', 'to', 'db'))
+        content = datafile.create_content_in_replace_mode(
+            tree, ('path', 'to', 'db'))
         # This item is sized so that the first data block is exactly filled.
         content.append_item(
             datafile.ItemContent(b'000000', b'000000', 1403044159, 1412770688))
@@ -408,9 +420,13 @@ class TestDataFile(unittest.TestCase):
         for i in range(500):
             item = datafile.ItemContent(cid1, cid1, 1417658340, 1417658340)
             content.append_item(item)
-        content.close()
         self.assertCountEqual(
-            (('path', 'to', 'db', 'content'),),
+            (('path', 'to', 'db', 'content.new'),),
+            tree._files_modified)
+        content.commit_and_close()
+        self.assertCountEqual(
+            (('path', 'to', 'db', 'content.new'),
+             ('path', 'to', 'db', 'content')),
             tree._files_modified)
         tree._files_modified = []
         self.assertEqual(

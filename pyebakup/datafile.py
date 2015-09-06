@@ -71,7 +71,7 @@ def _get_checksum_by_name(name):
     raise NotImplementedError(
         'Unknown block checksum: ' + repr(name))
 
-def create_main(tree, dbpath):
+def create_main_in_replace_mode(tree, dbpath):
     '''Create an ebakup database at tree:dbpath and return a writable
     DataFile for the "main" file.
 
@@ -79,14 +79,16 @@ def create_main(tree, dbpath):
     '''
     if tree.does_path_exist(dbpath):
         raise FileExistsError('File exists: /' + '/'.join(dbpath))
-    f = DataFile(tree, dbpath + ('main',))
+    f = DataFile(tree, dbpath + ('main.new',))
+    final = DataFile(tree, dbpath + ('main',))
     f.create_and_lock()
+    f.set_replacement_mode_with_datafile(final)
     f.append_item(ItemMagic(b'ebakup database v1'))
     f.append_item(ItemSetting(b'edb-blocksize', b'4096'))
     f.append_item(ItemSetting(b'edb-blocksum', b'sha256'))
     return f
 
-def create_content(tree, dbpath):
+def create_content_in_replace_mode(tree, dbpath):
     '''Create the "content" file for the ebakup database at tree:dbpath.
 
     The file is opened and locked for writing.
@@ -95,8 +97,10 @@ def create_content(tree, dbpath):
     ebakup database open at the same time, you need to hold a lock on
     "main" as long as you have locked any of the other files.
     '''
-    f = DataFile(tree, dbpath + ('content',))
+    f = DataFile(tree, dbpath + ('content.new',))
+    final = DataFile(tree, dbpath + ('content',))
     f.create_and_lock()
+    f.set_replacement_mode_with_datafile(final)
     f.append_item(ItemMagic(b'ebakup content data'))
     f.append_item(ItemSetting(b'edb-blocksize', b'4096'))
     f.append_item(ItemSetting(b'edb-blocksum', b'sha256'))
