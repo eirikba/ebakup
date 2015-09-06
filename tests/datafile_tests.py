@@ -136,7 +136,8 @@ class TestDataFile(unittest.TestCase):
     def test_create_typical_main(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to'))
-        main = datafile.create_main_in_replace_mode(tree, ('path', 'to', 'db'))
+        main = datafile.create_main_in_replacement_mode(
+            tree, ('path', 'to', 'db'))
         main.append_item(datafile.ItemSetting(b'checksum', b'sha256'))
         self.assertCountEqual(
             (('path', 'to', 'db', 'main.new'), ('path', 'to', 'db')),
@@ -176,7 +177,8 @@ class TestDataFile(unittest.TestCase):
         tree._add_directory(('path', 'to', 'db'))
         self.assertRaisesRegex(
             FileExistsError, 'exists.*path.*to.*db',
-            datafile.create_main_in_replace_mode, tree, ('path', 'to', 'db'))
+            datafile.create_main_in_replacement_mode,
+            tree, ('path', 'to', 'db'))
         self.assertEqual([], tree._files_modified)
 
     def test_open_main_does_not_exist(self):
@@ -342,7 +344,7 @@ class TestDataFile(unittest.TestCase):
     def test_create_content_db(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to', 'db'))
-        content = datafile.create_content_in_replace_mode(
+        content = datafile.create_content_in_replacement_mode(
             tree, ('path', 'to', 'db'))
         cid1 = b'010----hhhh'
         content.append_item(
@@ -411,7 +413,7 @@ class TestDataFile(unittest.TestCase):
     def test_create_multi_block_content_db(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to', 'db'))
-        content = datafile.create_content_in_replace_mode(
+        content = datafile.create_content_in_replacement_mode(
             tree, ('path', 'to', 'db'))
         # This item is sized so that the first data block is exactly filled.
         content.append_item(
@@ -530,7 +532,7 @@ class TestDataFile(unittest.TestCase):
         tree = FakeTree()
         tree._add_directory(('path', 'to', 'db'))
         starttime = datetime.datetime(2015, 9, 5, 21, 22, 42)
-        backup = datafile.create_backup_in_replace_mode(
+        backup = datafile.create_backup_in_replacement_mode(
             tree, ('path', 'to', 'db'), starttime)
         items = (
             {'kind': 'magic', 'value': b'ebakup backup data'},
@@ -589,7 +591,7 @@ class TestDataFile(unittest.TestCase):
         tree = FakeTree()
         tree._add_directory(('path', 'to', 'db'))
         starttime = datetime.datetime(2015, 9, 5, 21, 22, 42)
-        backup = datafile.create_backup_in_replace_mode(
+        backup = datafile.create_backup_in_replacement_mode(
             tree, ('path', 'to', 'db'), starttime)
         items = (
             {'kind': 'magic', 'value': b'ebakup backup data'},
