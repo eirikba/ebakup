@@ -9,8 +9,6 @@ import dbfile
 import valuecodecs
 import datafile
 
-import streamingdatafile
-
 def create_database(tree, path):
     '''Create a new, empty database at 'path' in 'tree'.
 
@@ -329,11 +327,11 @@ class ContentInfoFile(object):
     def __init__(self, db):
         self._db = db
         self._dbfile = dbfile.DBFile(db._tree, db._path + ('content',))
-        self._read_file(db._tree, db._path + ('content',))
+        self._read_file(db._tree, db._path)
 
     def _read_file(self, tree, path):
         self.contentdata = ContentInfoDict()
-        with streamingdatafile.StreamingReader(tree, path) as f:
+        with datafile.open_content(tree, path) as f:
             item = next(f)
             if item.kind != 'magic':
                 raise AssertionError('First item of content is not magic')
