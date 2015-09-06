@@ -7,6 +7,8 @@ import re
 
 import dbfile
 import valuecodecs
+import datafile
+
 import streamingdatafile
 
 def create_database(tree, path):
@@ -16,24 +18,21 @@ def create_database(tree, path):
     '''
     if tree.does_path_exist(path):
         raise FileExistsError('Path already exists: ' + str(path))
-    with streamingdatafile.StreamingWriter.create(
-            tree, path + ('main',)) as main:
-        main.write_header(b'ebakup database v1', 4096, b'sha256')
-        main.write_setting(b'checksum', b'sha256')
-    with streamingdatafile.StreamingWriter.create(
-            tree, path + ('content',)) as content:
-        content.write_header(b'ebakup content data', 4096, b'sha256')
+    main = datafile.create_main_in_replacement_mode(tree, path)
+    main.append_item(datafile.ItemSetting(b'checksum', b'sha256'))
+    main.commit_and_close()
+    datafile.create_content_in_replacement_mode(tree, path).commit_and_close()
     return Database(tree, path)
 
 class Database(object):
     def __init__(self, tree, path):
         self._tree = tree
         self._path = path
-        self._read_main(tree, path + ('main',))
+        self._read_main(tree, path)
         self._content = ContentInfoFile(self)
 
     def _read_main(self, tree, path):
-        with streamingdatafile.StreamingReader(tree, path) as main:
+        with datafile.open_main(tree, path) as main:
             item = next(main)
             if item.kind != 'magic':
                 raise AssertionError('First item in main is not magic')

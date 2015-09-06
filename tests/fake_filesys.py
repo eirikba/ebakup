@@ -129,6 +129,9 @@ class FakeFileSystem(object):
         assert not file1.is_directory
         return True
 
+    def is_same_file_system_as(self, other):
+        return other.path_to_full_string(()).startswith('local:/')
+
     def is_accessible(self):
         return True
 
@@ -233,6 +236,15 @@ class FakeFileSystem(object):
         self._make_directory(targetpath[:-1])
         self._paths[targetpath] = source
         del self._paths[sourcepath]
+
+    def delete_file_at_path(self, path):
+        self._check_access(path, 'delete')
+        target = self._paths.get(path)
+        if target is None:
+            return
+        if target.is_directory:
+            raise IsADirectory('Target is a directory: ' + str(targetpath))
+        del self._paths[path]
 
     def make_cheap_copy(self, sourcepath, targetpath):
         self._check_access(sourcepath, 'read')

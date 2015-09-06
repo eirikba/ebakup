@@ -117,6 +117,9 @@ class FakeDirectory(object):
             return None
         return self._files.get(proxypath, True)
 
+    def is_same_file_system_as(self, other):
+        return True
+
     def does_path_exist(self, path):
         plen = len(path)
         for k in self._files:

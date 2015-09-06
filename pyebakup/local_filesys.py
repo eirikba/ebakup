@@ -13,7 +13,10 @@ class LocalFileSystem(object):
     def path_to_string(self, path):
         assert os.path.dirname('/') == '/'
         stringpath = os.path.join('/', *path)
-        assert stringpath.startswith('/' + path[0])
+        if path:
+            assert stringpath.startswith('/' + path[0])
+        else:
+            assert stringpath == '/'
         return stringpath
 
     def path_from_string(self, stringpath):
