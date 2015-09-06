@@ -203,6 +203,14 @@ class FileSystemInterface(object):
     FileSystem abstraction.
     '''
 
+    def is_same_file_system_as(self, tree):
+        '''Return true if 'tree' represents the same file system as this
+        object.
+
+        Essentially, this means that using the same path with 'tree'
+        as with this object will refer to the same object.
+        '''
+
     def path_to_string(self, path):
         '''Convert a path in tuple form to the file system's string
         representation.
@@ -355,6 +363,14 @@ class FileSystemInterface(object):
         '''Rename 'sourcepath' to 'targetpath'.
 
         If 'targetpath' already exists, the rename operation will fail.
+        '''
+
+    def delete_file_at_path(self, path):
+        '''Delete the file at 'path'.
+
+        If 'path' is not a file, this method will fail and raise an
+        exception. However, if 'path' does not exist at all, this
+        method will succeed without doing anything.
         '''
 
     def make_cheap_copy(self, sourcepath, targetpath):

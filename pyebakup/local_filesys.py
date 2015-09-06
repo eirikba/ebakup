@@ -7,6 +7,9 @@ import stat
 import tempfile
 
 class LocalFileSystem(object):
+    def is_same_file_system_as(self, tree):
+        return tree.path_to_full_string(()) == 'local:/'
+
     def path_to_string(self, path):
         assert os.path.dirname('/') == '/'
         stringpath = os.path.join('/', *path)

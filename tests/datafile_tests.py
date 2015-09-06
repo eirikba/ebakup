@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import datetime
 import hashlib
 import unittest
 
@@ -37,6 +38,9 @@ class FakeTree(object):
         if byuser:
             self._files_modified.append(path)
 
+    def is_same_file_system_as(self, other):
+        return True
+
     def create_regular_file(self, path):
         self._add_file(path, b'', byuser=True)
         return FakeFile(self, path)
@@ -50,6 +54,17 @@ class FakeTree(object):
 
     def get_item_at_path(self, path):
         return FakeFile(self, path)
+
+    def rename_and_overwrite(self, sourcepath, targetpath):
+        self._files_modified.append(targetpath)
+        self._files[targetpath] = self._files[sourcepath]
+        del self._files[sourcepath]
+
+    def delete_file_at_path(self, path):
+        if path in self._dirs:
+            raise AssertionError('Not a file')
+        self._files_modified.append(path)
+        del self._files[path]
 
 class FakeFileData(object):
     def __init__(self, content):
@@ -448,3 +463,159 @@ class TestDataFile(unittest.TestCase):
             data[12288 + 73 * 19 : 12288 + 74 * 19])
         # ... followed by correct padding
         self.assertEqual(b'\x00' * 2658, data[12288 + 74 * 19 : 12288 + 4064])
+
+    def test_read_simple_backup(self):
+        tree = FakeTree()
+        tree._add_file(
+            ('path', 'to', 'db', '2015', '04-03T10:46'),
+            testdata.dbfiledata('backup-1'))
+        backup = datafile.open_backup(
+            tree, ('path', 'to', 'db'), datetime.datetime(2015, 4, 3, 10, 46))
+        expect = (
+            {'kind': 'magic', 'value': b'ebakup backup data'},
+            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
+            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
+            {'kind': 'setting',
+             'key': b'start', 'value': b'2015-04-03T10:46:06'},
+            {'kind': 'setting',
+             'key': b'end', 'value': b'2015-04-03T10:47:59'},
+            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path' },
+            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to' },
+            {'kind': 'file', 'parent': 9, 'name': b'file',
+             'cid': b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
+                    b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
+             'size': 7850, 'mtime_year': 2015, 'mtime_second': 0x42a042,
+             'mtime_ns': 765430000 },
+            {'kind': 'file', 'parent': 0, 'name': b'file',
+             'cid': b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
+                    b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
+             'size': 23, 'mtime_year': 2013, 'mtime_second': 0x10adba0,
+             'mtime_ns': 0 },
+            )
+        for x in expect:
+            item = next(backup)
+            for key, value in x.items():
+                self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertRaises(StopIteration, next, backup)
+        backup.close()
+        self.assertCountEqual((), tree._files_modified)
+
+    def test_open_backup_with_wrong_name(self):
+        tree = FakeTree()
+        tree._add_file(
+            ('path', 'to', 'db', '2015', '04-03T10:45'),
+            testdata.dbfiledata('backup-1'))
+        self.assertRaisesRegex(
+            datafile.InvalidDataError, 'non-matching start time.*10:46.*10:45',
+            datafile.open_backup,
+            tree, ('path', 'to', 'db'), datetime.datetime(2015, 4, 3, 10, 45))
+
+    def test_create_simple_backup(self):
+        tree = FakeTree()
+        tree._add_directory(('path', 'to', 'db'))
+        starttime = datetime.datetime(2015, 9, 5, 21, 22, 42)
+        backup = datafile.create_backup_in_replace_mode(
+            tree, ('path', 'to', 'db'), starttime)
+        items = (
+            {'kind': 'magic', 'value': b'ebakup backup data'},
+            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
+            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
+            {'kind': 'setting',
+             'key': b'start', 'value': b'2015-09-05T21:22:42'},
+            {'kind': 'setting',
+             'key': b'end', 'value': b'2015-09-05T21:24:06'},
+            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path' },
+            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to' },
+            {'kind': 'file', 'parent': 9, 'name': b'file',
+             'cid': b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
+                    b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
+             'size': 7850, 'mtime_year': 2015, 'mtime_second': 0x42a042,
+             'mtime_ns': 765430000 },
+            {'kind': 'file', 'parent': 0, 'name': b'file',
+             'cid': b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
+                    b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
+             'size': 23, 'mtime_year': 2013, 'mtime_second': 0x10adba0,
+             'mtime_ns': 0 },
+            )
+        for item in items:
+            if item['kind'] in ('magic', 'setting'):
+                continue
+            dataitem = datafile.Item(item['kind'])
+            for name, value in item.items():
+                setattr(dataitem, name, value)
+            backup.append_item(dataitem)
+        backup.insert_item(
+            0, -1, datafile.ItemSetting(b'end', b'2015-09-05T21:24:06'))
+        self.assertNotIn(
+            ('path', 'to', 'db', '2015', '09-05T21:22'), tree._files)
+        self.assertEqual(
+            True,
+            tree._files[('path', 'to', 'db', '2015', '09-05T21:22.new')].locked)
+        backup.commit_and_close()
+        self.assertCountEqual(
+            (('path', 'to', 'db', '2015'),
+             ('path', 'to', 'db', '2015', '09-05T21:22.new'),
+             ('path', 'to', 'db', '2015', '09-05T21:22')),
+            set(tree._files_modified))
+        tree._files_modified = []
+        self.assertNotIn(
+            ('path', 'to', 'db', '2015', '09-05T21:22.new'), tree._files)
+        backup = datafile.open_backup(tree, ('path', 'to', 'db'), starttime)
+        for x in items:
+            item = next(backup)
+            for key, value in x.items():
+                self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertRaises(StopIteration, next, backup)
+        backup.close()
+        self.assertCountEqual((), tree._files_modified)
+
+    def test_create_simple_backup_without_commit_will_abort(self):
+        tree = FakeTree()
+        tree._add_directory(('path', 'to', 'db'))
+        starttime = datetime.datetime(2015, 9, 5, 21, 22, 42)
+        backup = datafile.create_backup_in_replace_mode(
+            tree, ('path', 'to', 'db'), starttime)
+        items = (
+            {'kind': 'magic', 'value': b'ebakup backup data'},
+            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
+            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
+            {'kind': 'setting',
+             'key': b'start', 'value': b'2015-09-05T21:22:42'},
+            {'kind': 'setting',
+             'key': b'end', 'value': b'2015-09-05T21:24:06'},
+            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path' },
+            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to' },
+            {'kind': 'file', 'parent': 9, 'name': b'file',
+             'cid': b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
+                    b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
+             'size': 7850, 'mtime_year': 2015, 'mtime_second': 0x42a042,
+             'mtime_ns': 765430000 },
+            {'kind': 'file', 'parent': 0, 'name': b'file',
+             'cid': b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
+                    b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
+             'size': 23, 'mtime_year': 2013, 'mtime_second': 0x10adba0,
+             'mtime_ns': 0 },
+            )
+        for item in items:
+            if item['kind'] in ('magic', 'setting'):
+                continue
+            dataitem = datafile.Item(item['kind'])
+            for name, value in item.items():
+                setattr(dataitem, name, value)
+            backup.append_item(dataitem)
+        backup.insert_item(
+            0, -1, datafile.ItemSetting(b'end', b'2015-09-05T21:24:06'))
+        self.assertNotIn(
+            ('path', 'to', 'db', '2015', '09-05T21:22'), tree._files)
+        self.assertEqual(
+            True,
+            tree._files[('path', 'to', 'db', '2015', '09-05T21:22.new')].locked)
+        backup.close()
+        self.assertCountEqual(
+            (('path', 'to', 'db', '2015'),
+             ('path', 'to', 'db', '2015', '09-05T21:22.new')),
+            set(tree._files_modified))
+        self.assertNotIn(
+            ('path', 'to', 'db', '2015', '09-05T21:22.new'), tree._files)
+        self.assertNotIn(
+            ('path', 'to', 'db', '2015', '09-05T21:22'), tree._files)

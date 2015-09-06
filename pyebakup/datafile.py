@@ -30,6 +30,17 @@ def ItemDirectory(dirid, parent, name):
     item.name = name
     return item
 
+class ItemFile(object):
+    def __init__(self, parent, name, cid, size, mtime):
+        self.kind = 'file'
+        self.parent = parent
+        self.name = name
+        self.cid = cid
+        self.size = size
+        self.mtime_year = mtime[0]
+        self.mtime_second = mtime[1]
+        self.mtime_ns = mtime[2]
+
 class ItemContent(object):
     def __init__(self, cid, checksum, first, last):
         self.kind = 'content'
@@ -117,6 +128,24 @@ def create_backup_in_replace_mode(tree, dbpath, starttime):
     ebakup database open at the same time, you need to hold a lock on
     "main" as long as you have locked any of the other files.
     '''
+    fname = '{:02}-{:02}T{:02}:{:02}'.format(
+        starttime.month, starttime.day, starttime.hour, starttime.minute)
+    oldpath = dbpath + (str(starttime.year), fname)
+    newpath = dbpath + (str(starttime.year), fname + '.new')
+    old = DataFile(tree, oldpath)
+    new = DataFile(tree, newpath)
+    new.create_and_lock()
+    new.set_replacement_mode_with_datafile(old)
+    new.append_item(ItemMagic(b'ebakup backup data'))
+    new.append_item(ItemSetting(b'edb-blocksize', b'4096'))
+    new.append_item(ItemSetting(b'edb-blocksum', b'sha256'))
+    new.append_item(ItemSetting(
+        b'start',
+        '{:04}-{:02}-{:02}T{:02}:{:02}:{:02}'.format(
+            starttime.year, starttime.month, starttime.day,
+            starttime.hour, starttime.minute, starttime.second)
+        .encode('utf-8')))
+    return new
 
 def open_main(tree, dbpath, writable=False):
     '''Open the "main" file in the ebakup database at tree:dbpath.
@@ -162,6 +191,26 @@ def open_backup(tree, dbpath, starttime, writable=False):
     ebakup database open at the same time, you need to hold a lock on
     "main" as long as you have locked any of the other files.
     '''
+    fname = '{:02}-{:02}T{:02}:{:02}'.format(
+        starttime.month, starttime.day, starttime.hour, starttime.minute)
+    f = DataFile(tree, dbpath + (str(starttime.year), fname))
+    if writable:
+        raise AssertionError('backup files are immutable!')
+    else:
+        f.open_and_lock_readonly()
+    for item in f:
+        if item.kind == 'setting' and item.key == b'start':
+            value = item.value
+            break
+        if item.kind not in ('setting', 'magic'):
+            raise InvalidDataError(
+                'Failed to find "start" setting in backup file')
+    f.seek(0, 0)
+    if str(starttime.year) + '-' + fname != value[:-3].decode('utf-8'):
+        raise InvalidDataError(
+            'Backup file has non-matching start time: ' +
+            str(value) + ' vs ' + str(starttime.year) + '-' + fname)
+    return f
 
 class DataFile(object):
 
@@ -248,6 +297,27 @@ class DataFile(object):
             raise AssertionError('File already open')
         raise NotImplementedError()
 
+    def set_replacement_mode_with_datafile(self, replacefile):
+        '''Set this DataFile in replacement mode, with 'replacefile' as the
+        target file.
+
+        In replacement mode, calling close() on the DataFile will
+        remove the file. If you wish to keep the changes, you need to
+        call commit_and_close() instead.
+
+        Calling commit_and_close() will replace the file represented
+        by 'replacefile' with the file built by this DataFile. So the
+        path this DataFile is created with is just a temporary storage
+        until it is either removed (by close()) or renamed to the
+        final path (by commit_and_close()).
+
+        Regardless of which way this DataFile is closed, it will also
+        automatically call close() on 'replacefile'.
+        '''
+        if not self._tree.is_same_file_system_as(replacefile._tree):
+            raise AssertionError('Can not replace between file systems')
+        self._replace_file = replacefile
+
     def commit_and_close(self):
         '''Commit any changes, drop all locks and close the file.
 
@@ -256,7 +326,20 @@ class DataFile(object):
         in the "replace" mode, close() will discard all the changes
         while commit_and_close() will make the changes live.
         '''
-        raise NotImplementedError()
+        f = self._file
+        if f is None:
+            return
+        replace = self._replace_file
+        if replace is None:
+            self.close()
+            return
+        self.flush()
+        if not self._tree.is_same_file_system_as(replace._tree):
+            raise AssertionError('Can not replace between file systems')
+        self._tree.rename_and_overwrite(self._path, replace._path)
+        replace.close()
+        f.close()
+        self._clear_file_data()
 
     def close(self):
         '''Drop all locks and close the file.
@@ -271,8 +354,13 @@ class DataFile(object):
         '''
         if self._file is None:
             return
-        self.flush()
-        self._file.close()
+        if self._replace_file is not None:
+            self._tree.delete_file_at_path(self._path)
+            self._file.close()
+            self._replace_file.close()
+        else:
+            self.flush()
+            self._file.close()
         self._clear_file_data()
 
     def flush(self):
@@ -369,6 +457,10 @@ class DataFile(object):
         Any items after 'index' in the same block will have their
         indices increased by 1. Other blocks will be unaffected.
         '''
+        block = self._load_block(block)
+        if index == -1:
+            block.append_item(item)
+            return
         raise NotImplementedError()
 
     def append_item(self, item):
@@ -442,6 +534,9 @@ class DataFile(object):
         If (block, index) does not refer to an existing item (and is
         not -1, -1), an ItemNotFoundError will be raised.
         '''
+        if block == 0 and index == 0:
+            self._pos = (0, 0)
+            return
         raise NotImplementedError()
 
     def move_block(self, source, target):
@@ -483,6 +578,7 @@ class DataFile(object):
         self._itemcodec = None
         self._last_block_index = None
         self._blocks = {}
+        self._replace_file = None
 
     def _initialize_file_data(self):
         self._pos = (0, 0)
@@ -573,6 +669,8 @@ class DataFile(object):
             self._itemcodec = MainHandler()
         elif value == b'ebakup content data':
             self._itemcodec = ContentHandler()
+        elif value == b'ebakup backup data':
+            self._itemcodec = BackupHandler()
         else:
             raise NotImplementedError('Unhandled magic')
 
@@ -787,6 +885,8 @@ class ContentHandler(object):
                 block._items.append((data[start:done], item))
                 block._datasize += done - start
             elif data[done] == 0:
+                if data[done:size].strip(b'\x00'):
+                    raise InvalidDataError('Trailing garbage')
                 done = size
             else:
                 raise InvalidDataError('Unknown data item: ' + str(data[done]))
@@ -794,5 +894,133 @@ class ContentHandler(object):
 
     def create_empty_block(self, blockdatasize):
         block = ContentBlock()
+        block.set_blockdatasize(blockdatasize)
+        return block
+
+class BackupBlock(object):
+    def __init__(self):
+        self.modified = False
+        self._items = [] # [ (data, item) ]
+        self._datasize = 0
+        self._blockdatasize = None
+
+    def set_blockdatasize(self, size):
+        assert self._blockdatasize is None
+        if self._datasize > size:
+            raise BlockFullError('Block is over the new size limit')
+        self._blockdatasize = size
+
+    def get_item(self, index):
+        assert index >= 0
+        if index >= len(self._items):
+            raise ItemNotFoundError('Item ' + str(index) + ' not found')
+        return self._items[index][1]
+
+    def try_append(self, item):
+        if item.kind == 'directory':
+            data = [ b'\x90' ]
+            data.append(valuecodecs.make_varuint(item.dirid))
+            data.append(valuecodecs.make_varuint(item.parent))
+            data.append(valuecodecs.make_varuint(len(item.name)))
+            data.append(item.name)
+            data = b''.join(data)
+        elif item.kind == 'file':
+            data = [ b'\x91' ]
+            data.append(valuecodecs.make_varuint(item.parent))
+            data.append(valuecodecs.make_varuint(len(item.name)))
+            data.append(item.name)
+            data.append(valuecodecs.make_varuint(len(item.cid)))
+            data.append(item.cid)
+            data.append(valuecodecs.make_varuint(item.size))
+            year = item.mtime_year
+            second = item.mtime_second
+            ns = item.mtime_ns
+            if year < 1000 or year > 9999:
+                raise InvalidDataError(
+                    'Unreasonable last-modified year: ' + str(year))
+            if second < 0 or second > 31622399:
+                # Not checking for December 32 in non-leap years
+                raise InvalidDataError(
+                    'Unreasonable last-modifed second of year: ' + str(second))
+            if ns < 0 or ns > 999999999:
+                raise InvalidDataError(
+                    'Unreasonable last-modified nanosecond: ' + str(ns))
+            mtime = bytes((
+                item.mtime_year & 0xff, (item.mtime_year >> 8),
+                item.mtime_second & 0xff, (item.mtime_second >> 8) & 0xff,
+                (item.mtime_second >> 16) & 0xff,
+                ((item.mtime_second >> 17) & 0x80) + (item.mtime_ns & 0x3f),
+                (item.mtime_ns >> 6) & 0xff, (item.mtime_ns >> 14) & 0xff,
+                item.mtime_ns >> 22))
+            data.append(mtime)
+            data = b''.join(data)
+        else:
+            raise InvalidDataError('Unknown item type: ' + item.kind)
+
+        if (self._blockdatasize is not None and
+                self._datasize + len(data) > self._blockdatasize):
+            return False
+        self._items.append((data, item))
+        self._datasize += len(data)
+        return True
+
+    def encode(self):
+        return b''.join(x[0] for x in self._items)
+
+class BackupHandler(object):
+    def decode_block(self, data, size):
+        if size > len(data):
+            size = len(data)
+        done = 0
+        block = BackupBlock()
+        while done < size:
+            item = None
+            start = done
+            if data[done] == 0x90:
+                done += 1
+                dirid, done = valuecodecs.parse_varuint(data, done)
+                parent, done = valuecodecs.parse_varuint(data, done)
+                namelen, done = valuecodecs.parse_varuint(data, done)
+                name = data[done:done+namelen]
+                done += namelen
+                item = ItemDirectory(dirid, parent, name)
+                itemdata = data[start:done]
+            elif data[done] == 0x91:
+                done += 1
+                parent, done = valuecodecs.parse_varuint(data, done)
+                namelen, done = valuecodecs.parse_varuint(data, done)
+                name = data[done:done+namelen]
+                done += namelen
+                cidlen, done = valuecodecs.parse_varuint(data, done)
+                cid = data[done:done+cidlen]
+                done += cidlen
+                size, done = valuecodecs.parse_varuint(data, done)
+                mtime_year = data[done] + data[done+1] * 256
+                mtime_second = (
+                    data[done+2] + data[done+3] * 0x100 +
+                    data[done+4] * 0x10000)
+                if data[done+5] >= 0x80:
+                    mtime_second += 0x1000000
+                mtime_ns = (
+                    (data[done+5] & 0x3f) + data[done+6] * 0x40 +
+                    data[done+7] * 0x4000 + data[done+8] * 0x400000)
+                done += 9
+                item = ItemFile(
+                    parent, name, cid, size,
+                    (mtime_year, mtime_second, mtime_ns))
+                itemdata = data[start:done]
+            elif data[done] == 0:
+                if data[done:size].strip(b'\x00'):
+                    raise InvalidDataError('Trailing garbage')
+                done = size
+            else:
+                raise InvalidDataError('Unknown data item')
+            if item is not None:
+                block._items.append((itemdata, item))
+                block._datasize += len(itemdata)
+        return block
+
+    def create_empty_block(self, blockdatasize):
+        block = BackupBlock()
         block.set_blockdatasize(blockdatasize)
         return block
