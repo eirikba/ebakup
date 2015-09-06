@@ -999,7 +999,7 @@ class BackupHandler(object):
                 cidlen, done = valuecodecs.parse_varuint(data, done)
                 cid = data[done:done+cidlen]
                 done += cidlen
-                size, done = valuecodecs.parse_varuint(data, done)
+                filesize, done = valuecodecs.parse_varuint(data, done)
                 mtime_year = data[done] + data[done+1] * 256
                 mtime_second = (
                     data[done+2] + data[done+3] * 0x100 +
@@ -1011,7 +1011,7 @@ class BackupHandler(object):
                     data[done+7] * 0x4000 + data[done+8] * 0x400000)
                 done += 9
                 item = ItemFile(
-                    parent, name, cid, size,
+                    parent, name, cid, filesize,
                     (mtime_year, mtime_second, mtime_ns))
                 itemdata = data[start:done]
             elif data[done] == 0:
