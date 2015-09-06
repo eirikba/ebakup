@@ -245,17 +245,49 @@ class FakeStreamingBackupReader(object):
             yield item
 
     @property
-    def _data(self):
+    def _tree(self):
         # Yes, my code is using this. Bad code!
+        return FakeTreeForHackyBackupReaderAccess(self)
+
+    @property
+    def _path(self):
+        # Yes, my code is using this. Bad code!
+        return self
+
+class FakeTreeForHackyBackupReaderAccess(object):
+    def __init__(self, reader):
+        self._reader = reader
+
+    def get_item_at_path(self, path):
+        assert path == self._reader
+        return FakeFileForHackyBackupReaderAccess(self._reader)
+
+class FakeFileForHackyBackupReaderAccess(object):
+    def __init__(self, reader):
         data = []
-        for item in self._backup._items:
+        for item in reader._backup._items:
             data.append(item.kind.encode('utf-8'))
             for attr in (
                     'key', 'value', 'parent', 'dirid', 'name',
                     'cid', 'size', 'mtime', 'mtime_ns'):
                 if hasattr(item, attr):
                     data.append(repr(getattr(item, attr)).encode('utf-8'))
-        return b''.join(data)
+        self._data = b''.join(data)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, a, b, c):
+        self._data = None
+
+    def get_size(self):
+        return len(self._data)
+
+    def get_data_slice(self, start, end):
+        assert start == 0
+        assert end == len(self._data)
+        return self._data
+
 
 class FakeStreamingBackupWriter(object):
     def __init__(self, collection, starttime):

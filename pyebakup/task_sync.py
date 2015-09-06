@@ -255,7 +255,8 @@ class SyncTask(object):
     def _get_full_content_for_backup(self, collinfo, name):
         # This is cheating! But for now it gets me what I need.
         reader = collinfo.collection.get_backup_file_reader_for_name(name)
-        return reader._data
+        with reader._tree.get_item_at_path(reader._path) as f:
+            return f.get_data_slice(0, f.get_size())
 
 class CollectionData(object):
     def __init__(self, conf, collection):

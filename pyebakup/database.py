@@ -73,7 +73,7 @@ class Database(object):
         for name in dirs:
             try:
                 num = int(name)
-                if 2000 < num < 9999:
+                if 1900 < num < 9999:
                     years.append(name)
             except ValueError:
                 pass

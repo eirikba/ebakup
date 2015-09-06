@@ -13,6 +13,7 @@ import unittest
 
 import backupcollection
 import cli
+import datafile
 import fake_filesys
 
 class TestFullSequence(unittest.TestCase):
@@ -42,6 +43,7 @@ class TestFullSequence(unittest.TestCase):
         fs._set_utcnow(self.utcnow)
         self.make_initial_source_tree(fs)
         fs._allow_full_access_to_subtree(('backups', 'home'))
+        fs._allow_full_access_to_subtree(('backups', 'second'))
         fs._allow_reading_subtree(('home', 'me'))
         fs._disallow_reading_subtree(('home', 'me', 'tmp'))
         fs._disallow_reading_subtree(('home', 'me', '.cache'))
@@ -85,6 +87,19 @@ class TestFullSequence(unittest.TestCase):
         cli.main(('backup', 'home'), services=self.services, stdoutfile=out)
         self.advance_utcnow(seconds=80)
         self._check_result_of_second_backup(stdout=out.getvalue())
+        self.advance_utcnow(seconds=32)
+        self.assertRaisesRegex(
+            FileNotFoundError, 'Backup collection does not exist.*second',
+            cli.main, ('sync',), services=self.services, stdoutfile=out)
+        self.advance_utcnow(seconds=17)
+        out = io.StringIO()
+        cli.main(('sync', '--create'), services=self.services, stdoutfile=out)
+        self._check_result_of_sync(stdout=out.getvalue())
+        self.advance_utcnow(seconds=27)
+        out = io.StringIO()
+        cli.main(('sync', '--create'), services=self.services, stdoutfile=out)
+        # This should not have caused any changes, so just do the same check
+        self._check_result_of_sync(stdout=out.getvalue())
 
     def make_initial_source_tree(self, fs):
         fs._make_files(
@@ -119,6 +134,7 @@ class TestFullSequence(unittest.TestCase):
         return textwrap.dedent('''\
             backup home
                 collection local:/backups/home
+                collection local:/backups/second
                 source local:/home/me
                    paths .cache .thumbnails tmp
                        ignore
@@ -138,6 +154,8 @@ class TestFullSequence(unittest.TestCase):
             'Backup definitions:\n'
             '  backup home\n'
             '    collection local:/backups/home\n'
+            '      (Does not exist)\n'
+            '    collection local:/backups/second\n'
             '      (Does not exist)\n'
             '    source local:/home/me\n',
             outstr)
@@ -191,7 +209,7 @@ class TestFullSequence(unittest.TestCase):
             '3f32379fe4108e99279890faf44a836c6ad836ad331ea276d0a4b7858437091a',
             '9a56e724abdbeafb3c206603f085d887323695e4cbfabedbb25597d5d43012e0',
             '384d1cd1ecf7cbd6dfbd82894af0922bc113589d14d06c465eb145922ae00dd7',
-            '9261f035a0e43e30550a73086daef1fb0bed7f6f7ee5f01b8c4862ae91c0de95',
+            '5e16a40318f071df23a3d2fb600f7943764bca4896020ba9a54a00c10f49e99e',
             ):
             expected.add((cid[:2],))
             expected.add((cid[:2],cid[2:4]))
@@ -276,6 +294,8 @@ class TestFullSequence(unittest.TestCase):
             '    collection local:/backups/home\n'
             '      Least recently verified: 1995-01-01 00:00:20\n'
             '      Total number of content files: 4\n'
+            '    collection local:/backups/second\n'
+            '      (Does not exist)\n'
             '    source local:/home/me\n',
             outstr)
         self.assertRegex(firstline, r'Web ui started on port \d+')
@@ -331,3 +351,34 @@ class TestFullSequence(unittest.TestCase):
             datetime.datetime(1995, 1, 5, 0, 44, 0), bkup.get_start_time())
         self.assertEqual(
             datetime.datetime(1995, 1, 5, 0, 44, 0), bkup.get_end_time())
+
+    def _check_result_of_sync(self, stdout):
+        self.assertRegex(stdout, r'Web ui started on port \d{4}\n')
+        count = 0
+        for path in self.fs._paths:
+            if len(path) < 3:
+                continue
+            if (path[:2] == ('backups', 'home') and
+                    path[2] not in ('1995', 'tmp')):
+                if path == ('backups', 'home', 'db', 'content'):
+                    continue
+                count += 1
+                item1 = self.fs._paths[path]
+                item2 = self.fs._paths[('backups', 'second') + path[2:]]
+                self.assertEqual(item1.is_directory, item2.is_directory)
+                if not item1.is_directory:
+                    self.assertEqual(item1.data, item2.data, path[2:])
+        self.assertEqual(27, count)
+        cids1 = []
+        with datafile.open_content(self.fs, ('backups', 'home', 'db')) as cf:
+            for item in cf:
+                if item.kind == 'content':
+                    cids1.append(item.cid)
+        cids2 = []
+        with datafile.open_content(self.fs, ('backups', 'second', 'db')) as cf:
+            for item in cf:
+                if item.kind == 'content':
+                    self.assertEqual(789266769, item.first)
+                    self.assertEqual(789266769, item.last)
+                    cids2.append(item.cid)
+        self.assertCountEqual(cids1, cids2)
