@@ -95,71 +95,34 @@ class Database(object):
             backups.sort()
         return backups
 
-    def get_streaming_backup_reader_for_name(self, name):
-        '''Obtain a streaming reader for the backup named 'name'.
+    _re_backup_name = re.compile(r'^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)')
+    def get_backup_file_reader_for_name(self, name):
+        '''Obtain a DataFile opened read-only for the backup named 'name'.
 
         WARNING: This method may change behaviour or go away in the
         (near) future. I'm still considering whether this is a good
         idea.
 
-        The streaming reader is an iterator, so can be used with
-        next() and for-in. Each next() will provide the next item in
-        the backup. See the description of 'item' in
-        get_streaming_backup_writer() for details about those objects.
+        See DataFile.open_backup() for details on the returned object.
         '''
-        path = tuple(name.split('-', 1))
-        return streamingdatafile.StreamingReader(
-            self._tree, self._path + path)
+        match = self._re_backup_name.match(name)
+        start = datetime.datetime(
+            int(match.group(1)), int(match.group(2)), int(match.group(3)),
+            int(match.group(4)), int(match.group(5)))
+        return datafile.open_backup(self._tree, self._path, start)
 
-    def get_streaming_backup_writer_for_name(self, name):
-        '''Obtain a streaming writer for a backup.
+    def create_backup_file_in_replacement_mode(self, starttime):
+        '''Create a backup file for a backup starting at 'starttime'.
 
         This will create a new backup according to whatever data it is
-        fed.
+        fed. If there already exists a conflicting backup file, this
+        method will fail.
 
-        The returned object has a write(item) method to add something
-        to the backup. And a close() method to commit the backup to
-        the database.
-
-        The 'item' argument to write(item) must have a 'kind'
-        attribute (a string) that specifies what kind of item it is
-        and what other attributes it has:
-
-        'magic' : MUST occur as the first item.
-            value: The "magic" identifier of the file (a bytes object,
-                not including the final LF)
-
-        'setting': May only occur after 'magic' or other 'setting'
-                items.
-            key: The setting's key (a bytes object)
-            value: The setting's value (a bytes object)
-
-        'directory': Describes a directory entry.
-            dirid: The identifier for the directory (an integer). Note
-                that some values are predefined (most importantly 0 is
-                the root directory).
-            parent: The identifier for the parent directory (an
-                integer)
-            name: The name of the directory (a bytes object that may
-                potentially be a utf-8 encoded string)
-
-        'file': Describes a file entry.
-            parent: The identifier for the parent directory (an
-                integer)
-            name: The name of the file (a bytes object that may
-                potentially be a utf-8 encoded string)
-            size: The size of the files (an integer, in octets)
-            mtime_year: The year of the last-modified time (an
-                integer)
-            mtime_second: The second relative to the start of the year
-                of the last-modified time (an integer)
-            mtime_ns: The nanosecond of the last-modified time
-                (an integer).
-            contentid: The content id of the file (a bytes object)
+        See DataFile.create_backup_in_replacement_mode() for details
+        on the returned object.
         '''
-        path = tuple(name.split('-', 1))
-        return streamingdatafile.StreamingWriter.create(
-            self._tree, self._path + path)
+        return datafile.create_backup_in_replacement_mode(
+            self._tree, self._path, starttime)
 
     def get_most_recent_backup(self):
         '''Obtain the data for the most recent backup according to the

@@ -51,6 +51,12 @@ class FakeCollection(object):
 
     def _add_backup(self, when, files):
         bk = FakeBackup(when)
+        bk._items.append(
+            FakeItem(
+                'setting',
+                key=b'end',
+                value=time_to_setting(
+                    when + datetime.timedelta(seconds=3))))
         for f in files:
             cid = self._add_content_data(f.content)
             bkf = FakeItem(
@@ -90,14 +96,14 @@ class FakeCollection(object):
             raise AssertionError('Content is not expected to be read')
         return self._content.get(cid)
 
-    def get_streaming_backup_reader_for_name(self, name):
+    def get_backup_file_reader_for_name(self, name):
         for x in self._backups:
             if '-'.join(x._path) == name:
                 return FakeStreamingBackupReader(x)
         raise AssertionError('No backup named ' + name)
 
-    def get_streaming_backup_writer_for_name(self, name):
-        return FakeStreamingBackupWriter(self, name)
+    def create_backup_file_in_replacement_mode(self, starttime):
+        return FakeStreamingBackupWriter(self, starttime)
 
     def _make_path_from_contentid(self, cid):
         hexcid = hexstr(cid)
@@ -149,11 +155,6 @@ class FakeBackup(object):
                 'setting',
                 key=b'start',
                 value=time_to_setting(self._start_time)),
-            FakeItem(
-                'setting',
-                key=b'end',
-                value=time_to_setting(
-                    self._start_time + datetime.timedelta(seconds=3))),
         ]
 
     @property
@@ -257,16 +258,16 @@ class FakeStreamingBackupReader(object):
         return b''.join(data)
 
 class FakeStreamingBackupWriter(object):
-    def __init__(self, collection, name):
+    def __init__(self, collection, starttime):
         self._collection = collection
-        self._name = name
+        self._starttime = starttime
         self._items = []
-        self._backup = FakeBackup(None)
+        self._backup = FakeBackup(starttime)
         self._closed = False
 
     _re_datetime = re.compile(
         rb'^(\d\d\d\d)-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)$')
-    def write(self, item):
+    def append_item(self, item):
         assert not self._closed
         if item.kind == 'magic':
             assert item.value == b'ebakup backup data'
@@ -296,7 +297,7 @@ class FakeStreamingBackupWriter(object):
         else:
             raise NotImplementedError()
 
-    def close(self):
+    def commit_and_close(self):
         self._closed = True
         if self._collection._immutable:
             raise AssertionError('Collection is immutable')

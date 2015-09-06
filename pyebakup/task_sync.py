@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+import datetime
+import re
+
 class SyncTask(object):
 
     def __init__(self, config, args):
@@ -83,14 +86,22 @@ class SyncTask(object):
             'Copy ' + str(name) + ' to ' +
             targetinfo.conf.filesystem.path_to_full_string(
                 targetinfo.conf.path))
-        source = sourceinfo.collection.get_streaming_backup_reader_for_name(
-            name)
-        target = targetinfo.collection.get_streaming_backup_writer_for_name(
-            name)
+        source = (
+            sourceinfo.collection.get_backup_file_reader_for_name(name))
         item = next(source)
         assert item.kind == 'magic'
         assert item.value == b'ebakup backup data'
-        target.write(item)
+        first_items = []
+        for item in source:
+            first_items.append(item)
+            if item.kind == 'setting' and item.key == b'start':
+                break
+            if item.kind != 'setting':
+                raise AssertionError('No "start time" in backup file')
+        starttime = self._parse_start_time(item.value)
+        target = (
+            targetinfo.collection.create_backup_file_in_replacement_mode(
+                starttime))
         section = 'setting'
         for item in source:
             if item.kind != section:
@@ -101,7 +112,8 @@ class SyncTask(object):
                 raise AssertionError(
                     '"' + section + '" + followed by "' + item.kind + '"')
             if item.kind == 'setting':
-                pass
+                if item.key in (b'edb-blocksize', b'edb-blocksum', b'start'):
+                    continue
             elif item.kind == 'directory':
                 pass
             elif item.kind == 'file':
@@ -121,8 +133,16 @@ class SyncTask(object):
                     item.cid = cid
             else:
                 raise AssertionError('Unknown item type: ' + item.kind)
-            target.write(item)
-        target.close()
+            target.append_item(item)
+        target.commit_and_close()
+
+    _re_starttime = re.compile(rb'^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)$')
+    def _parse_start_time(self, value):
+        match = self._re_starttime.match(value)
+        return datetime.datetime(
+            int(match.group(1), 10), int(match.group(2), 10),
+            int(match.group(3), 10), int(match.group(4), 10),
+            int(match.group(5), 10), int(match.group(6), 10))
 
     def _copy_content(self, sourceinfo, targetinfo, contentid):
         self._ui.set_status(
@@ -201,7 +221,7 @@ class SyncTask(object):
         return False
 
     def _read_backupcids(self, info, name):
-        reader = info.collection.get_streaming_backup_reader_for_name(name)
+        reader = info.collection.get_backup_file_reader_for_name(name)
         dirs = { 0: () }
         bkcids = {}
         for item in reader:
@@ -234,7 +254,7 @@ class SyncTask(object):
 
     def _get_full_content_for_backup(self, collinfo, name):
         # This is cheating! But for now it gets me what I need.
-        reader = collinfo.collection.get_streaming_backup_reader_for_name(name)
+        reader = collinfo.collection.get_backup_file_reader_for_name(name)
         return reader._data
 
 class CollectionData(object):

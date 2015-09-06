@@ -104,23 +104,24 @@ class BackupCollection(object):
         '''
         return self._db.get_all_backup_names(order_by)
 
-    def get_streaming_backup_reader_for_name(self, name):
-        '''Obtain a streaming reader for the backup named 'name'.
+    def get_backup_file_reader_for_name(self, name):
+        '''Obtain a DataFile opened read-only for the backup named 'name'.
 
-        See Database.get_streaming_backup_reader_for_name() for details.
+        See Database.get_backup_file_reader_for_name() for details.
         '''
-        return self._db.get_streaming_backup_reader_for_name(name)
+        return self._db.get_backup_file_reader_for_name(name)
 
-    def get_streaming_backup_writer_for_name(self, name):
-        '''Obtain a streaming writer for a backup.
+    def create_backup_file_in_replacement_mode(self, starttime):
+        '''Create a backup file for a backup starting at 'starttime'.
 
         This will create a new backup according to whatever data it is
-        fed.
+        fed. If there already exists a conflicting backup file, this
+        method will fail.
 
-        See Database.get_streaming_backup_writer_for_name() for
+        See Database.create_backup_file_in_replacement_mode() for
         details on the returned object.
         '''
-        return self._db.get_streaming_backup_writer_for_name(name)
+        return self._db.create_backup_file_in_replacement_mode(starttime)
 
     def get_most_recent_backup(self):
         '''Return a BackupData object for the most recently created backup.
