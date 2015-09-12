@@ -319,6 +319,8 @@ class DataFile(object):
         Regardless of which way this DataFile is closed, it will also
         automatically call close() on 'replacefile'.
         '''
+        if self._replace_file is not None:
+            raise AssertionError('Already in replacement mode')
         if not self._tree.is_same_file_system_as(replacefile._tree):
             raise AssertionError('Can not replace between file systems')
         self._replace_file = replacefile
@@ -375,6 +377,8 @@ class DataFile(object):
         a while. This method will ensure that any such changes are
         written to the file. But see sync() for a complication.
         '''
+        if self._file is None:
+            raise AssertionError('File is not open')
         for idx, block in self._blocks.items():
             if block.modified:
                 block.modifed = False
@@ -406,11 +410,15 @@ class DataFile(object):
         Iterating over a DataFile will yield all the items in the file
         in order.
         '''
+        if self._file is None:
+            raise AssertionError('File is not open')
         return self
 
     def __next__(self):
         '''See __iter__().
         '''
+        if self._file is None:
+            raise AssertionError('File is not open')
         try:
             block = self._load_block(self._pos[0])
         except ItemNotFoundError:
@@ -430,6 +438,8 @@ class DataFile(object):
         does not refer to an existing item, an ItemNotFoundError will
         be raised.
         '''
+        if self._file is None:
+            raise AssertionError('File is not open')
         raise NotImplementedError()
 
     def replace_item(self, block, index, item):
@@ -444,6 +454,8 @@ class DataFile(object):
         This method does not change the position of any item in the
         file (except the one item that is replaced, of course).
         '''
+        if self._file is None:
+            raise AssertionError('File is not open')
         raise NotImplementedError()
 
     def insert_item(self, block, index, item):
@@ -462,6 +474,8 @@ class DataFile(object):
         Any items after 'index' in the same block will have their
         indices increased by 1. Other blocks will be unaffected.
         '''
+        if self._file is None:
+            raise AssertionError('File is not open')
         block = self._load_block(block)
         if index == -1:
             block.append_item(item)
@@ -479,6 +493,8 @@ class DataFile(object):
         This method does not change the position of any existing item
         in the file.
         '''
+        if self._file is None:
+            raise AssertionError('File is not open')
         if item.kind in ('magic', 'setting'):
             if self._last_block_index != 0:
                 raise AssertionError('Settings block is not last')
@@ -511,6 +527,8 @@ class DataFile(object):
         Any items after 'index' in the same block will have their
         indices decreased by 1. Other blocks will be unaffected.
         '''
+        if self._file is None:
+            raise AssertionError('File is not open')
         raise NotImplementedError()
 
     def tell(self):
@@ -526,6 +544,8 @@ class DataFile(object):
         There are no guarantees about when it will return which of
         those values.
         '''
+        if self._file is None:
+            raise AssertionError('File is not open')
         raise NotImplementedError()
 
     def seek(self, block, index):
@@ -542,6 +562,8 @@ class DataFile(object):
         If (block, index) does not refer to an existing item (and is
         not -1, -1), an ItemNotFoundError will be raised.
         '''
+        if self._file is None:
+            raise AssertionError('File is not open')
         if block == 0 and index == 0:
             self._pos = (0, 0)
             return
@@ -575,6 +597,8 @@ class DataFile(object):
         All the moved items will have their positions changed in the
         obvious way. No other items' positions are affected.
         '''
+        if self._file is None:
+            raise AssertionError('File is not open')
         raise NotImplementedError()
 
     def _clear_file_data(self):
