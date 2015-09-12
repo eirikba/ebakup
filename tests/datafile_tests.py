@@ -169,6 +169,8 @@ class TestDataFile(unittest.TestCase):
             for key, value in x.items():
                 self.assertEqual(value, getattr(item, key), msg=key)
         self.assertRaises(StopIteration, next, main)
+        self.assertRaises(StopIteration, next, main)
+        self.assertRaises(StopIteration, next, main)
         main.close()
         self.assertCountEqual((), tree._files_modified)
 
@@ -337,6 +339,8 @@ class TestDataFile(unittest.TestCase):
                                 msg='key:' + upkey)
                 else:
                     self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertRaises(StopIteration, next, content)
+        self.assertRaises(StopIteration, next, content)
         self.assertRaises(StopIteration, next, content)
         content.close()
         self.assertCountEqual((), tree._files_modified)
