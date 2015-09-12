@@ -666,6 +666,126 @@ class TestDataFile(unittest.TestCase):
         # ... followed by correct padding
         self.assertEqual(b'\x00' * 2658, data[12288 + 74 * 19 : 12288 + 4064])
 
+    def test_get_unopened_content(self):
+        tree = FakeTree()
+        tree._add_file(
+            ('path', 'to', 'db', 'content'),
+            testdata.dbfiledata('content-1'))
+        content = datafile.get_unopened_content(tree, ('path', 'to', 'db'))
+        expect = (
+            {'kind': 'magic', 'value': b'ebakup content data'},
+            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
+            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
+            { 'kind':'content',
+              'cid':b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y'
+                  b'\x00\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
+              'checksum':b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y'
+                  b'\x00\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
+              'first':0x55154078, 'last':0x55216909,
+              'updates':() },
+            { 'kind':'content',
+              'cid':b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
+                  b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
+              'checksum':b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
+                  b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
+              'first':0x55154078, 'last':0x55154078,
+              'updates': (
+                  { 'kind':'changed',
+                    'checksum':b'k\x8c\xba\x8b\x17\x8b\rL\x13\xde\xc9$<\x90\x04'
+                        b'\xeb\xc3\x03\xcbJ\xaf\xe93\x0c\x8d\x12^.\x94yS\xae',
+                    'first':0x55183045, 'last':0x551bea4b },
+                  { 'kind':'restored',
+                    'first':0x551beb3b, 'last':0x55216909 } ) },
+            { 'kind':'content',
+              'cid':b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
+                  b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98\x37\x73",
+              'checksum':b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
+                  b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98",
+              'first':0x5513d6d1, 'last':0x55168fac,
+              'updates': (
+                  { 'kind':'changed',
+                    'checksum':b'\x01\xfa\x04^\x9c\x11\xd5\x8d\xfe\x19]}\xd1(('
+                       b'\x0c\x00h\xad0\x13\xa3(\xb5\xe8\xb3\xac\xa3\x9e_\xfbb',
+                    'first':0x5517b191, 'last':0x551d1200 }, ) },
+            )
+        content.open_and_lock_readonly()
+        for x in expect:
+            if x.get('updates'):
+                break
+            item = next(content)
+            for key, value in x.items():
+                if key == 'updates':
+                    self.assertEqual(len(item.updates), len(value))
+                    for itemupd, expectupd in zip(item.updates, value):
+                        for upkey, upvalue in expectupd.items():
+                            self.assertEqual(
+                                upvalue, getattr(itemupd, upkey),
+                                msg='key:' + upkey)
+                else:
+                    self.assertEqual(value, getattr(item, key), msg=key)
+        content.close()
+        content.open_and_lock_readonly()
+        for x in expect:
+            item = next(content)
+            for key, value in x.items():
+                if key == 'updates':
+                    self.assertEqual(len(item.updates), len(value))
+                    for itemupd, expectupd in zip(item.updates, value):
+                        for upkey, upvalue in expectupd.items():
+                            self.assertEqual(
+                                upvalue, getattr(itemupd, upkey),
+                                msg='key:' + upkey)
+                else:
+                    self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertRaises(StopIteration, next, content)
+        self.assertRaises(StopIteration, next, content)
+        self.assertRaises(StopIteration, next, content)
+        content.close()
+        self.assertCountEqual((), tree._files_modified)
+
+    def test_access_content_without_opening_it(self):
+        tree = FakeTree()
+        tree._add_file(
+            ('path', 'to', 'db', 'content'),
+            testdata.dbfiledata('content-1'))
+        content = datafile.get_unopened_content(tree, ('path', 'to', 'db'))
+        self.assertRaisesRegex(AssertionError, 'is not open', next, content)
+        self.assertRaisesRegex(
+            AssertionError, 'is not open',
+            content.append_item, datafile.ItemSetting(b'key', b'value'))
+
+    def test_access_content_after_closing_it(self):
+        tree = FakeTree()
+        tree._add_file(
+            ('path', 'to', 'db', 'content'),
+            testdata.dbfiledata('content-1'))
+        content = datafile.get_unopened_content(tree, ('path', 'to', 'db'))
+        content.open_and_lock_readonly()
+        item = next(content)
+        self.assertEqual('magic', item.kind)
+        self.assertEqual(b'ebakup content data', item.value)
+        content.close()
+        self.assertRaisesRegex(AssertionError, 'is not open', next, content)
+        self.assertRaisesRegex(
+            AssertionError, 'is not open',
+            content.append_item, datafile.ItemSetting(b'key', b'value'))
+
+    def test_open_content_when_already_opened(self):
+        tree = FakeTree()
+        tree._add_file(
+            ('path', 'to', 'db', 'content'),
+            testdata.dbfiledata('content-1'))
+        content = datafile.get_unopened_content(tree, ('path', 'to', 'db'))
+        content.open_and_lock_readonly()
+        self.assertRaisesRegex(
+            AssertionError, 'already open', content.open_and_lock_readonly)
+
+    def test_get_and_open_content_when_it_does_not_exist(self):
+        tree = FakeTree()
+        tree._add_directory(('path', 'to', 'db'))
+        content = datafile.get_unopened_content(tree, ('path', 'to', 'db'))
+        self.assertRaises(FileNotFoundError, content.open_and_lock_readonly)
+
     def test_read_simple_backup(self):
         tree = FakeTree()
         tree._add_file(

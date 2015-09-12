@@ -217,6 +217,19 @@ def open_backup(tree, dbpath, starttime, writable=False):
             str(value) + ' vs ' + str(starttime.year) + '-' + fname)
     return f
 
+def get_unopened_content(tree, dbpath):
+    '''Get a DataFile for the "content" file in the ebakup database at
+    tree:dbpath.
+
+    The returned DataFile is not opened. To actually do anything with
+    the file, you need to call one of the open_* methods first.
+
+    Remember that if you want to hold more than one file from the same
+    ebakup database open at the same time, you need to hold a lock on
+    "main" as long as you have locked any of the other files.
+    '''
+    return DataFile(tree, dbpath + ('content',))
+
 class DataFile(object):
 
     '''A "data file" is a sequence of "blocks", each of which contains a
