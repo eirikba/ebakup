@@ -179,7 +179,7 @@ def open_content(tree, dbpath, writable=False):
     '''
     f = DataFile(tree, dbpath + ('content',))
     if writable:
-        raise NotImplementedError()
+        f.open_and_lock_readwrite()
     else:
         f.open_and_lock_readonly()
     return f
@@ -300,7 +300,10 @@ class DataFile(object):
         '''
         if self._file is not None:
             raise AssertionError('File already open')
-        raise NotImplementedError()
+        self._file = self._tree.get_modifiable_item_at_path(self._path)
+        self._file.lock_for_writing()
+        self._check_correct_file_opened()
+        self._initialize_file_data()
 
     def set_replacement_mode_with_datafile(self, replacefile):
         '''Set this DataFile in replacement mode, with 'replacefile' as the
@@ -381,7 +384,7 @@ class DataFile(object):
             raise AssertionError('File is not open')
         for idx, block in self._blocks.items():
             if block.modified:
-                block.modifed = False
+                block.modified = False
                 self._write_block(idx, block)
 
     def sync(self):
@@ -683,8 +686,10 @@ class DataFile(object):
 
     def _flush_block(self, idx):
         block = self._blocks.get(idx)
+        if block is None:
+            return
         if block.modified:
-            block.modifed = False
+            block.modified = False
             self._write_block(idx, block)
 
     def _write_block(self, idx, block):
@@ -805,6 +810,7 @@ class Block0(object):
         if (self._blockdatasize is not None and
                 len(data) + self._datasize > self._blockdatasize):
             raise BlockFullError('Block 0 full')
+        self.modified = True
         self._data.append(data)
         self._datasize += len(data)
 
@@ -859,6 +865,7 @@ class ContentBlock(object):
             if (self._blockdatasize is not None and
                     self._datasize + len(data) > self._blockdatasize):
                 return False
+            self.modified = True
             self._items.append((data, item))
             self._datasize += len(data)
             return True
@@ -992,6 +999,7 @@ class BackupBlock(object):
         if (self._blockdatasize is not None and
                 self._datasize + len(data) > self._blockdatasize):
             return False
+        self.modified = True
         self._items.append((data, item))
         self._datasize += len(data)
         return True

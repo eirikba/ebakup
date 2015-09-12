@@ -91,6 +91,8 @@ expected_tests = set((
     'datafile_tests.TestDataFile.test_read_main_with_non_default_block_sum',
     'datafile_tests.TestDataFile.test_read_typical_content_db',
     'datafile_tests.TestDataFile.test_read_typical_main',
+    'datafile_tests.TestDataFile.test_create_content_db_then_open_and_write_to_it',
+    'datafile_tests.TestDataFile.test_read_and_write_content_db',
     'dbfile_tests.TestBrokenFiles.test_non_matching_checksum_of_data_block',
     'dbfile_tests.TestBrokenFiles.test_non_matching_checksum_of_settings_block',
     'dbfile_tests.TestInspectUnopenedSimpleDBFile.test_get_block_count',
