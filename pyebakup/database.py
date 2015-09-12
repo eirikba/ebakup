@@ -9,6 +9,8 @@ import dbfile
 import valuecodecs
 import datafile
 
+class DataCorruptError(Exception): pass
+
 def create_database(tree, path):
     '''Create a new, empty database at 'path' in 'tree'.
 
@@ -503,25 +505,10 @@ class ContentInfo(object):
 class BackupInfoBuilder(object):
     def __init__(self, db, start):
         self._db = db
-        self._path = self._db._path + (
-            str(start.year),
-            '{:02}-{:02}T{:02}:{:02}'.format(
-                start.month, start.day, start.hour, start.minute))
-        self._block_no = 1
-        self._block_data = b''
         self._next_dirid = 8
         self._directories = { (): 0 }
-        self._dbfile = dbfile.DBFile(self._db._tree, self._path)
-        self._dbfile.create(b'ebakup backup data', 4096, hashlib.sha256)
-        try:
-            self._dbfile.set_setting(
-                'start',
-                '{:04}-{:02}-{:02}T{:02}:{:02}:{:02}'.format(
-                    start.year, start.month, start.day,
-                    start.hour, start.minute, start.second))
-        except:
-            self._dbfile.close_and_unlock()
-            raise
+        self._dbfile = datafile.create_backup_in_replacement_mode(
+            self._db._tree, self._db._path, start)
 
     def __enter__(self):
         '''Using a BackupInfoBuilder as a context will make it call abort()
@@ -539,19 +526,18 @@ class BackupInfoBuilder(object):
         The backup is registered as having been completed at 'when'
         (which should be a naive datetime.datetime in utc timezone).
         '''
-        self._write_current_block()
-        self._dbfile.set_setting(
-            'end',
-            '{:04}-{:02}-{:02}T{:02}:{:02}:{:02}'.format(
+        endsetting = '{:04}-{:02}-{:02}T{:02}:{:02}:{:02}'.format(
                 when.year, when.month, when.day,
-                when.hour, when.minute, when.second))
-        self._dbfile.commit()
+                when.hour, when.minute, when.second).encode('utf-8')
+        self._dbfile.insert_item(0, -1, datafile.ItemSetting(
+            b'end', endsetting))
+        self._dbfile.commit_and_close()
 
     def abort(self):
         '''If commit() has not been called yet, this method will delete the
         backup data object
         '''
-        self._dbfile.close_and_unlock()
+        self._dbfile.close()
 
     def add_file(self, path, contentid, size, mtime, mtime_nsec):
         '''Add a file to the backup data object.
@@ -564,38 +550,12 @@ class BackupInfoBuilder(object):
             dirid = self.add_directory(path[:i])
         name = path[-1]
         component = valuecodecs.path_component_to_bytes(name)
-        entry = b''.join(
-            (b'\x91',
-             valuecodecs.make_varuint(dirid),
-             valuecodecs.make_varuint(len(component)),
-             component,
-             valuecodecs.make_varuint(len(contentid)),
-             contentid,
-             valuecodecs.make_varuint(size),
-             valuecodecs.make_mtime_with_nsec(mtime, mtime_nsec)))
-        self._add_data_entry(entry)
-
-    def _add_data_entry(self, entry):
-        block_size = self._dbfile.get_block_data_size()
-        if len(self._block_data) + len(entry) <= block_size:
-            self._block_data += entry
-            return
-        if len(entry) > block_size:
-            raise ValueError(
-                'Size of entry ({}) exceeds block data size ({})'.format(
-                    len(entry), block_size))
-        self._write_current_block()
-        assert self._block_data == b''
-        self._block_data = entry
-
-    def _write_current_block(self):
-        if len(self._block_data) <= 0:
-            return
-        blockno = self._block_no
-        self._block_no += 1
-        blockdata = self._block_data
-        self._block_data = b''
-        self._dbfile.set_block(blockno, blockdata)
+        mtime_second = int(
+            (mtime - datetime.datetime(mtime.year, 1, 1)).total_seconds())
+        item = datafile.ItemFile(
+            dirid, component, contentid, size,
+            (mtime.year, mtime_second, mtime_nsec))
+        self._dbfile.append_item(item)
 
     def add_directory(self, path):
         dirid = self._directories.get(path)
@@ -611,13 +571,8 @@ class BackupInfoBuilder(object):
         self._next_dirid += 1
         self._directories[path] = dirid
         component = valuecodecs.path_component_to_bytes(name)
-        entry = b''.join((
-            b'\x90',
-            valuecodecs.make_varuint(dirid),
-            valuecodecs.make_varuint(parentid),
-            valuecodecs.make_varuint(len(component)),
-            component))
-        self._add_data_entry(entry)
+        item = datafile.ItemDirectory(dirid, parentid, component)
+        self._dbfile.append_item(item)
         return dirid
 
 class DirectoryData(object):
