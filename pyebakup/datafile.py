@@ -517,11 +517,14 @@ class DataFile(object):
         '''Return the current (read) position.
 
         The returned value is a pair (block, index), indicating that
-        the next() will yield the 'index'th item of the 'block'th
-        block. 'block' and 'index' are both zero-based.
+        next() will yield the 'index'th item of the 'block'th block.
+        'block' and 'index' are both zero-based.
 
         If the current position is at the end of the file (so next()
-        will raise StopIteration), the returned value is (-1, -1).
+        will raise StopIteration), this method may return (-1, -1), or
+        it may return (last_block, last_index+1) or (last_block+1, 0).
+        There are no guarantees about when it will return which of
+        those values.
         '''
         raise NotImplementedError()
 
