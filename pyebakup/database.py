@@ -5,7 +5,6 @@ import datetime
 import hashlib
 import re
 
-import dbfile
 import valuecodecs
 import datafile
 
@@ -23,6 +22,14 @@ def create_database(tree, path):
     main.commit_and_close()
     datafile.create_content_in_replacement_mode(tree, path).commit_and_close()
     return Database(tree, path)
+
+def _datetime_from_backup_name(name):
+    match = Database._re_backup_name.match(name)
+    if match is None:
+        raise AssertionError('Invalid backup name: ' + name)
+    return datetime.datetime(
+        int(match.group(1)), int(match.group(2)), int(match.group(3)),
+        int(match.group(4)), int(match.group(5)))
 
 class Database(object):
     def __init__(self, tree, path):
@@ -131,15 +138,9 @@ class Database(object):
         years = self._get_backup_year_list()
         if not years:
             return None
-        backup_paths = self._get_backup_paths_for_year(years[-1])
-        backup_path = backup_paths[-1]
-        backup = BackupInfo(self, self._path + backup_path)
-        start = backup.get_start_time()
-        assert backup_path == (
-            str(start.year),
-            '{:02}-{:02}T{:02}:{:02}'.format(
-                start.month, start.day, start.hour, start.minute))
-        return backup
+        backup_names = self._get_backup_names_for_year(years[-1])
+        backup_name = backup_names[-1]
+        return BackupInfo(self, backup_name)
 
     def _get_backup_year_list(self):
         years = []
@@ -153,12 +154,12 @@ class Database(object):
         years.sort()
         return years
 
-    def _get_backup_paths_for_year(self, year):
+    def _get_backup_names_for_year(self, year):
         year_name = str(year)
         dirs, files = self._tree.get_directory_listing(
             self._path + (year_name,))
         assert not dirs
-        names = [ (year_name, x) for x in files ]
+        names = [ year_name + '-' + x for x in files ]
         names.sort()
         return names
 
@@ -169,32 +170,27 @@ class Database(object):
         years = self._get_backup_year_list()
         if not years:
             return None
-        backup_paths = self._get_backup_paths_for_year(years[0])
-        backup_path = backup_paths[0]
-        backup = BackupInfo(self, self._path + backup_path)
-        start = backup.get_start_time()
-        assert backup_path == (
-            str(start.year),
-            '{:02}-{:02}T{:02}:{:02}'.format(
-                start.month, start.day, start.hour, start.minute))
+        backup_names = self._get_backup_names_for_year(years[0])
+        backup_name = backup_names[0]
+        backup = BackupInfo(self, backup_name)
         return backup
 
     def get_most_recent_backup_before(self, when):
         '''Obtain the data for the most recent backup before 'when' according
         to the starting time.
         '''
-        yearly = self._get_backup_paths_for_year(when.year)
-        when_name = '{:02}-{:02}T{:02}:{:02}'.format(
-            when.month, when.day, when.hour, when.minute)
-        candidates = [x for x in yearly if x[1] <= when_name]
+        yearly = self._get_backup_names_for_year(when.year)
+        when_name = '{:04}-{:02}-{:02}T{:02}:{:02}'.format(
+            when.year, when.month, when.day, when.hour, when.minute)
+        candidates = [x for x in yearly if x <= when_name]
         backup = None
         if candidates:
-            backup_path = candidates[-1]
-            backup = BackupInfo(self, self._path + backup_path)
+            backup_name = candidates[-1]
+            backup = BackupInfo(self, backup_name)
             if backup.get_start_time() >= when:
                 if len(candidates) > 1:
-                    backup_path = candidates[-2]
-                    backup = BackupInfo(self, self._path + backup_path)
+                    backup_name = candidates[-2]
+                    backup = BackupInfo(self, backup_name)
                 else:
                     backup = None
         if not backup:
@@ -202,31 +198,26 @@ class Database(object):
             years = [ x for x in years if x < when.year ]
             if not years:
                 return None
-            backup_path = self._get_backup_paths_for_year(years[-1])[-1]
-            backup = BackupInfo(self, self._path + backup_path)
-        start = backup.get_start_time()
-        assert backup_path == (
-            str(start.year),
-            '{:02}-{:02}T{:02}:{:02}'.format(
-                start.month, start.day, start.hour, start.minute))
+            backup_name = self._get_backup_names_for_year(years[-1])[-1]
+            backup = BackupInfo(self, backup_name)
         return backup
 
     def get_oldest_backup_after(self, when):
         '''Obtain the data for the oldest backup after 'when' according to the
         starting time.
         '''
-        yearly = self._get_backup_paths_for_year(when.year)
-        when_name = '{:02}-{:02}T{:02}:{:02}'.format(
-            when.month, when.day, when.hour, when.minute)
-        candidates = [x for x in yearly if x[1] >= when_name]
+        yearly = self._get_backup_names_for_year(when.year)
+        when_name = '{:04}-{:02}-{:02}T{:02}:{:02}'.format(
+            when.year, when.month, when.day, when.hour, when.minute)
+        candidates = [x for x in yearly if x >= when_name]
         backup = None
         if candidates:
-            backup_path = candidates[0]
-            backup = BackupInfo(self, self._path + backup_path)
+            backup_name = candidates[0]
+            backup = BackupInfo(self, backup_name)
             if backup.get_start_time() <= when:
                 if len(candidates) > 1:
-                    backup_path = candidates[1]
-                    backup = BackupInfo(self, self._path + backup_path)
+                    backup_name = candidates[1]
+                    backup = BackupInfo(self, backup_name)
                 else:
                     backup = None
         if not backup:
@@ -234,13 +225,8 @@ class Database(object):
             years = [ x for x in years if x > when.year ]
             if not years:
                 return None
-            backup_path = self._get_backup_paths_for_year(years[0])[0]
-            backup = BackupInfo(self, self._path + backup_path)
-        start = backup.get_start_time()
-        assert backup_path == (
-            str(start.year),
-            '{:02}-{:02}T{:02}:{:02}'.format(
-                start.month, start.day, start.hour, start.minute))
+            backup_name = self._get_backup_names_for_year(years[0])[0]
+            backup = BackupInfo(self, backup_name)
         return backup
 
     def start_backup(self, when):
@@ -587,77 +573,72 @@ FileData = collections.namedtuple(
     ('name', 'parentid', 'contentid', 'size', 'mtime', 'mtime_nsec'))
 
 class BackupInfo(object):
-    def __init__(self, db, path):
+    def __init__(self, db, name):
         self._db = db
-        self._path = path
-        self._dbfile = dbfile.DBFile(self._db._tree, self._path)
+        self._name = name
+        start = _datetime_from_backup_name(name)
+        self._dbfile = datafile.open_backup(
+            self._db._tree, self._db._path, start)
         self._read_whole_file()
+        start = self.get_start_time()
+        assert name == (
+            '{:04}-{:02}-{:02}T{:02}:{:02}'.format(
+                start.year, start.month, start.day, start.hour, start.minute))
 
     def _read_whole_file(self):
-        dbfile = self._dbfile
-        with dbfile.open_for_reading():
+        start = _datetime_from_backup_name(self._name)
+        with datafile.open_backup(self._db._tree, self._db._path, start) as f:
             self.settings = {}
-            for key in dbfile.get_setting_keys():
-                if key not in (b'start', b'end'):
-                    raise NotTestedError('Unknown setting: ' + str(key))
-                assert key not in self.settings
-                self.settings[key] = dbfile.get_multi_setting(key)
             self.directories = {}
-            self.files = []
             self.directories[0] = DirectoryData(None, None)
-            block_index = 1
-            data = dbfile.get_block(block_index)
-            while data is not None:
-                self._add_data_from_block(data)
-                block_index += 1
-                data = dbfile.get_block(block_index)
+            self.files = []
+            state = 0
+            for item in f:
+                if item.kind == 'magic':
+                    assert state == 0
+                    state = 1
+                    assert item.value == b'ebakup backup data'
+                elif item.kind == 'setting':
+                    assert state == 1
+                    if item.key not in (
+                            b'edb-blocksize', b'edb-blocksum',
+                            b'start', b'end'):
+                        raise NotTestedError(
+                            'Unknown setting: ' + str(item.key))
+                    assert item.key not in self.settings
+                    self.settings[item.key] = item.value
+                else:
+                    if state == 1:
+                        state = 2
+                    assert state == 2
+                    if item.kind == 'directory':
+                        self._add_directory(item.parent, item.dirid, item.name)
+                    elif item.kind == 'file':
+                        self._add_file(item)
+                    else:
+                        raise NotTestedError(
+                            'Unknown data entry (' + str(item.kind) + ')')
             self._build_tree()
 
-    def _add_data_from_block(self, data):
-        done = 0
-        while True:
-            if done >= len(data):
-                return
-            elif data[done] == 0x90:
-                done += 1
-                dirid, done = valuecodecs.parse_varuint(data, done)
-                parentid, done = valuecodecs.parse_varuint(data, done)
-                assert parentid == 0 or parentid > 7
-                namelen, done = valuecodecs.parse_varuint(data, done)
-                name = data[done:done+namelen]
-                done += namelen
-                self._add_directory(parentid, dirid, name)
-            elif data[done] == 0x91:
-                done += 1
-                parentid, done = valuecodecs.parse_varuint(data, done)
-                namelen, done = valuecodecs.parse_varuint(data, done)
-                name = data[done:done+namelen]
-                done += namelen
-                cidlen, done = valuecodecs.parse_varuint(data, done)
-                contentid = data[done:done+cidlen]
-                done += cidlen
-                size, done = valuecodecs.parse_varuint(data, done)
-                mtime, mtime_nsec = valuecodecs.parse_mtime(data, done)
-                done += 9
-                self._add_file(
-                    parentid, name, contentid, size, mtime, mtime_nsec)
-            elif data[done] == 0:
-                return
-            else:
-                raise NotTestedError(
-                    'Unknown data entry (type: ' + str(data[done]) + ')')
 
     def _add_directory(self, parentid, dirid, name):
         assert dirid not in self.directories
         self.directories[dirid] = DirectoryData(
             valuecodecs.bytes_to_path_component(name), parentid)
 
-    def _add_file(self, parentid, name, contentid, size, mtime, mtime_nsec):
-        assert mtime.microsecond == mtime_nsec // 1000
+    def _add_file(self, item):
+        mtime = (
+            datetime.datetime(item.mtime_year, 1, 1) +
+            datetime.timedelta(
+                seconds=item.mtime_second, microseconds=item.mtime_ns//1000))
         self.files.append(
             FileData(
-                valuecodecs.bytes_to_path_component(name), parentid, contentid,
-                size, mtime, mtime_nsec))
+                valuecodecs.bytes_to_path_component(item.name),
+                item.parent,
+                item.cid,
+                item.size,
+                mtime,
+                item.mtime_ns))
 
     def _build_tree(self):
         for d in self.directories.values():
@@ -682,15 +663,10 @@ class BackupInfo(object):
         '''Return the time at which the backup was started.
         '''
         start_time = self.settings.get(b'start')
-        if not start_time:
+        if start_time is None:
             raise DataCorruptError(
-                'No "start" setting found for ' +
-                self._path[-2] + '/' + self._path[-1])
-        if len(start_time) > 1:
-            raise DataCorruptError(
-                'Multiple "start" settings found for ' +
-                self._path[-2] + '/' + self._path[-1])
-        match = BackupInfo.re_datetime.match(start_time[0])
+                'No "start" setting found for backup ' + self._name)
+        match = BackupInfo.re_datetime.match(start_time)
         if not match:
             raise DataCorruptError(
                 'The "start" setting of a backup is not on the correct form (' +
@@ -703,15 +679,10 @@ class BackupInfo(object):
         '''Return the time at which the backup had completed.
         '''
         end_time = self.settings.get(b'end')
-        if not end_time:
+        if end_time is None:
             raise DataCorruptError(
-                'No "end" setting found for ' +
-                self._path[-2] + '/' + self._path[-1])
-        if len(end_time) > 1:
-            raise DataCorruptError(
-                'Multiple "end" settings found for ' +
-                self._path[-2] + '/' + self._path[-1])
-        match = BackupInfo.re_datetime.match(end_time[0])
+                'No "end" setting found for backup ' + self._name)
+        match = BackupInfo.re_datetime.match(end_time)
         if not match:
             raise DataCorruptError(
                 'The "end" setting of a backup is not on the correct form (' +
