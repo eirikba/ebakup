@@ -16,6 +16,26 @@ the system actually robust.
 
 ---------------------------------------------------------------------------
 
+Make Database modifications concurrency-safe
+
+The Database object (or more specifically the ContentInfoFile object)
+does not keep the content file locked except just when it is modifying
+the file. This is semi-intentional, since otherwise the file would
+typically be locked for a long time, which would not be nice. I
+believe this is only a problem if two processes try to add items with
+the same content id. Both processes will fail to find that content id
+in the database and then both will add it. In practice, the only case
+where this will realistically happen is if both processes adds items
+with the exact same content. In which case the resulting data will be
+unambiguously "correct", though not entirely optimal.
+
+I think the right solution here is to add some check for whether the
+content file has changed before writing new items to it. Probably just
+checking whether the last-modified time stamp has changed will be good
+enough. If the file has changed, read it in again.
+
+---------------------------------------------------------------------------
+
 Record access rights and executable status
 
 Currently I only back up the content of each file. For the shadow
