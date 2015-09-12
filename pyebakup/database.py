@@ -326,12 +326,14 @@ class ContentChecksum(object):
 class ContentInfoFile(object):
     def __init__(self, db):
         self._db = db
-        self._dbfile = dbfile.DBFile(db._tree, db._path + ('content',))
-        self._read_file(db._tree, db._path)
+        self._dbfile = datafile.get_unopened_content(db._tree, db._path)
+        self._read_file()
 
-    def _read_file(self, tree, path):
+    def _read_file(self):
         self.contentdata = ContentInfoDict()
-        with datafile.open_content(tree, path) as f:
+        f = self._dbfile
+        f.open_and_lock_readonly()
+        with f:
             item = next(f)
             if item.kind != 'magic':
                 raise AssertionError('First item of content is not magic')
@@ -386,9 +388,7 @@ class ContentInfoFile(object):
     def add_content_item(self, when, checksum):
         '''Add the given content item to the file and return its content id.
         '''
-        timestamp = int((when - datetime.datetime(1970, 1, 1)) /
-                        datetime.timedelta(seconds=1))
-        timestamp32 = valuecodecs.make_uint32(timestamp)
+        # Make unique content id for 'checksum'
         current = set(
             x.get_contentid() for x in
             self.get_all_content_infos_with_checksum(checksum))
@@ -401,55 +401,20 @@ class ContentInfoFile(object):
             else:
                 extra = extra[:-1] + bytes((extra[-1] + 1,))
         assert contentid.startswith(checksum)
-        entry = b''.join((
-            b'\xdd',
-            valuecodecs.make_varuint(len(contentid)),
-            valuecodecs.make_varuint(len(checksum)),
+        timestamp = int((when - datetime.datetime(1970, 1, 1)) /
+                        datetime.timedelta(seconds=1))
+        item = datafile.ItemContent(
             contentid,
-            timestamp32,
-            timestamp32))
-        self._add_entry(entry)
+            checksum,
+            timestamp,
+            timestamp)
+        self._dbfile.open_and_lock_readwrite()
+        with self._dbfile:
+            self._dbfile.append_item(item)
         self.contentdata[contentid] = ContentData(
             contentid, checksum, (ContentChecksum(checksum, when, when, True),))
         return contentid
 
-    def _add_entry(self, entry):
-        with self._dbfile.open_for_in_place_modification():
-            blocksize = self._dbfile.get_block_data_size()
-            if len(entry) > blocksize:
-                raise ValueError('Entry too big {} for block size {}'.format(
-                    len(entry), blocksize))
-            blockno = self._dbfile.get_block_count() - 1
-            if blockno > 0:
-                block = self._dbfile.get_block(blockno)
-                block = self._trim_block(block)
-                if len(block) + len(entry) <= blocksize:
-                    self._dbfile.set_block(blockno, block + entry)
-                    return
-            blockno += 1
-            assert blockno > 0
-            self._dbfile.set_block(blockno, entry)
-
-    def _trim_block(self, block):
-        '''Return the actual data in 'block'.
-        '''
-        done = 0
-        while done < len(block) and block[done] != 0:
-            if block[done] == 0xdd:
-                done += 1
-                cidlen, done = valuecodecs.parse_varuint(block, done)
-                cklen, done = valuecodecs.parse_varuint(block, done)
-                done += max(cidlen, cklen) + 8
-                while (done < len(block) and
-                       (block[done] == 0xa0 or block[done] == 0xa1)):
-                    if block[done] == 0xa1:
-                        done += cklen
-                    done += 9
-            else:
-                raise NotTestedError('Unknown data entry')
-        assert done <= len(block)
-        assert block[done:] == b'\x00' * (len(block) - done)
-        return block[:done]
 
 class ContentInfoDict(object):
     def __init__(self):
