@@ -6,7 +6,260 @@ import unittest
 import database
 import testdata
 
-from dbfile_tests import FileData, FakeDirectory, FakeFile
+class FileData(object):
+    def __init__(self, tree, content):
+        self.tree = tree
+        self.content = content
+        self.locked = 0 # True: write locked, number: count of read locks
+
+class FakeDirectory(object):
+    def __init__(self):
+        self._files = {}
+        self._allowed_access = {}
+        self._lock_proxies = {}
+
+    def _add_file(self, path, content):
+        assert path
+        assert path not in self._files
+        parent = path[:-1]
+        while parent:
+            assert parent not in self._files
+            parent = parent[:-1]
+        self._files[path] = FileData(self, content)
+
+    def _is_path_directory(self, path):
+        pathlen = len(path)
+        for k in self._files:
+            if len(k) > pathlen and k[:pathlen] == path:
+                return True
+        return False
+
+    def _is_write_allowed(self, path):
+        access = self._allowed_access.get(path)
+        if not access:
+            return False
+        return 'write' in access
+
+    def _is_write_to_file_object_allowed(self, fobj):
+        current = self._files.get(fobj._path)
+        if current is not fobj._data:
+            return False
+        return self._is_write_allowed(fobj._path)
+
+    def _is_create_file_allowed(self, path):
+        access = self._allowed_access.get(path)
+        if not access:
+            return False
+        return 'create' in access
+
+    def _is_rename_file_allowed(self, source_path):
+        access = self._allowed_access.get(source_path)
+        if not access:
+            return False
+        return 'rename' in access
+
+    def _is_overwrite_file_allowed(self, path):
+        access = self._allowed_access.get(path)
+        if not access:
+            return False
+        return 'overwrite' in access
+
+    def _allow_create_regular_file(self, path):
+        self._add_allowed_access(path, 'create')
+
+    def _add_allowed_access(self, path, what):
+        access = self._allowed_access.get(path, set())
+        if not access:
+            self._allowed_access[path] = access
+        access.add(what)
+
+    def _disallow_create_regular_file(self, path):
+        self._remove_allowed_access(path, 'create')
+
+    def _remove_allowed_access(self, path, what):
+        access = self._allowed_access.get(path)
+        if access is None:
+            return
+        access.remove(what)
+        if not access:
+            del self._allowed_access[path]
+
+    def _allow_modification(self, path):
+        self._add_allowed_access(path, 'write')
+
+    def _disallow_modification(self, path):
+        self._remove_allowed_access(path, 'write')
+
+    def _allow_delete_file(self, path):
+        self._add_allowed_access(path, 'delete')
+
+    def _disallow_delete_file(self, path):
+        self._remove_allowed_access(path, 'delete')
+
+    def _allow_overwrite_file(self, path):
+        self._add_allowed_access(path, 'overwrite')
+
+    def _disallow_overwrite_file(self, path):
+        self._remove_allowed_access(path, 'overwrite')
+
+    def _allow_rename_file(self, path):
+        self._add_allowed_access(path, 'rename')
+
+    def _disallow_rename_file(self, path):
+        self._remove_allowed_access(path, 'rename')
+
+    def _set_lock_proxy(self, path, lockpath):
+        self._lock_proxies[path] = lockpath
+
+    def _get_lock_proxy(self, path):
+        proxypath = self._lock_proxies.get(path)
+        if proxypath is None:
+            return None
+        return self._files.get(proxypath, True)
+
+    def is_same_file_system_as(self, other):
+        return True
+
+    def does_path_exist(self, path):
+        plen = len(path)
+        for k in self._files:
+            if k[:plen] == path:
+                return True
+        return False
+
+    def get_item_at_path(self, path):
+        data = self._files.get(path)
+        if data:
+            return FakeFile(path, data)
+        for k in self._files:
+            if k[:len(path)] == path:
+                raise AssertionError('directories not supported yet')
+        raise FileNotFoundError('No such file: ' + repr(path))
+
+    def get_modifiable_item_at_path(self, path):
+        f = self.get_item_at_path(path)
+        f._writable = True
+        return f
+
+    def get_directory_listing(self, path=()):
+        if path in self._files:
+            raise NotADirectoryError('Not a directory')
+        dirs = set()
+        files = []
+        pathlen = len(path)
+        for cand in self._files:
+            if cand[:pathlen] != path:
+                continue
+            name = cand[pathlen]
+            if len(cand) > pathlen + 1:
+                dirs.add(name)
+            else:
+                files.append(name)
+        return tuple(dirs), tuple(files)
+
+
+    def create_regular_file(self, path):
+        assert isinstance(path, tuple)
+        if not self._is_create_file_allowed(path):
+            raise AssertionError(
+                'Unexpected creation of regular file: ' + str(path))
+        if path in self._files:
+            raise FileExistsError('Path already exists: ' + str(path))
+        for k in self._files:
+            if k == path[:len(k)]:
+                raise NotAdirectoryError('Not a directory: ' + str(path))
+            if k[:len(path)] == path:
+                raise IsADirectoryError('Is a directory: ' + str(path))
+        fd = FileData(self, b'')
+        self._files[path] = fd
+        f = FakeFile(path, fd)
+        f._writable = True
+        return f
+
+    def rename_and_overwrite(self, sourcepath, targetpath):
+        if not self._is_overwrite_file_allowed(targetpath):
+            raise AssertionError(
+                'Unexpected rename, overwrite of ' + repr(targetpath))
+        if not self._is_rename_file_allowed(sourcepath):
+            raise AssertionError(
+                'Unexpected rename of ' + repr(sourcepath))
+        if self._is_path_directory(targetpath):
+            raise IsADirectoryError('Is a directory: ' + str(targetpath))
+        data = self._files[sourcepath]
+        del self._files[sourcepath]
+        self._files[targetpath] = data
+
+
+class FakeFile(object):
+    def __init__(self, path, data):
+        self._path = path
+        self._data = data
+        self._locked = 0 # 0: unlocked, 1: read locked, True: write locked
+        self._writable = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, a, b, c):
+        self.close()
+
+    def drop_all_cached_data(self):
+        pass
+
+    def lock_for_reading(self):
+        if self._locked == 1:
+            raise AssertionError('Multiple read locks')
+        if self._data.locked is True:
+            raise AssertionError('Deadlock!')
+        self._locked = 1
+        self._data.locked += 1
+
+    def lock_for_writing(self):
+        if not self._writable:
+            raise io.UnsupportedOperation('write lock')
+        if self._locked != 0:
+            raise AssertionError('Deadlock!')
+        if self._data.locked != 0:
+            raise AssertionError('Deadlock!')
+        self._locked = True
+        self._data.locked = True
+
+    def get_size(self):
+        return len(self._data.content)
+
+    def get_data_slice(self, start, end):
+        lockproxy = self._data.tree._get_lock_proxy(self._path)
+        if lockproxy is None and self._locked == 0:
+            raise AssertionError('Read from unlocked file')
+        if lockproxy is True:
+            raise AssertionError('Read from unlocked file (no proxy)')
+        if lockproxy is not None and lockproxy.locked == 0:
+            raise AssertionError('Read from unlocked file (proxy lock)')
+        return self._data.content[start:end]
+
+    def write_data_slice(self, start, data):
+        if not self._writable:
+            raise io.UnsupportedOperation('write')
+        lockproxy = self._data.tree._get_lock_proxy(self._path)
+        if lockproxy is None and  self._locked is not True:
+            raise AssertionError('Write to unlocked file')
+        if lockproxy is True:
+            raise AssertionError('Write to unlocked file (no proxy)')
+        if lockproxy is not None and lockproxy.locked is not True:
+            raise AssertionError('Write to unlocked file (proxy lock)')
+        if not self._data.tree._is_write_to_file_object_allowed(self):
+            raise AssertionError('Unexpected write to ' + str(self._path))
+        old = self._data.content
+        self._data.content = old[:start] + data + old[start+len(data):]
+        return start + len(data)
+
+    def close(self):
+        if self._locked == 1:
+            assert self._data.locked > 0
+            self._data.locked -= 1
+            self._locked = 0
+        assert self._locked == 0
+
 
 class TestSimpleDatabase(unittest.TestCase):
     def test_read_simple_database(self):
