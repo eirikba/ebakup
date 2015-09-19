@@ -98,6 +98,7 @@ expected_tests = set((
     'datafile_tests.TestDataFile.test_get_unopened_content',
     'datafile_tests.TestDataFile.test_open_content_when_already_opened',
     'datafile_tests.TestDataFile.test_read_and_write_content_db',
+    'datafile_tests.TestDataFile.test_create_simple_backup_with_special_files',
     'glob_utils_tests.TestSimpleGlobs.test_does_not_have_common_matches',
     'glob_utils_tests.TestSimpleGlobs.test_has_common_matches',
     'glob_utils_tests.TestSimpleGlobs.test_invalid_globs',

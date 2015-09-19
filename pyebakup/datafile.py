@@ -41,6 +41,13 @@ class ItemFile(object):
         self.mtime_second = mtime[1]
         self.mtime_ns = mtime[2]
 
+class ItemSpecialFile(ItemFile):
+    def __init__(self, filetype, parent, name, cid, size, mtime):
+        if filetype not in ('symlink', 'socket', 'pipe', 'device', 'unknown'):
+            raise AssertionError('Unhandled file type: ' + filetype)
+        ItemFile.__init__(self, parent, name, cid, size, mtime)
+        self.kind = 'file-' + filetype
+
 class ItemContent(object):
     def __init__(self, cid, checksum, first, last):
         self.kind = 'content'
@@ -968,6 +975,9 @@ class BackupBlock(object):
             raise ItemNotFoundError('Item ' + str(index) + ' not found')
         return self._items[index][1]
 
+    _filetypechars = {
+        'file-unknown': b'?', 'file-symlink': b'L', 'file-socket': b'S',
+        'file-pipe': b'P', 'file-device': b'D' }
     def try_append(self, item):
         if item.kind == 'directory':
             data = [ b'\x90' ]
@@ -976,8 +986,11 @@ class BackupBlock(object):
             data.append(valuecodecs.make_varuint(len(item.name)))
             data.append(item.name)
             data = b''.join(data)
-        elif item.kind == 'file':
-            data = [ b'\x91' ]
+        elif item.kind.startswith('file'):
+            if item.kind == 'file':
+                data = [ b'\x91' ]
+            else:
+                data = [ b'\x94' ]
             data.append(valuecodecs.make_varuint(item.parent))
             data.append(valuecodecs.make_varuint(len(item.name)))
             data.append(item.name)
@@ -1005,6 +1018,11 @@ class BackupBlock(object):
                 (item.mtime_ns >> 6) & 0xff, (item.mtime_ns >> 14) & 0xff,
                 item.mtime_ns >> 22))
             data.append(mtime)
+            if item.kind != 'file':
+                filetypechar = self._filetypechars.get(item.kind)
+                if filetypechar is None:
+                    raise AssertionError('Unknown file type: ' + item.kind)
+                data.append(filetypechar)
             data = b''.join(data)
         else:
             raise InvalidDataError('Unknown item type: ' + item.kind)
@@ -1021,6 +1039,10 @@ class BackupBlock(object):
         return b''.join(x[0] for x in self._items)
 
 class BackupHandler(object):
+    _filetypechars = {
+        b'?'[0]: 'unknown', b'L'[0]: 'symlink', b'S'[0]: 'socket',
+        b'P'[0]: 'pipe', b'D'[0]: 'device',
+        }
     def decode_block(self, data, size):
         if size > len(data):
             size = len(data)
@@ -1038,7 +1060,8 @@ class BackupHandler(object):
                 done += namelen
                 item = ItemDirectory(dirid, parent, name)
                 itemdata = data[start:done]
-            elif data[done] == 0x91:
+            elif data[done] in (0x91, 0x94):
+                itemtype = data[done]
                 done += 1
                 parent, done = valuecodecs.parse_varuint(data, done)
                 namelen, done = valuecodecs.parse_varuint(data, done)
@@ -1058,9 +1081,21 @@ class BackupHandler(object):
                     (data[done+5] & 0x3f) + data[done+6] * 0x40 +
                     data[done+7] * 0x4000 + data[done+8] * 0x400000)
                 done += 9
-                item = ItemFile(
-                    parent, name, cid, filesize,
-                    (mtime_year, mtime_second, mtime_ns))
+                if itemtype == 0x91:
+                    item = ItemFile(
+                        parent, name, cid, filesize,
+                        (mtime_year, mtime_second, mtime_ns))
+                elif itemtype == 0x94:
+                    ftype = self._filetypechars.get(data[done])
+                    if ftype is None:
+                        raise AssertionError(
+                            'Unknown filetype: ' + str(data[done]))
+                    done += 1
+                    item = ItemSpecialFile(
+                        ftype, parent, name, cid, filesize,
+                        (mtime_year, mtime_second, mtime_ns))
+                else:
+                    raise AssertionError('unreachable')
                 itemdata = data[start:done]
             elif data[done] == 0:
                 if data[done:size].strip(b'\x00'):
