@@ -962,15 +962,11 @@ class TestDataFile(unittest.TestCase):
              'key': b'end', 'value': b'2015-09-05T21:24:06'},
             {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path' },
             {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to' },
-            # size here is set small to check that I don't
-            # accidentally overwrite the "size" of the data during
-            # parsing with the "size" of this file.
             {'kind': 'file', 'parent': 9, 'name': b'file',
              'cid': b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
                     b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
              'size': 23, 'mtime_year': 2015, 'mtime_second': 0x42a042,
              'mtime_ns': 765430000 },
-            # size here is set large enough to require multi-byte encoding
             {'kind': 'file', 'parent': 0, 'name': b'file',
              'cid': b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
                     b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
