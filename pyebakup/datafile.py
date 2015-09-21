@@ -403,6 +403,7 @@ class DataFile(object):
         if self._file is None:
             raise AssertionError('File is not open')
         for idx, block in self._blocks.items():
+            assert block.blockno == idx
             if block.modified:
                 block.modified = False
                 self._write_block(idx, block)
@@ -690,6 +691,7 @@ class DataFile(object):
         block = Block0(b'', self._blockdatasize)
         self._blocks[0] = block
         block.modified = True
+        block.blockno = 0
 
     def _create_block(self):
         assert self._last_block_index >= 0
@@ -697,6 +699,7 @@ class DataFile(object):
         self._last_block_index += 1
         self._blocks[self._last_block_index] = block
         block.modified = True
+        block.blockno = self._last_block_index
         return block
 
     def _check_correct_file_opened(self):
@@ -713,6 +716,7 @@ class DataFile(object):
             self._write_block(idx, block)
 
     def _write_block(self, idx, block):
+        assert block.blockno == idx
         data = block.encode()
         if len(data) > self._blockdatasize:
             raise AssertionError('Final block data too big!')
@@ -761,6 +765,7 @@ class DataFile(object):
             block = self._itemcodec.decode_block(
                 blockdata, self._blockdatasize)
         self._blocks[index] = block
+        block.blockno = index
         return block
 
     def _check_blocksum(self, data):
