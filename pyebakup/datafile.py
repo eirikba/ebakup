@@ -1028,6 +1028,7 @@ class BackupBlock(object):
                 if filetypechar is None:
                     raise AssertionError('Unknown file type: ' + item.kind)
                 data.append(filetypechar)
+                data.append(b'\x01')
             data = b''.join(data)
         else:
             raise InvalidDataError('Unknown item type: ' + item.kind)
@@ -1095,6 +1096,8 @@ class BackupHandler(object):
                     if ftype is None:
                         raise AssertionError(
                             'Unknown filetype: ' + str(data[done]))
+                    done += 1
+                    assert data[done] == 1
                     done += 1
                     item = ItemSpecialFile(
                         ftype, parent, name, cid, filesize,
