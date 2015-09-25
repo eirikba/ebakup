@@ -50,10 +50,39 @@ during a single backup run:
 - The content id of a copy of the content
 - The size of the file
 - The last-modified time stamp of the original file
+- Optionally some extra data
 
 The content id refers to the content in the content storage, and also
 doubles as the checksum of the file's content (due to the way content
 ids are created).
+
+
+Block sequence
+==============
+
+The blocks in the file are divided into three sets. Each set must be
+complete before the next set starts.
+
+- The settings block. This is the first block in the file and contains
+  only "magic" and "settings". Also, all "magic" and "settings" items
+  are in this block.
+
+- The definition blocks. After the settings block comes zero or more
+  blocks that only contain <keyvalue> and <extradef> items. Also, all
+  <keyvalue> and <extradef> items must be in these blocks.
+
+- The data blocks. The rest of the file consists of blocks that store
+  the actual data, such as file and directory items.
+
+This organization is designed to minimize the amount of data that has
+to be examined to act on the file. The settings block is required for
+any access to the file, so that is a single block at the very
+beginning.
+
+The <extradef> items are referred to by data items. So all the
+<extradef> items are collected at the beginning of the file to
+minimize the amount of data that may be necessary to read in order to
+find any particular <extradef> item.
 
 
 Directories
@@ -61,9 +90,12 @@ Directories
 
 <dataentry> = 0x90 <dirid> <dirparent> <namelength> <dirname>
 
+<dataentry> = 0x92 <dirid> <dirparent> <namelength> <dirname> <extra>
+
 <dirid>, <dirparent> = continued high bit octet sequence
 <namelength> = continued high bit little endian unsigned integer
 <dirname> = <namelength> octets
+<extra> = continued high bit octet sequence
 
 <dirid> values 0-7 are reserved.
 
@@ -73,6 +105,9 @@ the unnamed "root" directory. <dirname> gives the name of the
 directory itself. Systems where file names are strings should encode
 the file name using utf-8.
 
+<extra> describes any optional extra data, such as ownership or access
+restrictions. See the "extra data" section for details.
+
 
 Files
 =====
@@ -81,6 +116,14 @@ Files
     0x91 <dirparent> <namelength> <filename>
     <cidlength> <contentid> <size> <mtime>
 
+<dataentry> =
+    0x93 <dirparent> <namelength> <filename>
+    <cidlength> <contentid> <size> <mtime> <extra>
+
+<dataentry> =
+    0x94 <dirparent> <namelength> <filename>
+    <cidlength> <contentid> <size> <mtime> <type> <extra>
+
 <dirparent> = continued high bit octet sequence
 <namelength>, <cidlength> =
     continued high bit little endian unsigned integer
@@ -88,6 +131,8 @@ Files
 <contentid> = <cidlength> octets
 <size> = continued high bit little endian unsigned integer
 <mtime> = <year> <second> <nanosecond>
+<extra> = continued high bit octet sequence
+<type> = '?' | 'L' | 'S' | 'P' | 'D' | ...
 
 Each of these entries describe one file that was backed
 up. <dirparent> indicates which directory the file lives in, again
@@ -129,6 +174,106 @@ years from 1 to 65535, which should be sufficient for my limited use.
 When writing these values it is important to use the correct
 <mtime>. If there is doubt as to what the correct <mtime> value is for
 the data that was actually backed up, store 0.
+
+<extra> describes any optional extra data, such as ownership or access
+restrictions. See the "extra data" section for details.
+
+<type> is a single octet indicating the type of the file. The 0x91 and
+0x93 entries represent "regular" files. The 0x94 entries represent
+"special" files. A "regular" file is essentially just a sequence of
+octets. Anything else is "special". A "special" file does not have
+content as such. Any <contentid> refers to a description of the file.
+If there is no further description, the <contentid> is empty (i.e.
+<cidlength> == 0).
+
+Currently defined values for <type> are:
+  "?" - Unknown.
+  "L" - Symbolic link. The content (if present) is the path of the
+      linked-to file.
+  "S" - Socket.
+  "P" - Pipe.
+  "D" - Device.
+  More may be added in the future.
+
+Note that "?" may be used for any file, even if a more specific type
+could be used instead. This is necessary to support further values
+being added in the future. The only exception is that it should not be
+used for regular files.
+
+
+Extra data
+==========
+
+<keyvalue> = 0x21 <length> <kvid> <key> ":" <value>
+<extradef> = 0x22 <length> <xid> <kvid>*
+<extra> = <xid>
+
+<length> = continued high bit little-endian unsigned integer giving
+    the number of octets of the rest of the item (i.e. <kvid> <key>
+    ":" <value> for keyvalue items and <xid> <kvid>* for extradefs.)
+<kvid> = continued high bit octet sequence
+<xid> = continued high bit octet sequence
+<key> = utf-8 representation of the key, must not contain ':'
+<value> = The value, filling up until <length> octets are used
+
+The <extra> production of files and directories describe extra,
+optional information. The information is given as a collection of
+key-value pairs with a special encoding.
+
+Each key-value pair is assigned a <kvid> by a <keyvalue> production. A
+collection of key-value pairs is assigned an <xid> by an <extradef>
+production. This <xid> is then used as the <extra> production of files
+and directories.
+
+<xid> = 0-7 are reserved.
+   <xid> = 0 means "no data". (Thus an 0x93 entry with <extra>=0 would
+       be equivalent to an 0x91 entry).
+
+
+The currently defined keys are:
+
+  "owner" <string> - The user that owns the file. The value is the
+      user name.
+
+  "group" <string> - The group the file belongs to. The value is the
+      group name.
+
+  "unix-access" <setid> <owner> <group> <all> - The classical unix
+      access restrictions for the file. The value is exactly 4
+      characters giving a 12 bit sequence as an octal value. The first
+      character has bits 4: set-user-id, 2: set-group-id, 1: sticky.
+      The last three characters have bits 4: read allowed, 2: write
+      allowed, 1: execute allowed. The second character sets rights
+      for the "owner", the third character for "group" and the last
+      for everyone. The exact meaning of the bits can depend a bit on
+      the system they belong to.
+
+More keys will surely be added in the future.
+
+Example:
+
+   0x21 11 0 "user:eirik"
+   0x21 12 1 "group:eirik"
+   0x21 17 2 "unix-access:0644"
+   0x22 3 8 0 1 2
+   0x21 17 4 "unix-access:0755"
+   0x22 3 9 1 2 4
+   0x93 0 5 "file" 0x20 <32 octets> 0x15 <9 octets> 8
+   0x92 0 8 3 "dir" 9
+   0x93 8 6 "file2" 0x20 <32 octets> 0x44 <9 octets> 9
+
+This would be a list of 3 items: A file "/file", a directory "/dir"
+and another file "/dir/file2". All the files are owned by the user
+"eirik" and the group "eirik".
+
+The file "/file" can be both read and written by the user "eirik" and
+everyone else has only read access. The directory "/dir" can be
+modified by the user "eirik" and can be read and accessed by everyone
+("Reading" a directory typically means to list the content, while
+"execute" typically means access the items inside it). And
+"/dir/file2" can be modified by the user "eirik" and read and executed
+by everyone.
+
 
 
 Making changes

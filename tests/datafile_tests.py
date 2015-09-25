@@ -846,8 +846,10 @@ class TestDataFile(unittest.TestCase):
              'key': b'start', 'value': b'2015-09-05T21:22:42'},
             {'kind': 'setting',
              'key': b'end', 'value': b'2015-09-05T21:24:06'},
-            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path' },
-            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to' },
+            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path',
+             'extra_data': 0 },
+            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to',
+             'extra_data': 0 },
             # size here is set small to check that I don't
             # accidentally overwrite the "size" of the data during
             # parsing with the "size" of this file.
@@ -855,13 +857,13 @@ class TestDataFile(unittest.TestCase):
              'cid': b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
                     b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
              'size': 23, 'mtime_year': 2015, 'mtime_second': 0x42a042,
-             'mtime_ns': 765430000 },
+             'mtime_ns': 765430000, 'extra_data': 0 },
             # size here is set large enough to require multi-byte encoding
             {'kind': 'file', 'parent': 0, 'name': b'file',
              'cid': b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
                     b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
              'size': 7850, 'mtime_year': 2013, 'mtime_second': 0x10adba0,
-             'mtime_ns': 0 },
+             'mtime_ns': 0, 'extra_data': 0 },
             )
         for item in items:
             if item['kind'] in ('magic', 'setting'):
@@ -909,18 +911,20 @@ class TestDataFile(unittest.TestCase):
              'key': b'start', 'value': b'2015-09-05T21:22:42'},
             {'kind': 'setting',
              'key': b'end', 'value': b'2015-09-05T21:24:06'},
-            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path' },
-            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to' },
+            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path',
+             'extra_data': 0 },
+            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to',
+             'extra_data': 0 },
             {'kind': 'file', 'parent': 9, 'name': b'file',
              'cid': b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
                     b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
              'size': 7850, 'mtime_year': 2015, 'mtime_second': 0x42a042,
-             'mtime_ns': 765430000 },
+             'mtime_ns': 765430000, 'extra_data': 0 },
             {'kind': 'file', 'parent': 0, 'name': b'file',
              'cid': b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
                     b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
              'size': 23, 'mtime_year': 2013, 'mtime_second': 0x10adba0,
-             'mtime_ns': 0 },
+             'mtime_ns': 0, 'extra_data': 0 },
             )
         for item in items:
             if item['kind'] in ('magic', 'setting'):
@@ -960,26 +964,28 @@ class TestDataFile(unittest.TestCase):
              'key': b'start', 'value': b'2015-09-05T21:22:42'},
             {'kind': 'setting',
              'key': b'end', 'value': b'2015-09-05T21:24:06'},
-            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path' },
-            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to' },
+            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path',
+             'extra_data': 0 },
+            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to',
+             'extra_data': 0 },
             {'kind': 'file', 'parent': 9, 'name': b'file',
              'cid': b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
                     b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
              'size': 23, 'mtime_year': 2015, 'mtime_second': 0x42a042,
-             'mtime_ns': 765430000 },
+             'mtime_ns': 765430000, 'extra_data': 0 },
             {'kind': 'file', 'parent': 0, 'name': b'file',
              'cid': b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
                     b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
              'size': 7850, 'mtime_year': 2013, 'mtime_second': 0x10adba0,
-             'mtime_ns': 0 },
+             'mtime_ns': 0, 'extra_data': 0 },
             {'kind': 'file-symlink', 'parent': 0, 'name': b'symbolic_link',
              'cid': b':&h)\x02-\xaf`\x92\xde\x11\xbb\xd7\xaaK4\xb7\xa0E\xa1\x8d'
                     b'\xb8#(\x02"\xc2s\x01\xd6\x03\xd1',
              'size': 27, 'mtime_year': 2014, 'mtime_second': 29899012,
-             'mtime_ns': 259388602 },
+             'mtime_ns': 259388602, 'extra_data': 0 },
             {'kind': 'file-socket', 'parent': 0, 'name': b'fs_socket',
              'cid': b'', 'size': 0, 'mtime_year': 2014,
-             'mtime_second': 24395803, 'mtime_ns': 946662039},
+             'mtime_second': 24395803, 'mtime_ns': 946662039, 'extra_data': 0},
             )
         for item in items:
             if item['kind'] in ('magic', 'setting'):
@@ -1022,3 +1028,215 @@ class TestDataFile(unittest.TestCase):
         self.assertRaises(StopIteration, next, backup)
         backup.close()
         self.assertCountEqual((), tree._files_modified)
+
+    def test_create_simple_backup_with_extra_file_data(self):
+        tree = FakeTree()
+        tree._add_directory(('path', 'to', 'db'))
+        starttime = datetime.datetime(2015, 9, 5, 21, 22, 42)
+        backup = datafile.create_backup_in_replacement_mode(
+            tree, ('path', 'to', 'db'), starttime)
+        items = (
+            {'kind': 'magic', 'value': b'ebakup backup data'},
+            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
+            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
+            {'kind': 'setting',
+             'key': b'start', 'value': b'2015-09-05T21:22:42'},
+            {'kind': 'setting',
+             'key': b'end', 'value': b'2015-09-05T21:24:06'},
+            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path',
+             'extra_data': {
+                 'owner': 'me', 'group': 'me', 'unix-access': 0o755 } },
+            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to',
+             'extra_data': {
+                 'owner': 'me', 'group': 'me', 'unix-access': 0o755 } },
+            {'kind': 'file', 'parent': 9, 'name': b'file',
+             'cid': b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
+                    b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
+             'size': 23, 'mtime_year': 2015, 'mtime_second': 0x42a042,
+             'mtime_ns': 765430000,
+             'extra_data': {
+                 'owner': 'me', 'group': 'me', 'unix-access': 0o644 } },
+            {'kind': 'file', 'parent': 0, 'name': b'file',
+             'cid': b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
+                    b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
+             'size': 7850, 'mtime_year': 2013, 'mtime_second': 0x10adba0,
+             'mtime_ns': 0,
+             'extra_data': {
+                 'owner': 'me', 'group': 'me', 'unix-access': 0o755 } },
+            {'kind': 'file-symlink', 'parent': 0, 'name': b'symbolic_link',
+             'cid': b':&h)\x02-\xaf`\x92\xde\x11\xbb\xd7\xaaK4\xb7\xa0E\xa1\x8d'
+                    b'\xb8#(\x02"\xc2s\x01\xd6\x03\xd1',
+             'size': 27, 'mtime_year': 2014, 'mtime_second': 29899012,
+             'mtime_ns': 259388602,
+             'extra_data': {
+                 'owner': 'other', 'group': 'other', 'unix-access': 0o644 } },
+            {'kind': 'file-socket', 'parent': 0, 'name': b'fs_socket',
+             'cid': b'', 'size': 0, 'mtime_year': 2014,
+             'mtime_second': 24395803, 'mtime_ns': 946662039,
+             'extra_data': {
+                 'owner': 'root', 'group': 'staff', 'unix-access': 0o640 } },
+            )
+        kvs = KeyValueDict()
+        extradefs = ExtraDataDict()
+        xidblock = None
+        for item in items:
+            if item['kind'] in ('magic', 'setting'):
+                continue
+            if item['kind'] == 'directory':
+                dataitem = datafile.ItemDirectory(
+                    item['dirid'], item['parent'], item['name'])
+            elif item['kind'] == 'file':
+                dataitem = datafile.ItemFile(
+                    item['parent'], item['name'], item['cid'],
+                    item['size'],
+                    (item['mtime_year'], item['mtime_second'],
+                     item['mtime_ns']))
+            elif item['kind'].startswith('file-'):
+                kind = item['kind'][5:]
+                dataitem = datafile.ItemSpecialFile(
+                    kind, item['parent'], item['name'], item['cid'],
+                    item['size'],
+                    (item['mtime_year'], item['mtime_second'],
+                     item['mtime_ns']))
+            else:
+                raise AssertionError('Unexpected kind: ' + item['kind'])
+            if 'extra_data' in item:
+                itemkvids = []
+                for key, value in item['extra_data'].items():
+                    kvid = kvs.get(key, value)
+                    if kvid is None:
+                        kvid = kvs.add(key,value)
+                        if xidblock is None:
+                            xidblock = 1
+                            if backup.does_block_exist(1):
+                                backup.move_block(1, -1)
+                            else:
+                                backup.create_block()
+                                # And create the first data block, too
+                                # (so we don't put data in the
+                                # definition block).
+                                backup.create_block()
+                        backup.insert_item(
+                            xidblock, -1, datafile.ItemKeyValue(
+                                kvid, key, value))
+                    itemkvids.append(kvid)
+                xid = extradefs.get(itemkvids)
+                if xid is None:
+                    xid = extradefs.add(itemkvids)
+                    backup.insert_item(
+                        xidblock, -1, datafile.ItemExtraDef(xid, itemkvids))
+                dataitem.set_extra_data(xid)
+            backup.append_item(dataitem)
+        backup.insert_item(
+            0, -1, datafile.ItemSetting(b'end', b'2015-09-05T21:24:06'))
+        self.assertNotIn(
+            ('path', 'to', 'db', '2015', '09-05T21:22'), tree._files)
+        self.assertEqual(
+            True,
+            tree._files[('path', 'to', 'db', '2015', '09-05T21:22.new')].locked)
+        backup.commit_and_close()
+        self.assertCountEqual(
+            (('path', 'to', 'db', '2015'),
+             ('path', 'to', 'db', '2015', '09-05T21:22.new'),
+             ('path', 'to', 'db', '2015', '09-05T21:22')),
+            set(tree._files_modified))
+        tree._files_modified = []
+        self.assertNotIn(
+            ('path', 'to', 'db', '2015', '09-05T21:22.new'), tree._files)
+        backup = datafile.open_backup(tree, ('path', 'to', 'db'), starttime)
+        kvids = {}
+        xids = { 0: tuple() }
+        for x in items:
+            item = next(backup)
+            while item.kind in ('key-value', 'extradef'):
+                if item.kind == 'key-value':
+                    self.assertNotIn(item.kvid, kvids)
+                    kvids[item.kvid] = (item.key, item.value)
+                else:
+                    self.assertNotIn(item.xid, xids)
+                    xids[item.xid] = item.kvids
+                item = next(backup)
+            for key, value in x.items():
+                if key == 'extra_data':
+                    extra = {}
+                    for kvid in xids[item.extra_data]:
+                        k, v = kvids[kvid]
+                        extra[k] = v
+                    self.assertExtraDataEqual(value, extra)
+                else:
+                    self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertRaises(StopIteration, next, backup)
+        self.assertKeyValueDictsEqual(kvs.kvids, kvids)
+        self.assertEqual(extradefs.xids, xids)
+        backup.close()
+        self.assertCountEqual((), tree._files_modified)
+
+    def assertExtraDataEqual(self, expected, actual):
+        x = {}
+        for k,v in expected.items():
+            x[self.encodeKvKey(k)] = self.encodeKvValue(v)
+        self.assertEqual(x, actual)
+
+    def encodeKvKey(self, k):
+        if isinstance(k, str):
+            return k.encode('utf-8')
+        return k
+
+    def encodeKvValue(self, v):
+        if isinstance(v, bytes):
+            return v
+        return str(v).encode('utf-8')
+
+    def assertKeyValueDictsEqual(self, expected, actual):
+        x = {}
+        for k,v in expected.items():
+            self.assertEqual(2, len(v))
+            x[k] = (self.encodeKvKey(v[0]), self.encodeKvValue(v[1]))
+        self.assertEqual(x, actual)
+
+class KeyValueDict(object):
+    def __init__(self):
+        self.next_kvid = 0
+        self.kvids = {}
+
+    def get(self, key, value):
+        for kvid, (k,v) in self.kvids.items():
+            if k == key and v == value:
+                return kvid
+        return None
+
+    def add(self, key, value):
+        kvid = self.next_kvid
+        self.next_kvid += 1
+        self.kvids[kvid] = (key, value)
+        return kvid
+
+    def get_or_add(self, key, value):
+        kvid = self.get(key, value)
+        if kvid is not None:
+            return kvid
+        return self.add(key,value)
+
+class ExtraDataDict(object):
+    def __init__(self):
+        self.next_xid = 8
+        self.xids = { 0: tuple() }
+
+    def get(self, kvids):
+        kvidset = set(kvids)
+        for xid, kvs in self.xids.items():
+            if set(kvs) == kvidset:
+                return xid
+        return None
+
+    def add(self, kvids):
+        xid = self.next_xid
+        self.next_xid += 1
+        self.xids[xid] = tuple(kvids)
+        return xid
+
+    def get_or_add(self, kvids):
+        xid = self.get(kvids)
+        if xid is not None:
+            return xid
+        return self.add(kvids)

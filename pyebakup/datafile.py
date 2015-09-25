@@ -23,12 +23,36 @@ def ItemSetting(key, value):
     item.value=value
     return item
 
-def ItemDirectory(dirid, parent, name):
-    item = Item('directory')
-    item.dirid = dirid
-    item.parent = parent
-    item.name = name
+def ItemKeyValue(kvid, key, value):
+    item = Item('key-value')
+    item.kvid = kvid
+    if isinstance(key, str):
+        item.key = key.encode('utf-8')
+    else:
+        item.key = key
+    assert b':' not in item.key
+    if isinstance(value, bytes):
+        item.value = value
+    else:
+        item.value = str(value).encode('utf-8')
     return item
+
+def ItemExtraDef(xid, kvids):
+    item = Item('extradef')
+    item.xid = xid
+    item.kvids = kvids
+    return item
+
+class ItemDirectory(object):
+    def __init__(self, dirid, parent, name):
+        self.kind = 'directory'
+        self.dirid = dirid
+        self.parent = parent
+        self.name = name
+        self.extra_data = 0
+
+    def set_extra_data(self, xid):
+        self.extra_data = xid
 
 class ItemFile(object):
     def __init__(self, parent, name, cid, size, mtime):
@@ -40,6 +64,10 @@ class ItemFile(object):
         self.mtime_year = mtime[0]
         self.mtime_second = mtime[1]
         self.mtime_ns = mtime[2]
+        self.extra_data = 0
+
+    def set_extra_data(self, xid):
+        self.extra_data = xid
 
 class ItemSpecialFile(ItemFile):
     def __init__(self, filetype, parent, name, cid, size, mtime):
@@ -455,6 +483,21 @@ class DataFile(object):
         self._pos = (self._pos[0], self._pos[1] + 1)
         return item
 
+    def get_last_block_index(self):
+        '''Return the index of the last block that exists in the file.
+        '''
+        return self._last_block_index
+
+    def does_block_exist(self, blockidx):
+        '''Return True iff block number 'block' exists in the file.
+        '''
+        return blockidx <= self._last_block_index
+
+    def create_block(self):
+        '''Appends a new, empty block to the end of the file.
+        '''
+        self._create_block()
+
     def get_item(self, block, index):
         '''Get the 'index'th item of the 'block'th block.
 
@@ -623,6 +666,13 @@ class DataFile(object):
         '''
         if self._file is None:
             raise AssertionError('File is not open')
+        raise NotTestedError()
+        sourceblock = self._load_block(source)
+        if target == -1:
+            targetblock = self._create_block()
+            targetblock.append_block_data(sourceblock)
+            sourceblock.clear_block_data()
+            return
         raise NotImplementedError()
 
     def _clear_file_data(self):
@@ -862,6 +912,10 @@ class ContentBlock(object):
             raise ItemNotFoundError('Item ' + str(index) + ' not found')
         return self._items[index][1]
 
+    def append_item(self, item):
+        if not self.try_append(item):
+            raise BlockFullError('Block is full')
+
     def try_append(self, item):
         if item.kind == 'content':
             data = [ b'\xdd' ]
@@ -980,20 +1034,44 @@ class BackupBlock(object):
             raise ItemNotFoundError('Item ' + str(index) + ' not found')
         return self._items[index][1]
 
+    def append_block_data(self, sourceblock):
+        if self._datasize + sourceblock._datasize > self._blockdatasize:
+            raise BlockFullError('Not sufficient space in the block')
+        self._items += sourceblock._items
+        self._datasize += sourceblock._datasize
+        self._modified = True
+
+    def clear_block_data(self):
+        self._items = []
+        self._datasize = 0
+        self._modified = True
+
+    def append_item(self, item):
+        if not self.try_append(item):
+            raise BlockFullError('Block is full')
+
     _filetypechars = {
         'file-unknown': b'?', 'file-symlink': b'L', 'file-socket': b'S',
         'file-pipe': b'P', 'file-device': b'D' }
     def try_append(self, item):
         if item.kind == 'directory':
-            data = [ b'\x90' ]
+            if item.extra_data:
+                data = [ b'\x92' ]
+            else:
+                data = [ b'\x90' ]
             data.append(valuecodecs.make_varuint(item.dirid))
             data.append(valuecodecs.make_varuint(item.parent))
             data.append(valuecodecs.make_varuint(len(item.name)))
             data.append(item.name)
+            if item.extra_data:
+                data.append(valuecodecs.make_varuint(item.extra_data))
             data = b''.join(data)
         elif item.kind.startswith('file'):
             if item.kind == 'file':
-                data = [ b'\x91' ]
+                if item.extra_data:
+                    data = [ b'\x93' ]
+                else:
+                    data = [ b'\x91' ]
             else:
                 data = [ b'\x94' ]
             data.append(valuecodecs.make_varuint(item.parent))
@@ -1028,8 +1106,25 @@ class BackupBlock(object):
                 if filetypechar is None:
                     raise AssertionError('Unknown file type: ' + item.kind)
                 data.append(filetypechar)
-                data.append(b'\x01')
+            if item.kind != 'file' or item.extra_data:
+                data.append(valuecodecs.make_varuint(item.extra_data))
             data = b''.join(data)
+        elif item.kind == 'key-value':
+            assert b':' not in item.key
+            data = [ ]
+            data.append(valuecodecs.make_varuint(item.kvid))
+            data.append(item.key)
+            data.append(b':')
+            data.append(item.value)
+            data = b''.join(data)
+            data = b'\x21' + valuecodecs.make_varuint(len(data)) + data
+        elif item.kind == 'extradef':
+            data = [ ]
+            data.append(valuecodecs.make_varuint(item.xid))
+            for kvid in item.kvids:
+                data.append(valuecodecs.make_varuint(kvid))
+            data = b''.join(data)
+            data = b'\x22' + valuecodecs.make_varuint(len(data)) + data
         else:
             raise InvalidDataError('Unknown item type: ' + item.kind)
 
@@ -1057,7 +1152,8 @@ class BackupHandler(object):
         while done < size:
             item = None
             start = done
-            if data[done] == 0x90:
+            if data[done] in (0x90, 0x92):
+                itemtype = data[done]
                 done += 1
                 dirid, done = valuecodecs.parse_varuint(data, done)
                 parent, done = valuecodecs.parse_varuint(data, done)
@@ -1065,8 +1161,11 @@ class BackupHandler(object):
                 name = data[done:done+namelen]
                 done += namelen
                 item = ItemDirectory(dirid, parent, name)
+                if itemtype == 0x92:
+                    extra_data, done = valuecodecs.parse_varuint(data, done)
+                    item.set_extra_data(extra_data)
                 itemdata = data[start:done]
-            elif data[done] in (0x91, 0x94):
+            elif data[done] in (0x91, 0x93, 0x94):
                 itemtype = data[done]
                 done += 1
                 parent, done = valuecodecs.parse_varuint(data, done)
@@ -1087,7 +1186,7 @@ class BackupHandler(object):
                     (data[done+5] & 0x3f) + data[done+6] * 0x40 +
                     data[done+7] * 0x4000 + data[done+8] * 0x400000)
                 done += 9
-                if itemtype == 0x91:
+                if itemtype in (0x91, 0x93):
                     item = ItemFile(
                         parent, name, cid, filesize,
                         (mtime_year, mtime_second, mtime_ns))
@@ -1097,13 +1196,36 @@ class BackupHandler(object):
                         raise AssertionError(
                             'Unknown filetype: ' + str(data[done]))
                     done += 1
-                    assert data[done] == 1
-                    done += 1
                     item = ItemSpecialFile(
                         ftype, parent, name, cid, filesize,
                         (mtime_year, mtime_second, mtime_ns))
                 else:
                     raise AssertionError('unreachable')
+                if itemtype in (0x93, 0x94):
+                    extra, done = valuecodecs.parse_varuint(data, done)
+                    item.set_extra_data(extra)
+                itemdata = data[start:done]
+            elif data[done] == 0x21:
+                done += 1
+                length, done = valuecodecs.parse_varuint(data, done)
+                end = done + length
+                kvid, done = valuecodecs.parse_varuint(data, done)
+                kv = data[done:end]
+                done = end
+                key, value = kv.split(b':', 1)
+                item = ItemKeyValue(kvid, key, value)
+                itemdata = data[start:done]
+            elif data[done] == 0x22:
+                done += 1
+                length, done = valuecodecs.parse_varuint(data, done)
+                end = done + length
+                xid, done = valuecodecs.parse_varuint(data, done)
+                kvids = []
+                while done < end:
+                    kvid, done = valuecodecs.parse_varuint(data, done)
+                    kvids.append(kvid)
+                assert done == end
+                item = ItemExtraDef(xid, tuple(kvids))
                 itemdata = data[start:done]
             elif data[done] == 0:
                 if data[done:size].strip(b'\x00'):
