@@ -58,9 +58,6 @@ class FileInterface(object):
         not be called in that case.
         '''
 
-    def is_regular(self):
-        '''True iff the file is a "regular" file. That is, the file is
-        essentially just a sequence of octets with some metadata.
         '''
 
     def get_size(self):
