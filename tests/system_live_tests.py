@@ -9,6 +9,7 @@ import io
 import os
 import re
 import shutil
+import socket
 import textwrap
 import unittest
 
@@ -181,3 +182,72 @@ class TestLocalFileSys(unittest.TestCase):
             IsADirectoryError,
             'is a directory.*DELETEME_testebakup.*subdir',
             fs.get_item_at_path, root + ('subdir',))
+
+    def test_get_filetype_regular(self):
+        fs = filesys.get_file_system('local')
+        root = fs.path_from_string(root_path)
+        path = root + ('a_file',)
+        strpath = os.path.join(root_path, 'a_file')
+        with open(strpath, 'xb') as f:
+            f.write(b'Yay!\n')
+        item = fs.get_item_at_path(path)
+        self.assertEqual('file', item.get_filetype())
+
+    def test_get_filetype_symlink(self):
+        fs = filesys.get_file_system('local')
+        root = fs.path_from_string(root_path)
+        path = root + ('a_file',)
+        strpath = os.path.join(root_path, 'a_file')
+        os.symlink('target', strpath)
+        item = fs.get_item_at_path(path)
+        self.assertEqual('symlink', item.get_filetype())
+
+    def test_get_filetype_socket(self):
+        fs = filesys.get_file_system('local')
+        root = fs.path_from_string(root_path)
+        path = root + ('a_file',)
+        strpath = os.path.join(root_path, 'a_file')
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.bind(strpath)
+        item = fs.get_item_at_path(path)
+        self.assertEqual('socket', item.get_filetype())
+
+    def test_get_filetype_pipe(self):
+        fs = filesys.get_file_system('local')
+        root = fs.path_from_string(root_path)
+        path = root + ('a_file',)
+        strpath = os.path.join(root_path, 'a_file')
+        os.mkfifo(strpath)
+        item = fs.get_item_at_path(path)
+        self.assertEqual('pipe', item.get_filetype())
+
+    def test_readsymlink(self):
+        fs = filesys.get_file_system('local')
+        root = fs.path_from_string(root_path)
+        path = root + ('a_file',)
+        strpath = os.path.join(root_path, 'a_file')
+        os.symlink('target', strpath)
+        item = fs.get_item_at_path(path)
+        self.assertEqual(b'target', item.readsymlink())
+
+    def test_readsymlink_on_file(self):
+        fs = filesys.get_file_system('local')
+        root = fs.path_from_string(root_path)
+        path = root + ('a_file',)
+        strpath = os.path.join(root_path, 'a_file')
+        with open(strpath, 'xb') as f:
+            f.write(b'Yay!\n')
+        item = fs.get_item_at_path(path)
+        self.assertRaisesRegex(
+            OSError, 'a_file', item.readsymlink)
+
+    def test_size_of_symlink(self):
+        fs = filesys.get_file_system('local')
+        root = fs.path_from_string(root_path)
+        path = root + ('a_file',)
+        with open(os.path.join(root_path, 'target'), 'xb') as f:
+            f.write(b'This is the content of the real file\n')
+        strpath = os.path.join(root_path, 'a_file')
+        os.symlink('target', strpath)
+        item = fs.get_item_at_path(path)
+        self.assertEqual(37, item.get_size())

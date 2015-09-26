@@ -58,13 +58,57 @@ class FileInterface(object):
         not be called in that case.
         '''
 
+    def get_filetype(self):
+        '''The type of the file.
+
+        The return value is:
+          'file': a regular file
+          'directory': a directory
+          'symlink': a symbolic link
+          'socket': a socket
+          'pipe': a pipe or fifo
+          'device': a device file
+          'unknown': unknown file type
+
+        More values may be added to this list over time.
+
+        The various types in more details:
+
+        'file' - A sequence of octets with some metadata.
+
+        'directory' - A container of other files.
+
+        'symlink' - A file that only contains a pointer to another
+        file and usually behaves like that other file. It does have
+        its own metadata, though.
+
+        'socket' - A file that behaves similar to network sockets. A
+        server can "listen" to the socket and clients can "connect" to
+        it.
+
+        'pipe' - A file where anything written to it can only be read
+        once. And the data must be read in the same order as it was
+        written.
+
+        'device' - A file that represents a piece of hardware. Or
+        something pretending to be hardware. Which could include some
+        interfaces to very non-hardware kernel structures.
+
+        'unknown' - The implementation failed to classify it as one of
+        the other types. It is guaranteed that the file does not have
+        'file' or 'directory' type, but it could have any of the other
+        types. Or a type not in the list.
+
         '''
 
     def get_size(self):
         '''The size of the file's data, in octets.
 
-        Only valid for regular files. Raises AttributeError() if
-        called on special files.
+        For regular files, this is the size of the file's data in
+        octets. For symlinks, this is the size of the pointed-to
+        file's data. Broken symlinks raise FileNotFoundError.
+
+        Raises AttributeError() if called on other files.
         '''
 
     def get_mtime(self):
@@ -73,6 +117,9 @@ class FileInterface(object):
         Definitely valid for regular files, maybe valid for special
         files. Raises AttributeError() if called on a file that
         doesn't provide a last modification time.
+
+        Symlinks return the mtime of the pointed-to file rather than
+        its own mtime. Broken symlinks raise FileNotFoundError.
 
         The returned value is a (mtime, nanoseconds) pair, where
         'mtime' gives last modification time of the file as a
@@ -85,6 +132,15 @@ class FileInterface(object):
 
         '''
 
+    def readsymlink(self):
+        '''Return a filesystem-specific representation of the target of the
+        symlink.
+
+        The returned value is guaranteed to be a bytes object.
+
+        If the file is not a symlink, an exception is raised.
+        '''
+
     def get_data_slice(self, start, end):
         '''Retrieve part of the data of the file.
 
@@ -94,8 +150,9 @@ class FileInterface(object):
         less data than requested (and so can be used to reliably
         detect end-of-file).
 
-        Only valid for regular files. Raises AttributeError() if
-        called on special files.
+        Only valid for regular files (and symlinks, which acts as
+        their pointed-to file). Raises AttributeError() if called on
+        special files.
         '''
 
     def write_data_slice(self, start, data):
@@ -111,12 +168,12 @@ class FileInterface(object):
         greater than the size of the file, the content of the
         intervening data will be undefined.
 
-        Only valid for regular files. Raises AttributeError() if
-        called on special files.
+        Only valid for regular files (and symlinks, which acts as
+        their pointed-to file). Raises AttributeError() if called on
+        special files.
 
         The position of the first octet after the newly written data
         is returned.
-
         '''
 
     def lock_for_reading(self):
@@ -146,8 +203,9 @@ class FileInterface(object):
         '''Free up any temporary resources tied to the underlying file and
         drop all locks.
 
-        Only valid for regular files. Raises AttributeError() if
-        called on special files.
+        Only valid for regular files (and symlinks, which operate on
+        the pointed-to file). Raises AttributeError() if called on
+        special files.
         '''
 
 class TemporaryFileInterface(FileInterface):

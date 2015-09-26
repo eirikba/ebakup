@@ -139,6 +139,7 @@ class LocalFile(object):
         self._openfile = openfile
         self._writable = writable
         self._cached_stat = None
+        self._cached_lstat = None
 
     def __enter__(self):
         return self
@@ -147,11 +148,13 @@ class LocalFile(object):
         self.close()
 
     def _exists(self):
-        s = self._stat()
+        s = self._lstat()
         return bool(s)
 
     def _isdir(self):
         s = self._stat()
+        if s is False:
+            return False
         return stat.S_ISDIR(s.st_mode)
 
     def _open(self):
@@ -164,14 +167,33 @@ class LocalFile(object):
 
     def drop_all_cached_data(self):
         self._cached_stat = None
+        self._cached_lstat = None
 
     def close(self):
         if self._openfile is not None:
             self._openfile.close()
             self._openfile = None
 
+    def get_filetype(self):
+        s = self._lstat()
+        if stat.S_ISREG(s.st_mode):
+            return 'file'
+        if stat.S_ISDIR(s.st_mode):
+            return 'directory'
+        if stat.S_ISLNK(s.st_mode):
+            return 'symlink'
+        if stat.S_ISFIFO(s.st_mode):
+            return 'pipe'
+        if stat.S_ISSOCK(s.st_mode):
+            return 'socket'
+        if stat.S_ISBLK(s.st_mode) or stat.S_ISCHR(s.st_mode):
+            return 'device'
+        return 'unknown'
+
     def get_size(self):
         s = self._stat()
+        if s is None:
+            raise FileNotFoundError('File not found: ' + self._stringpath)
         return s.st_size
 
     def _stat(self):
@@ -182,13 +204,31 @@ class LocalFile(object):
                 self._cached_stat = False
         return self._cached_stat
 
+    def _lstat(self):
+        if self._cached_lstat is None:
+            try:
+                self._cached_lstat = os.lstat(self._stringpath)
+            except FileNotFoundError:
+                self._cached_lstat = False
+        return self._cached_lstat
+
     def get_mtime(self):
         s = self._stat()
+        if s is None:
+            raise FileNotFoundError('File not found: ' + self._stringpath)
         mtime_ns = s.st_mtime_ns % 1000000000
         mtime = datetime.datetime.utcfromtimestamp(s.st_mtime_ns // 1000000000)
         mtime = mtime.replace(microsecond=mtime_ns//1000)
         assert mtime.microsecond == mtime_ns // 1000
         return mtime, mtime_ns
+
+    def readsymlink(self):
+        content = os.readlink(self._stringpath)
+        if isinstance(content, str):
+            return content.encode('utf-8')
+        if isinstance(content, bytes):
+            return content
+        raise AssertionError('readlink returned unexpected data type')
 
     def get_data_slice(self, start, end):
         self._open()
