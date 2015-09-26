@@ -120,6 +120,12 @@ class LocalFileSystem(object):
     def rename_and_overwrite(self, source, target):
         os.replace(self.path_to_string(source), self.path_to_string(target))
 
+    def delete_file_at_path(self, path):
+        strpath = self.path_to_string(path)
+        if not os.path.exists(strpath):
+            return
+        os.remove(strpath)
+
     def get_config_paths_for(self, application):
         paths = []
         confhome = os.environ.get('XDG_CONFIG_HOME')

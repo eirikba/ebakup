@@ -183,6 +183,24 @@ class TestLocalFileSys(unittest.TestCase):
             'is a directory.*DELETEME_testebakup.*subdir',
             fs.get_item_at_path, root + ('subdir',))
 
+    def test_delete_file_at_path(self):
+        fs = filesys.get_file_system('local')
+        root = fs.path_from_string(root_path)
+        path = root + ('a_file',)
+        strpath = os.path.join(root_path, 'a_file')
+        with open(strpath, 'xb') as f:
+            f.write(b'Yay!\n')
+        self.assertTrue(os.path.exists(strpath))
+        fs.delete_file_at_path(path)
+        self.assertFalse(os.path.exists(strpath))
+        # Deleting non-existing files should "succeed" silently
+        fs.delete_file_at_path(path)
+        self.assertFalse(os.path.exists(strpath))
+        os.mkdir(strpath)
+        self.assertRaisesRegex(
+            IsADirectoryError, 'a_file', fs.delete_file_at_path, path)
+        self.assertTrue(os.path.exists(strpath))
+
     def test_get_filetype_regular(self):
         fs = filesys.get_file_system('local')
         root = fs.path_from_string(root_path)
