@@ -208,10 +208,13 @@ class LocalFile(object):
 
     def _stat(self):
         if self._cached_stat is None:
-            try:
-                self._cached_stat = os.stat(self._stringpath)
-            except FileNotFoundError:
-                self._cached_stat = False
+            if self._openfile is not None:
+                self._cached_stat = os.stat(self._openfile.fileno())
+            else:
+                try:
+                    self._cached_stat = os.stat(self._stringpath)
+                except FileNotFoundError:
+                    self._cached_stat = False
         return self._cached_stat
 
     def _lstat(self):
