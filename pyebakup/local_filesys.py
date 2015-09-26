@@ -67,6 +67,11 @@ class LocalFileSystem(object):
     def does_path_exist(self, path):
         return os.path.exists(self.path_to_string(path))
 
+    def is_open_file_same_as_path(self, f, path):
+        fstat = os.stat(f._openfile.fileno())
+        pstat = os.stat(self.path_to_string(path))
+        return os.path.samestat(fstat, pstat)
+
     def get_directory_listing(self, path, include_special_files=True):
         stringpath = self.path_to_string(path)
         names = os.listdir(stringpath)

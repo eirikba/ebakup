@@ -753,9 +753,8 @@ class DataFile(object):
         return block
 
     def _check_correct_file_opened(self):
-        # TODO: Implement this (check that self._tree:self._path is
-        # the same file as self._file)
-        return True
+        if not self._tree.is_open_file_same_as_path(self._file, self._path):
+            raise AssertionError('The opened file is not at the expected path')
 
     def _flush_block(self, idx):
         block = self._blocks.get(idx)

@@ -154,6 +154,10 @@ class FakeFileSystem(object):
         self._check_access(path, 'stat')
         return path in self._paths
 
+    def is_open_file_same_as_path(self, f, path):
+        pf = self._paths[path]
+        return pf == f._item
+
     def get_directory_listing(self, path=()):
         self._check_access(path, 'listdir')
         dirs = set()

@@ -52,6 +52,9 @@ class FakeTree(object):
             return True
         return False
 
+    def is_open_file_same_as_path(self, f, path):
+        return self._files[path] == f._data
+
     def get_item_at_path(self, path):
         return FakeFile(self, path)
 

@@ -329,6 +329,15 @@ class FileSystemInterface(object):
         '''Returns True if 'path' exists in the tree, and False otherwise.
         '''
 
+    def is_open_file_same_as_path(self, f, path):
+        '''Returns True iff the open file 'f' is the same file as the file at
+        'path'.
+
+        'f' should be a file object opened from this tree object. If
+        not, the behaviour is unspecified. You may get the wrong
+        answer. You may get an exception.
+        '''
+
     def get_directory_listing(self, path=(), include_special_files=True):
         '''Return the names of all the items at 'path' as a pair (dirs, files)
         of lists. The 'dirs' list contains the names of all the
