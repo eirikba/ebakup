@@ -525,7 +525,8 @@ class BackupInfoBuilder(object):
         '''
         self._dbfile.close()
 
-    def add_file(self, path, contentid, size, mtime, mtime_nsec):
+    def add_file(
+            self, path, contentid, size, mtime, mtime_nsec, filetype='file'):
         '''Add a file to the backup data object.
 
         Note: mtime.microsecond will be ignored! (But should be either
@@ -538,9 +539,15 @@ class BackupInfoBuilder(object):
         component = valuecodecs.path_component_to_bytes(name)
         mtime_second = int(
             (mtime - datetime.datetime(mtime.year, 1, 1)).total_seconds())
-        item = datafile.ItemFile(
-            dirid, component, contentid, size,
-            (mtime.year, mtime_second, mtime_nsec))
+        if filetype == 'file':
+            item = datafile.ItemFile(
+                dirid, component, contentid, size,
+                (mtime.year, mtime_second, mtime_nsec))
+        else:
+            item = datafile.ItemSpecialFile(
+                filetype,
+                dirid, component, contentid, size,
+                (mtime.year, mtime_second, mtime_nsec))
         self._dbfile.append_item(item)
 
     def add_directory(self, path):
@@ -570,7 +577,8 @@ class DirectoryData(object):
 
 FileData = collections.namedtuple(
     'FileData',
-    ('name', 'parentid', 'contentid', 'size', 'mtime', 'mtime_nsec'))
+    ('name', 'parentid', 'contentid', 'size', 'mtime', 'mtime_nsec',
+     'filetype'))
 
 class BackupInfo(object):
     def __init__(self, db, name):
@@ -615,6 +623,8 @@ class BackupInfo(object):
                         self._add_directory(item.parent, item.dirid, item.name)
                     elif item.kind == 'file':
                         self._add_file(item)
+                    elif item.kind.startswith('file-'):
+                        self._add_file(item)
                     else:
                         raise NotTestedError(
                             'Unknown data entry (' + str(item.kind) + ')')
@@ -631,6 +641,12 @@ class BackupInfo(object):
             datetime.datetime(item.mtime_year, 1, 1) +
             datetime.timedelta(
                 seconds=item.mtime_second, microseconds=item.mtime_ns//1000))
+        if item.kind == 'file':
+            filetype = 'file'
+        elif item.kind.startswith('file-'):
+            filetype = item.kind[5:]
+        else:
+            raise UnreachableError()
         self.files.append(
             FileData(
                 valuecodecs.bytes_to_path_component(item.name),
@@ -638,7 +654,8 @@ class BackupInfo(object):
                 item.cid,
                 item.size,
                 mtime,
-                item.mtime_ns))
+                item.mtime_ns,
+                filetype))
 
     def _build_tree(self):
         for d in self.directories.values():

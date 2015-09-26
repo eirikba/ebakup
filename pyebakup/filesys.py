@@ -129,7 +129,19 @@ class FileInterface(object):
 
         'mtime' and 'nanoseconds' SHALL agree to microsecond
         precision (i.e. mtime.microsecond == nanoseconds//1000).
+        '''
 
+    def get_link_mtime(self):
+        '''The time of last modification of the symlink.
+
+        Probably valid for the same types of files as get_mtime().
+
+        When called on a symlink, this method returns the
+        last-modified time for the symlink itself, while get_mtime()
+        returns the last-modified time for the file pointed to by the
+        symlink.
+
+        For other file types, this is equivalent to get_mtime().
         '''
 
     def readsymlink(self):
@@ -317,11 +329,22 @@ class FileSystemInterface(object):
         '''Returns True if 'path' exists in the tree, and False otherwise.
         '''
 
-    def get_directory_listing(self, path=()):
+    def get_directory_listing(self, path=(), include_special_files=True):
         '''Return the names of all the items at 'path' as a pair (dirs, files)
         of lists. The 'dirs' list contains the names of all the
         directories, while the 'files' list contains the names of all
         the files.
+
+        If 'include_special_files' is True (the default), the 'files'
+        list will contain all files including "special" files such as
+        symbolic links, named sockets and device files. If
+        'include_special_files' is False, the 'files' list will contain
+        only the "regular" files in the directory.
+
+        Regardless of 'include_special_files', the 'dirs' and 'files'
+        list will only contain the "proper" contents of 'path'. In
+        particular, the typical "." and ".." items (referring to the
+        directory itself and the parent directory) are never included.
         '''
 
     def get_item_at_path(self, path):

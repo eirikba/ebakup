@@ -71,25 +71,40 @@ class BackupOperation(object):
             self._files_backed_up += 1
             assert how in ('static', 'dynamic')
             sourcefile = source.tree.get_item_at_path(sourcepath)
-            cid = self._get_cid_if_assumed_unchanged(sourcefile, targetpath)
-            size = sourcefile.get_size()
-            mtime, mtime_ns = sourcefile.get_mtime()
-            if cid is None:
-                cid = self._try_add_content(sourcefile, sourcepath)
-            if cid is None:
-                self._logger.log_error('File not backed up', sourcepath)
+            filetype = sourcefile.get_filetype()
+            if filetype == 'file':
+                size = sourcefile.get_size()
+                mtime, mtime_ns = sourcefile.get_mtime()
+                cid = self._get_cid_if_assumed_unchanged(sourcefile, targetpath)
+                if cid is None:
+                    cid = self._try_add_content(sourcefile, sourcepath)
+                if cid is None:
+                    self._logger.log_error('File not backed up', sourcepath)
+            elif filetype in ('socket', 'pipe', 'device', 'other'):
+                size = 0
+                mtime, mtime_ns = sourcefile.get_mtime()
+                cid = b''
+            elif filetype == 'symlink':
+                data = sourcefile.readsymlink()
+                size = len(data)
+                mtime, mtime_ns = sourcefile.get_link_mtime()
+                cid = self._try_add_content_from_data(data)
+                if cid is None:
+                    self._logger.log_error('Symlink not backed up', sourcepath)
             else:
+                raise AssertionError(
+                    'Unknown file type: ' + str(sourcepath))
+            if cid is not None:
                 backup.add_file(
-                    targetpath, cid, sourcefile.get_size(),
-                    mtime, mtime_ns)
-                if how == 'static':
-                    old_cid = self._get_old_cid_for_path(targetpath)
-                    if old_cid is None:
-                        self._added_static_contentids.add(cid)
-                    elif cid != old_cid:
-                        self._logger.log(
-                            self._logger.LOG_ERROR,
-                            'static file changed', targetpath)
+                    targetpath, cid, size, mtime, mtime_ns, filetype)
+            if how == 'static':
+                old_cid = self._get_old_cid_for_path(targetpath)
+                if old_cid is None:
+                    self._added_static_contentids.add(cid)
+                elif cid != old_cid:
+                    self._logger.log(
+                        self._logger.LOG_ERROR,
+                        'static file changed', targetpath)
         self._ui.set_status(
             'backup', 'Backup of ' +
             source.tree.path_to_full_string(source.sourcepath) + ' complete')
@@ -99,6 +114,8 @@ class BackupOperation(object):
             return None
         oldinfo = self.previous.get_file_info(targetpath)
         if not oldinfo:
+            return None
+        if oldinfo.filetype != 'file':
             return None
         mtime, mtime_ns = sourcefile.get_mtime()
         if (sourcefile.get_size() == oldinfo.size and
@@ -114,6 +131,9 @@ class BackupOperation(object):
             self._logger.log_error(
                 'Permission denied to source file', sourcepath)
         return None
+
+    def _try_add_content_from_data(self, data):
+        return self._backupcollection.add_content_data(data)
 
     def _get_old_cid_for_path(self, path):
         if not self.previous:

@@ -46,6 +46,21 @@ should at least record this information in the database.
 
 ---------------------------------------------------------------------------
 
+Shadow copies of special files
+
+Currently the code will make shadow copies of every file that has
+"content". All regular files should have content, and so should be
+correctly created. Most kinds of special files are not (currently)
+expected to have content, so those will not be created. However,
+special files with "content" (which is really a file-specific
+description) will be created as regular files with that content. To
+begin with, symbolic links are the only files that have "content".
+
+I'm sure this is not the right behaviour, but I'm not sure what the
+right behaviour is.
+
+---------------------------------------------------------------------------
+
 Missing test: BackupCollection._find_duplicate_content_of_file() is
 not tested at all.
 
@@ -96,22 +111,6 @@ could buffer up a bunch of changes and write them together. Probably
 the best solution here would be to have some in-memory storage of the
 data not yet written, and then have a background thread that wakes up
 every 5 minutes and writes any buffered data to disk.
-
----------------------------------------------------------------------------
-
-Handle special files
-
-Symlinks are currently ignored. That's probably not optimal. Maybe
-symlinks pointing out of tree should be ignored, while symlinks to
-in-tree files (and directories) should be registered as symlinks (with
-path)? Or may symlinks out-of-tree should be registered too, but
-obviously not in the shadow tree?
-
-Similar for sockets and pipes. Register in database, but don't add to
-shadow tree?
-
-What about device files? Should not occur, but could be registered in
-the database none the less.
 
 ---------------------------------------------------------------------------
 

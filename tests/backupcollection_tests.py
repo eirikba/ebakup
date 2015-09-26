@@ -244,7 +244,8 @@ class FakeBackupBuilder(object):
         self._db = db
         self._backup = FakeBackup(start_time)
 
-    def add_file(self, path, contentid, size, mtime, mtime_nsec):
+    def add_file(
+            self, path, contentid, size, mtime, mtime_nsec, filetype='file'):
         if path in self._backup._files:
             raise FileExistsError('File already exists: ' + str(path))
         for i in range(1, len(path)):
@@ -253,7 +254,7 @@ class FakeBackupBuilder(object):
                     'Path is not a directory: ' + str(path[:i]))
             self._backup._directories.add(path[:i])
         self._backup._files[path] = FakeFileData(
-            contentid, size, mtime, mtime_nsec)
+            contentid, size, mtime, mtime_nsec, filetype)
 
     def commit(self, end_time):
         backup = self._backup
@@ -336,11 +337,12 @@ class FakeContentTimelineItem(object):
         self.restored = restored
 
 class FakeFileData(object):
-    def __init__(self, contentid, size, mtime, mtime_nsec):
+    def __init__(self, contentid, size, mtime, mtime_nsec, filetype):
         self.contentid = contentid
         self.size = size
         self.mtime = mtime
         self.mtime_nsec = mtime_nsec
+        self.filetype = filetype
 
 class TestUtilities(unittest.TestCase):
     def test_make_path_from_contentid_in_new_collection(self):
@@ -801,6 +803,41 @@ class TestSingleStuff(unittest.TestCase):
         bc2 = backupcollection.open_collection(
             storetree, ('path', 'to', 'store'), services=services)
         self.assertEqual(None, bc2.get_most_recent_backup())
+
+    def test_add_content_data(self):
+        storetree = FakeDirectory()
+        db = FakeDatabases()
+        services = {
+            'database.open': db.open,
+            'database.create': db.create,
+            }
+        bc = backupcollection.create_collection(
+            storetree, ('path', 'to', 'store'), services=services)
+        backup = bc.start_backup(
+            datetime.datetime(2015, 2, 14, 19, 55, 32, 328629))
+        with backup:
+            cid1 = bc.add_content_data(
+                b'This is some content!',
+                now=datetime.datetime(2015, 2, 14, 19, 56, 7))
+            checksum1 = (
+                b'\x8f+Guq\x0b\xea\x98\x8b\xec\xe0==z\xdb\x1e'
+                b'\x1dd\xf0\n\xcd\x03%\xeb\xa6D\xc1\x0c\xc4"I\'')
+            backup.add_file(
+                ('homedir', 'file.txt'), cid1, 21,
+                datetime.datetime(2014, 9, 11, 9, 3, 54), 759831036)
+            backup.commit()
+        bc2 = backupcollection.open_collection(
+            storetree, ('path', 'to', 'store'), services=services)
+        backup2 = bc2.get_most_recent_backup()
+        self.assertNotEqual(None, backup2)
+        info = backup2.get_file_info(('homedir', 'file.txt'))
+        self.assertNotEqual(None, info)
+        self.assertEqual(21, info.size)
+        self.assertEqual(cid1, info.contentid)
+        contentinfo = bc2.get_content_info(info.contentid)
+        self.assertNotEqual(None, contentinfo)
+        self.assertEqual(checksum1, contentinfo.goodsum)
+
 
 class TestBrokenUsage(unittest.TestCase):
 

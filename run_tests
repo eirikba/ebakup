@@ -25,6 +25,7 @@ expected_tests = set((
     'backupcollection_tests.TestBasicBackup.test_shadow_tree_created',
     'backupcollection_tests.TestBrokenUsage.test_add_two_files_with_same_path',
     'backupcollection_tests.TestBrokenUsage.test_open_collection_that_does_not_exist',
+    'backupcollection_tests.TestSingleStuff.test_add_content_data',
     'backupcollection_tests.TestSingleStuff.test_default_start_and_end_time',
     'backupcollection_tests.TestSingleStuff.test_get_most_recent_backup_when_no_backup_available',
     'backupcollection_tests.TestTwoBackups.test_backup_sequence',

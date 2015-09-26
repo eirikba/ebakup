@@ -265,6 +265,28 @@ class BackupCollection(object):
         rest = hexify(contentid[2:])
         return self._path + ('content',) + (first, second, rest)
 
+    def add_content_data(self, data, now=None):
+        '''Add 'data' to the content store and return its content id. If a
+        suitable item already exists in the content store, nothing is
+        added to the content store and the content id of the existing
+        item is returned.
+        '''
+        if now is None:
+            now = self._utcnow()
+        checksum_algo = self._db.get_checksum_algorithm()
+        checksummer = checksum_algo()
+        checksummer.update(data)
+        checksum = checksummer.digest()
+        contentid = self._find_duplicate_content_of_data(data, checksum)
+        if contentid:
+            return contentid
+        contentid = self._db.add_content_item(now, checksum)
+        target_path = self._make_path_from_contentid(contentid)
+        with self._tree.create_temporary_file(self._path + ('tmp',)) as f:
+            f.write_data_slice(0, data)
+            f.rename_without_overwrite_on_close(self._tree, target_path)
+        return contentid
+
     def list_contentids_for_checksum(self, checksum):
         '''Return a list of all content ids that represent content items
         having 'checksum' as checksum.
@@ -373,11 +395,20 @@ class BackupBuilder(object):
     def __exit__(self, a, b, c):
         self.abort()
 
-    def add_file(self, path, contentid, size, mtime, mtime_nsec):
+    def add_file(
+            self, path, contentid, size, mtime, mtime_nsec, filetype='file'):
         '''Add the file at 'path' to the backup, with the given attributes.
         '''
-        self._backup.add_file(path, contentid, size, mtime, mtime_nsec)
-        self._collection._make_shadow_copy(self._shadow_root + path, contentid)
+        self._backup.add_file(
+            path, contentid, size, mtime, mtime_nsec, filetype)
+        if contentid != b'':
+            # TODO: Figure out what to do with special files. This
+            # code will avoid making shadow copies of special files
+            # that have no file-specific description. Special files
+            # with file-specific descriptions will be created as
+            # regular files having the description as content.
+            self._collection._make_shadow_copy(
+                self._shadow_root + path, contentid)
 
     def commit(self, end_time=None):
         '''Finish up the backup and publish it in the database.
@@ -437,20 +468,26 @@ class BackupData(object):
             contentid = filedata.contentid,
             size = filedata.size,
             mtime = filedata.mtime,
-            mtime_nsec = filedata.mtime_nsec)
+            mtime_nsec = filedata.mtime_nsec,
+            filetype = filedata.filetype)
 
 class FileData(object):
-    def __init__(self, db, contentid, size, mtime, mtime_nsec):
+    def __init__(self, db, contentid, size, mtime, mtime_nsec, filetype):
         self._db = db
         self.contentid = contentid
         self.size = size
         self.mtime = mtime
         self.mtime_nsec = mtime_nsec
+        self.filetype = filetype
         self._good_checksum = None
 
     @property
     def good_checksum(self):
-        if not self._good_checksum:
-            info = self._db.get_content_info(self.contentid)
-            self._good_checksum = info.get_good_checksum()
+        if self._good_checksum is None:
+            if self.contentid == b'':
+                assert self.filetype != 'file'
+                self._good_checksum = b''
+            else:
+                info = self._db.get_content_info(self.contentid)
+                self._good_checksum = info.get_good_checksum()
         return self._good_checksum

@@ -26,6 +26,9 @@ class FakeBackupCollection(object):
 
     def add_content(self, sourcefile):
         data = sourcefile._get_content()
+        return self.add_content_data(data)
+
+    def add_content_data(self, data):
         self._content_add_count[data] = self._content_add_count.get(data, 0) + 1
         if data not in self._content:
             self._content[data] = b'content' + data
@@ -48,13 +51,14 @@ class FakeBackupBuilder(object):
         self._done = True
         self._collection._backups.append(self._backup)
 
-    def add_file(self, path, contentid, size, mtime, mtime_ns):
+    def add_file(self, path, contentid, size, mtime, mtime_ns, filetype):
         assert path not in self._backup._files
         self._backup._files[path] = FakeBackupFileInfo(
-            contentid, size, mtime, mtime_ns)
+            contentid, size, mtime, mtime_ns, filetype)
 
 FakeBackupFileInfo = collections.namedtuple(
-    'FakeBackupFileInfo', ('contentid', 'size', 'mtime', 'mtime_nsec'))
+    'FakeBackupFileInfo',
+    ('contentid', 'size', 'mtime', 'mtime_nsec', 'filetype'))
 class FakeBackup(object):
     def __init__(self):
         self._files = {} # { path: FakeBackupFileInfo }
@@ -92,6 +96,18 @@ class FakeTree(object):
             self._files[folder + (name,)] = FakeFile(filenum)
             filenum += 1
 
+    def _add_symlink(self, path, content):
+        global filenum
+        filenum += 1
+        f = FakeFile(filenum, 'symlink')
+        f._override(content=content)
+        self._files[path] = f
+
+    def _add_special_file(self, path, filetype):
+        global filenum
+        filenum += 1
+        self._files[path] = FakeFile(filenum, filetype)
+
     def path_to_full_string(self, path):
         return 'faketree:' + str(path)
 
@@ -114,7 +130,8 @@ class FakeTree(object):
         return self._files[path]
 
 class FakeFile(object):
-    def __init__(self, fileid):
+    def __init__(self, fileid, filetype='file'):
+        self._filetype = filetype
         self._fileid = fileid
         self._overrides = {}
         self._access = {}
@@ -126,7 +143,11 @@ class FakeFile(object):
         '''Not really the actual content. Rather, a short bytes object that
         uniquely identifies the actual content of this file.
         '''
+        assert self._filetype == 'file'
         self._register_access('content')
+        return self._get_raw_content()
+
+    def _get_raw_content(self):
         override = self._overrides.get('content')
         if override is not None:
             return override
@@ -146,10 +167,15 @@ class FakeFile(object):
 
     def get_size(self):
         self._register_access('size')
+        assert self._filetype == 'file'
         return self._fileid * 3 + 7
 
     def get_mtime(self):
         self._register_access('mtime')
+        assert self._filetype != 'symlink'
+        return self.get_link_mtime()
+
+    def get_link_mtime(self):
         mtime = (datetime.datetime(2015, 2, 14) +
                  datetime.timedelta(seconds=self._fileid))
         nanosecond = self._overrides.get('mtime_nsec')
@@ -157,6 +183,15 @@ class FakeFile(object):
             nanosecond = (999999960 + self._fileid * 7) % 1000000000
         mtime = mtime.replace(microsecond=nanosecond//1000)
         return mtime, nanosecond
+
+    def get_filetype(self):
+        self._register_access('filetype')
+        return self._filetype
+
+    def readsymlink(self):
+        self._register_access('readsymlink')
+        assert self._filetype == 'symlink'
+        return self._get_raw_content()
 
 def add_backup_handlers(tree, ignore=None, dynamic=None, static=None):
     root = tree.subtrees
@@ -216,6 +251,10 @@ class TestBasicBackup(unittest.TestCase):
             ('home', 'me', 'tmp', 'subdir'), ('neither', 'nor'))
         sourcetree._add_files(('home', 'me'), ('toplevel',))
         sourcetree._add_files(('home',), ('outside', 'and more'))
+        sourcetree._add_symlink(
+            ('home', 'me', 'myfiles', 'sl'), b'/home/missing')
+        sourcetree._add_special_file(
+            ('home', 'me', 'myfiles', 'sock'), 'socket')
         tree = bo.add_tree_to_backup(sourcetree, ('home', 'me'), ('main',))
         add_backup_handlers(
             tree,
@@ -233,6 +272,8 @@ class TestBasicBackup(unittest.TestCase):
             ('main', 'myfiles', 'static', 'two'),
             ('main', 'myfiles', 'static', 'more', 'three'),
             ('main', 'myfiles', 'static', 'more', 'four'),
+            ('main', 'myfiles', 'sl'),
+            ('main', 'myfiles', 'sock'),
             ('main', 'tmp', 'stuff'),
             ('main', 'toplevel')]
 
@@ -262,11 +303,14 @@ class TestBasicBackup(unittest.TestCase):
         for totest in self.expected_backed_up_files:
             fcid = backup._files[totest][0]
             sourcename = ('home', 'me') + totest[1:]
-            content = sourcetree._files[sourcename]._get_content()
-            ccid = self.backupcollection._content[content]
-            self.assertEqual(
-                fcid, ccid,
-                msg='Content mismatch for ' + str(totest))
+            content = sourcetree._files[sourcename]._get_raw_content()
+            if sourcename == ('home', 'me', 'myfiles', 'sock'):
+                self.assertNotIn(content, self.backupcollection._content)
+            else:
+                ccid = self.backupcollection._content[content]
+                self.assertEqual(
+                    fcid, ccid,
+                    msg='Content mismatch for ' + str(totest))
         self.assertNoLoggedProblems()
 
     def test_files_are_backed_up_with_correct_metadata(self):
@@ -277,10 +321,19 @@ class TestBasicBackup(unittest.TestCase):
             bkfile = backup._files[totest]
             sourcename = ('home', 'me') + totest[1:]
             srcfile = sourcetree._files[sourcename]
-            self.assertEqual(
-                srcfile.get_size(), bkfile[1],
-                msg='Size mismatch for ' + str(totest))
-            mtime, mtime_ns = srcfile.get_mtime()
+            if srcfile.get_filetype() == 'file':
+                self.assertEqual(
+                    srcfile.get_size(), bkfile[1],
+                    msg='Size mismatch for ' + str(totest))
+            elif srcfile.get_filetype() == 'symlink':
+                self.assertEqual(
+                    len(srcfile.readsymlink()), bkfile[1],
+                    msg='Size mismatch for ' + str(totest))
+            else:
+                self.assertEqual(
+                    0, bkfile[1],
+                    msg='Size mismatch for ' + str(totest))
+            mtime, mtime_ns = srcfile.get_link_mtime()
             self.assertEqual(
                 mtime, bkfile[2],
                 msg='mtime mismatch for ' + str(totest))
@@ -481,7 +534,14 @@ class TestBasicBackup(unittest.TestCase):
         self.assertIn(
             changed._get_content(), self.backupcollection._content_add_count)
         for content, count in self.backupcollection._content_add_count.items():
-            self.assertEqual(1, count)
+            if content == self.sourcetree._files[
+                    ('home', 'me', 'myfiles', 'sl')].readsymlink():
+                # For now, symlinks are added every time. I expect
+                # them to be few and small, so the performance impact
+                # is negligible.
+                self.assertEqual(2, count)
+            else:
+                self.assertEqual(1, count)
             if content != changed._get_content():
                 self.assertIn(content, old_contents)
         self.assertNoLoggedProblems()
@@ -517,7 +577,14 @@ class TestBasicBackup(unittest.TestCase):
         # And now, check that no contents have been added at all
         # during the second back-up operation.
         for content, count in self.backupcollection._content_add_count.items():
-            self.assertEqual(1, count)
+            if content == self.sourcetree._files[
+                    ('home', 'me', 'myfiles', 'sl')].readsymlink():
+                # For now, symlinks are added every time. I expect
+                # them to be few and small, so the performance impact
+                # is negligible.
+                self.assertEqual(2, count)
+            else:
+                self.assertEqual(1, count)
             self.assertIn(content, old_contents)
         self.assertNoLoggedProblems()
 
@@ -563,6 +630,12 @@ class TestBasicBackup(unittest.TestCase):
             backup2._files[('main', 'myfiles', 'more data')].contentid)
         for content, count in self.backupcollection._content_add_count.items():
             if content == changed._get_content():
+                self.assertEqual(2, count)
+            elif content == self.sourcetree._files[
+                    ('home', 'me', 'myfiles', 'sl')].readsymlink():
+                # For now, symlinks are added every time. I expect
+                # them to be few and small, so the performance impact
+                # is negligible.
                 self.assertEqual(2, count)
             else:
                 self.assertEqual(1, count)

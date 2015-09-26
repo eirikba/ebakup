@@ -67,7 +67,7 @@ class LocalFileSystem(object):
     def does_path_exist(self, path):
         return os.path.exists(self.path_to_string(path))
 
-    def get_directory_listing(self, path):
+    def get_directory_listing(self, path, include_special_files=True):
         stringpath = self.path_to_string(path)
         names = os.listdir(stringpath)
         dirs = []
@@ -75,18 +75,17 @@ class LocalFileSystem(object):
         for name in names:
             st = os.lstat(os.path.join(stringpath, name))
             if stat.S_ISLNK(st.st_mode):
-                # Ignoring symlinks is probably OK, but not optimal
-                pass
+                if (include_special_files):
+                    files.append((st.st_ino, name))
             elif stat.S_ISDIR(st.st_mode):
                 dirs.append(name)
             elif stat.S_ISREG(st.st_mode):
                 files.append((st.st_ino, name))
             elif stat.S_ISSOCK(st.st_mode) or stat.S_ISFIFO(st.st_mode):
-                # Ignore other special files.
-                # Currently assuming no device files appears.
-                pass
+                if (include_special_files):
+                    files.append((st.st_ino, name))
             else:
-                raise AssertionError('Neither file nor directory: ' + name)
+                raise AssertionError('Unknown file type: ' + name)
         files.sort()
         files = tuple(x[1] for x in files)
         return dirs, files
@@ -198,7 +197,7 @@ class LocalFile(object):
 
     def get_size(self):
         s = self._stat()
-        if s is None:
+        if s is False:
             raise FileNotFoundError('File not found: ' + self._stringpath)
         return s.st_size
 
@@ -220,7 +219,17 @@ class LocalFile(object):
 
     def get_mtime(self):
         s = self._stat()
-        if s is None:
+        if s is False:
+            raise FileNotFoundError('File not found: ' + self._stringpath)
+        mtime_ns = s.st_mtime_ns % 1000000000
+        mtime = datetime.datetime.utcfromtimestamp(s.st_mtime_ns // 1000000000)
+        mtime = mtime.replace(microsecond=mtime_ns//1000)
+        assert mtime.microsecond == mtime_ns // 1000
+        return mtime, mtime_ns
+
+    def get_link_mtime(self):
+        s = self._lstat()
+        if s is False:
             raise FileNotFoundError('File not found: ' + self._stringpath)
         mtime_ns = s.st_mtime_ns % 1000000000
         mtime = datetime.datetime.utcfromtimestamp(s.st_mtime_ns // 1000000000)

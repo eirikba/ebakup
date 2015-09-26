@@ -144,6 +144,24 @@ file name using utf-8.
 storage. Also, due to the way content ids are constructed, it doubles
 as a checksum of the file's content.
 
+<size> is the size of the file's data in octets. If the file is a
+symlink, it is the size of the link's description, not the the size of
+the pointed-to file. For other special files, the size is 0.
+
+<mtime> describes the last-modified time of the file. For symlinks it
+is the last-modified time of the link itself, not of the pointed-to
+file. See "Encoding last-modified time" for details.
+
+<extra> describes any optional extra data, such as ownership or access
+restrictions. See the "extra data" section for details.
+
+<type> describes what kind of file it is. See "Special files" for
+details.
+
+
+Encoding last-modified time
+---------------------------
+
 <mtime> consists of a year, a second-of-the-year part and a nanosecond
 part. The <second> value assumes that all minutes have 60 seconds, all
 hours have 60 minutes, and all days have 24 hours and all non-leap
@@ -175,8 +193,9 @@ When writing these values it is important to use the correct
 <mtime>. If there is doubt as to what the correct <mtime> value is for
 the data that was actually backed up, store 0.
 
-<extra> describes any optional extra data, such as ownership or access
-restrictions. See the "extra data" section for details.
+
+Special files
+-------------
 
 <type> is a single octet indicating the type of the file. The 0x91 and
 0x93 entries represent "regular" files. The 0x94 entries represent

@@ -187,7 +187,7 @@ class FakeFileSystem(object):
         if path in self._paths:
             raise FileExistsError('File already exists: ' + str(path))
         self._make_directory(path[:-1])
-        fileitem = FileItem.make_empty(self)
+        fileitem = FileItem.make_empty_regular_file(self)
         self._paths[path] = fileitem
         f = FakeFile(self, path, fileitem)
         f._writable = True
@@ -200,7 +200,7 @@ class FakeFileSystem(object):
         while path + ('tmpfile' + str(counter),) in self._paths:
             counter += 1
         use_path = path + ('tmpfile' + str(counter),)
-        fileitem = FileItem.make_empty(self)
+        fileitem = FileItem.make_empty_regular_file(self)
         self._paths[use_path] = fileitem
         return FakeTempFile(self, use_path, fileitem)
 
@@ -296,6 +296,7 @@ class FakeFileSystem(object):
 
     def _add_file(
             self, path, content=None, mtime=None, mtime_ns=None,
+            filetype='file',
             perms=None, update=False):
         if not update and path in self._paths:
             raise FileExistsError('File already exists: ' + str(path))
@@ -303,6 +304,8 @@ class FakeFileSystem(object):
             raise FileNotFoundError('File does not exists: ' + str(path))
         self._make_directory(path[:-1])
         item = FileItem()
+        if filetype not in ('file', 'symlink'):
+            assert content is None
         if content is not None:
             assert isinstance(content, bytes)
             item.data = content
@@ -320,7 +323,20 @@ class FakeFileSystem(object):
             item.mtime_ns = mtime_ns
         if perms is not None:
             item.perms = perms
+        assert filetype in ('file', 'symlink', 'socket', 'pipe', 'device')
+        item.filetype = filetype
         self._paths[path] = item
+        return item
+
+    def _add_symlink(
+            self, path, target=None, mtime=None, mtime_ns=None,
+            perms=None, update=False):
+        assert isinstance(target, bytes)
+        item = self._add_file(
+            path=path, content=None, mtime=mtime, mtime_ns=mtime_ns,
+            filetype='symlink',
+            perms=perms, update=update)
+        item.link_target = target
 
     def _add_directory(self, path, perms=None):
         if path in self._paths:
@@ -368,22 +384,43 @@ class FakeFile(object):
         self._item.lock += 1
         self._lock = 1
 
+    def get_filetype(self):
+        ft = self._item.filetype
+        assert ft in ('file', 'socket', 'pipe', 'symlink', 'device', 'other')
+        return ft
+
     def get_size(self):
         self._tree._check_access(self._path, 'stat')
-        return len(self._item.data)
+        if self._item.filetype == 'file':
+            return len(self._item.data)
+        if self._item.filetype in ('socket', 'pipe'):
+            return 0
+        raise NotImplementedError()
 
     def get_mtime(self):
         self._tree._check_access(self._path, 'stat')
+        assert self._item.filetype != 'symlink'
         return self._item.mtime, self._item.mtime_ns
+
+    def get_link_mtime(self):
+        self._tree._check_access(self._path, 'stat')
+        return self._item.mtime, self._item.mtime_ns
+
+    def readsymlink(self):
+        self._tree._check_access(self._path, 'read')
+        assert self._item.filetype == 'symlink'
+        return self._item.link_target
 
     def get_data_slice(self, start, end):
         self._tree._check_access(self._path, 'read')
+        assert self._item.filetype == 'file'
         return self._item.data[start:end]
 
     def write_data_slice(self, start, data):
         if not self._writable:
             raise io.UnsupportedOperationError('write')
         self._tree._check_access(self._path, 'write')
+        assert self._item.filetype == 'file'
         # While it is allowed to start a write beyond the end of the
         # current data, I think it would be a bug if it actually
         # happens.
@@ -432,8 +469,9 @@ class FileItem(object):
         self.perms = 'rwx'
 
     @staticmethod
-    def make_empty(filesys):
+    def make_empty_regular_file(filesys):
         item = FileItem()
+        item.filetype = 'file'
         item.data = b''
         item.mtime = filesys._utcnow()
         us = item.mtime.microsecond
@@ -443,7 +481,6 @@ class FileItem(object):
 
     @staticmethod
     def create_from_id(filesys, fileid):
-        item = FileItem()
         size = (fileid * fileid * 3889) % 6211
         data = str(fileid).encode('utf-8')
         data = data * (size // len(data))
@@ -451,6 +488,7 @@ class FileItem(object):
             data += b'a' * (size - len(data))
         assert len(data) == size
         item = FileItem()
+        item.filetype = 'file'
         item.data = data
         item.mtime = (
             filesys._utcnow() -

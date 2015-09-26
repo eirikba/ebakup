@@ -129,6 +129,17 @@ class TestFullSequence(unittest.TestCase):
             content=b'A different photo',
             mtime=datetime.datetime(1994, 4, 5, 2, 36, 23),
             mtime_ns=34763519)
+        fs._add_file(
+            ('home', 'me', 'socket'),
+            filetype='socket',
+            mtime=datetime.datetime(1994, 2, 20, 3, 59, 16),
+            mtime_ns=60446634)
+        fs._add_symlink(
+            ('home', 'me', 'symlink'),
+            target=b'system/notes.txt',
+            mtime=datetime.datetime(1994, 6, 15, 14, 2, 47),
+            mtime_ns=145225216)
+
 
     def get_initial_config_file_content(self):
         return textwrap.dedent('''\
@@ -210,6 +221,7 @@ class TestFullSequence(unittest.TestCase):
             '9a56e724abdbeafb3c206603f085d887323695e4cbfabedbb25597d5d43012e0',
             '384d1cd1ecf7cbd6dfbd82894af0922bc113589d14d06c465eb145922ae00dd7',
             '5e16a40318f071df23a3d2fb600f7943764bca4896020ba9a54a00c10f49e99e',
+            '9266be2ad9656a674b89ee113851aa31773a8c5414e6329fb9e605ea3d9415ac',
             ):
             expected.add((cid[:2],))
             expected.add((cid[:2],cid[2:4]))
@@ -237,7 +249,7 @@ class TestFullSequence(unittest.TestCase):
                 datetime.datetime(1995, 1, 1, 0, 0, 20)))
         dirs, files = bkup.list_directory(())
         self.assertCountEqual(('.config', 'My Pictures'), dirs)
-        self.assertCountEqual(('notes.txt',), files)
+        self.assertCountEqual(('notes.txt', 'socket', 'symlink'), files)
         dirs, files = bkup.list_directory(('My Pictures',))
         self.assertCountEqual((), dirs)
         self.assertCountEqual(('DSC_1886.JPG', 'DSC_1903.JPG'), files)
@@ -250,6 +262,7 @@ class TestFullSequence(unittest.TestCase):
             b"?27\x9f\xe4\x10\x8e\x99'\x98\x90\xfa"
             b"\xf4J\x83lj\xd86\xad3\x1e\xa2v\xd0\xa4\xb7\x85\x847\t\x1a",
             info.good_checksum)
+        self.assertEqual('file', info.filetype)
         info = bkup.get_file_info(('My Pictures', 'DSC_1903.JPG'))
         self.assertEqual(
             datetime.datetime(1994, 4, 5, 2, 36, 23, 34763), info.mtime)
@@ -259,6 +272,7 @@ class TestFullSequence(unittest.TestCase):
             b'8M\x1c\xd1\xec\xf7\xcb\xd6\xdf\xbd\x82\x89'
             b'J\xf0\x92+\xc1\x13X\x9d\x14\xd0lF^\xb1E\x92*\xe0\r\xd7',
             info.good_checksum)
+        self.assertEqual('file', info.filetype)
         cid = info.contentid
         reader = coll.get_content_reader(cid)
         self.assertEqual(17, reader.get_size())
@@ -282,6 +296,19 @@ class TestFullSequence(unittest.TestCase):
             datetime.datetime(1995, 1, 1, 0, 0, 20), timeline[0].first)
         self.assertEqual(
             datetime.datetime(1995, 1, 1, 0, 0, 20), timeline[0].last)
+        info = bkup.get_file_info(('socket',))
+        self.assertEqual(
+            datetime.datetime(1994, 2, 20, 3, 59, 16, 60446), info.mtime)
+        self.assertEqual(60446634, info.mtime_nsec)
+        self.assertEqual(0, info.size)
+        self.assertEqual(b'', info.good_checksum)
+        self.assertEqual('socket', info.filetype)
+        info = bkup.get_file_info(('symlink',))
+        self.assertEqual(
+            datetime.datetime(1994, 6, 15, 14, 2, 47, 145225), info.mtime)
+        self.assertEqual(145225216, info.mtime_nsec)
+        self.assertEqual(16, info.size)
+        self.assertEqual('symlink', info.filetype)
 
     def _check_info_after_initial_backup(self):
         out = io.StringIO()
@@ -293,7 +320,7 @@ class TestFullSequence(unittest.TestCase):
             'Backup definitions:\n  backup home\n'
             '    collection local:/backups/home\n'
             '      Least recently verified: 1995-01-01 00:00:20\n'
-            '      Total number of content files: 4\n'
+            '      Total number of content files: 5\n'
             '    collection local:/backups/second\n'
             '      (Does not exist)\n'
             '    source local:/home/me\n',
@@ -368,7 +395,7 @@ class TestFullSequence(unittest.TestCase):
                 self.assertEqual(item1.is_directory, item2.is_directory)
                 if not item1.is_directory:
                     self.assertEqual(item1.data, item2.data, path[2:])
-        self.assertEqual(27, count)
+        self.assertEqual(29, count)
         cids1 = []
         with datafile.open_content(self.fs, ('backups', 'home', 'db')) as cf:
             for item in cf:

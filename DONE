@@ -1,3 +1,23 @@
+Handle special files
+
+Status: FIXED (special files are registered with their file type.
+    Handling in shadow tree is sub-optimal, but I added another TODO
+    for that)
+
+Symlinks are currently ignored. That's probably not optimal. Maybe
+symlinks pointing out of tree should be ignored, while symlinks to
+in-tree files (and directories) should be registered as symlinks (with
+path)? Or maybe symlinks out-of-tree should be registered too, but
+obviously not in the shadow tree?
+
+Similar for sockets and pipes. Register in database, but don't add to
+shadow tree?
+
+What about device files? Should not occur, but could be registered in
+the database none the less.
+
+---------------------------------------------------------------------------
+
 Avoid writing "small" duplicate files to disk needlessly
 
 Status: FIXED (100MiB memory buffer)

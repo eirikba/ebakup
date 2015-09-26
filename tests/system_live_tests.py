@@ -14,6 +14,7 @@ import textwrap
 import unittest
 
 import cli
+import database
 import filesys
 import tests.settings
 
@@ -52,6 +53,8 @@ class TestBackup(unittest.TestCase):
         self._check_first_backup_on_disk()
         self.advance_utcnow(seconds=400)
         self._check_first_backup_info()
+        self.advance_utcnow(seconds=23)
+        self._check_first_backup_data()
         self.advance_utcnow(seconds=4000)
 
     def _make_source_tree(self):
@@ -71,6 +74,8 @@ class TestBackup(unittest.TestCase):
         self._make_file(
             os.path.join(sourcedir, 'tmp', 'boring.txt'),
             content=b'Ignore this file')
+        os.symlink('data', os.path.join(sourcedir, 'subdir', 'symlink'))
+        os.symlink('dead', os.path.join(sourcedir, 'dangling'))
 
     def _make_file(self, path, content):
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -93,13 +98,24 @@ class TestBackup(unittest.TestCase):
 
     def _check_first_backup_on_disk(self):
         contentpath = os.path.join(root_path, 'backup', 'content')
-        self.assertCountEqual(('45', '7d', '01'), os.listdir(contentpath))
+        self.assertCountEqual(
+            ('28', '3a', '45', '7d', '01'), os.listdir(contentpath))
+        self.assertCountEqual(
+            ('a3',), os.listdir(os.path.join(contentpath, '28')))
+        self.assertCountEqual(
+            ('6e',), os.listdir(os.path.join(contentpath, '3a')))
         self.assertCountEqual(
             ('35',), os.listdir(os.path.join(contentpath, '45')))
         self.assertCountEqual(
             ('d4',), os.listdir(os.path.join(contentpath, '7d')))
         self.assertCountEqual(
             ('bd',), os.listdir(os.path.join(contentpath, '01')))
+        self.assertCountEqual(
+            ('a5e81d1e89f0efc70b63bf717b921373fc7fac70bc1b7e4d466799c0c6b0',),
+            os.listdir(os.path.join(contentpath, '28', 'a3')))
+        self.assertCountEqual(
+            ('b0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7',),
+            os.listdir(os.path.join(contentpath, '3a', '6e')))
         self.assertCountEqual(
             ('6929829dc9fded17e755db91b93c25a4ed3fb9d60d92d4bd1e935a0ecc75',),
             os.listdir(os.path.join(contentpath, '45', '35')))
@@ -142,11 +158,34 @@ class TestBackup(unittest.TestCase):
               backup home
                 collection local:/path/to/testbakup/backup
                   Least recently verified: 2014-12-01 00:02:03
-                  Total number of content files: 3
+                  Total number of content files: 5
                 source local:/path/to/testbakup/sources
             '''),
         info)
         self.assertRegex(first, r'Web ui started on port \d+')
+
+    def _check_first_backup_data(self):
+        fs = filesys.get_file_system('local')
+        db = database.Database(
+            fs, fs.path_from_string(root_path) + ('backup','db'))
+        backup = db.get_most_recent_backup()
+        self.assertEqual(
+            datetime.datetime(2014, 12, 1, 0, 2, 3), backup.get_start_time())
+        self.assertTrue(backup.is_file(('home', 'subdir', 'data')))
+        self.assertFalse(backup.is_file(('subdir', 'data')))
+        self.assertFalse(backup.is_directory(('home', 'subdir', 'data')))
+        self.assertTrue(backup.is_directory(('home', 'subdir')))
+        self.assertTrue(backup.is_directory(('home',)))
+        self.assertTrue(backup.is_file(('home', 'subdir', 'symlink')))
+        self.assertFalse(backup.is_directory(('home', 'subdir', 'symlink')))
+        self.assertTrue(backup.is_file(('home', 'dangling')))
+        info = backup.get_file_info(('home', 'subdir', 'data'))
+        self.assertEqual('file', info.filetype)
+        self.assertEqual(9, info.size)
+        info = backup.get_file_info(('home', 'subdir', 'symlink'))
+        self.assertEqual('symlink', info.filetype)
+        info = backup.get_file_info(('home', 'dangling'))
+        self.assertEqual('symlink', info.filetype)
 
 @unittest.skipUnless(
     tests.settings.run_live_tests,

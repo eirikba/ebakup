@@ -102,22 +102,23 @@ class SyncTask(object):
         target = (
             targetinfo.collection.create_backup_file_in_replacement_mode(
                 starttime))
-        section = 'setting'
+        prevkind = 'setting'
         for item in source:
-            if item.kind != section:
-                if item.kind in ('file', 'directory'):
-                    if section in ('setting', 'file', 'directory'):
-                        section = item.kind
-            if item.kind != section:
+            if self._is_valid_itemkind_progression(prevkind, item.kind):
+                prevkind = item.kind
+            else:
                 raise AssertionError(
-                    '"' + section + '" + followed by "' + item.kind + '"')
+                    '"' + prevkind + '" + followed by "' + item.kind + '"')
             if item.kind == 'setting':
                 if item.key in (b'edb-blocksize', b'edb-blocksum', b'start'):
                     continue
             elif item.kind == 'directory':
                 pass
-            elif item.kind == 'file':
-                cid = self._copy_content(sourceinfo, targetinfo, item.cid)
+            elif (item.kind == 'file' or item.kind.startswith('file-')):
+                if item.cid == b'':
+                    cid  = b''
+                else:
+                    cid = self._copy_content(sourceinfo, targetinfo, item.cid)
                 if cid != item.cid:
                     # This isn't wrong per se. But it is highly
                     # unexpected and probably indicates a bug
@@ -135,6 +136,32 @@ class SyncTask(object):
                 raise AssertionError('Unknown item type: ' + item.kind)
             target.append_item(item)
         target.commit_and_close()
+
+    def _is_valid_itemkind_progression(self, prev, cur):
+        if prev == cur:
+            return True
+        prevgroup = self._group_for_itemkind(prev)
+        curgroup = self._group_for_itemkind(cur)
+        if prevgroup == 'settings':
+            return True
+        if curgroup == 'settings':
+            return False
+        if prevgroup == 'definitions':
+            return True
+        if curgroup == 'definitions':
+            return False
+        if prevgroup == 'data':
+            return True
+        raise UnreachableError()
+
+    def _group_for_itemkind(self, kind):
+        if kind == 'setting':
+            return 'settings'
+        if kind in ('file', 'directory'):
+            return 'data'
+        if kind.startswith('file-'):
+            return 'data'
+        raise AssertionError('Unknown item kind: ' + kind)
 
     _re_starttime = re.compile(rb'^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)$')
     def _parse_start_time(self, value):
