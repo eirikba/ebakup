@@ -144,6 +144,108 @@ class FakeFile(object):
             self._data.content[start + datalen:])
         return start + datalen
 
+class StandardItemData(object):
+    def load_content_1(self):
+        self.items = [
+            {'kind': 'magic', 'value': b'ebakup content data'},
+            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
+            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
+            { 'kind':'content',
+              'cid':b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y'
+                  b'\x00\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
+              'checksum':b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y'
+                  b'\x00\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
+              'first':0x55154078, 'last':0x55216909,
+              'updates':() },
+            { 'kind':'content',
+              'cid':b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
+                  b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
+              'checksum':b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
+                  b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
+              'first':0x55154078, 'last':0x55154078,
+              'updates': (
+                  { 'kind':'changed',
+                    'checksum':b'k\x8c\xba\x8b\x17\x8b\rL\x13\xde\xc9$<\x90\x04'
+                        b'\xeb\xc3\x03\xcbJ\xaf\xe93\x0c\x8d\x12^.\x94yS\xae',
+                    'first':0x55183045, 'last':0x551bea4b },
+                  { 'kind':'restored',
+                    'first':0x551beb3b, 'last':0x55216909 } ) },
+            { 'kind':'content',
+              'cid':b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
+                  b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98\x37\x73",
+              'checksum':b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
+                  b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98",
+              'first':0x5513d6d1, 'last':0x55168fac,
+              'updates': (
+                  { 'kind':'changed',
+                    'checksum':b'\x01\xfa\x04^\x9c\x11\xd5\x8d\xfe\x19]}\xd1(('
+                       b'\x0c\x00h\xad0\x13\xa3(\xb5\xe8\xb3\xac\xa3\x9e_\xfbb',
+                    'first':0x5517b191, 'last':0x551d1200 }, ) },
+            ]
+
+    def load_backup_1(self):
+        self.items = [
+            {'kind': 'magic', 'value': b'ebakup backup data'},
+            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
+            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
+            {'kind': 'setting',
+             'key': b'start', 'value': b'2015-04-03T10:46:06'},
+            {'kind': 'setting',
+             'key': b'end', 'value': b'2015-04-03T10:47:59'},
+            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path',
+             'extra_data': 0 },
+            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to',
+             'extra_data': 0 },
+            {'kind': 'file', 'parent': 9, 'name': b'file',
+             'cid': b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
+                    b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
+             'size': 7850, 'mtime_year': 2015, 'mtime_second': 0x42a042,
+             'mtime_ns': 765430000, 'extra_data': 0 },
+            {'kind': 'file', 'parent': 0, 'name': b'file',
+             'cid': b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
+                    b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
+             'size': 23, 'mtime_year': 2013, 'mtime_second': 0x10adba0,
+             'mtime_ns': 0, 'extra_data': 0 },
+            ]
+
+    def append_item(self, item):
+        self.items.append(item)
+
+    def change_setting(self, key, value):
+        found = 0
+        for item in self.items:
+            if item['kind'] == 'setting' and item['key'] == key:
+                found += 1
+                item['value'] = value
+        if found != 1:
+            raise AssertionError(
+                'Expected 1 setting with key "' + str(key) +
+                '", but found ' + str(found))
+
+    def change_extra_data_for_dirid(self, dirid, extra):
+        found = 0
+        for item in self.items:
+            if item['kind'] == 'directory' and item['dirid'] == dirid:
+                found += 1
+                item['extra_data'] = extra
+        if found != 1:
+            raise AssertionError(
+                'Expected 1 directory with id ' + str(dirid) +
+                ', but found ' + str(found))
+
+    def change_extra_data_for_file(self, parent, name, extra):
+        found = 0
+        for item in self.items:
+            if (item['kind'] == 'file' and item['parent'] == parent and
+                    item['name'] == name):
+                found += 1
+                item['extra_data'] = extra
+        if found != 1:
+            raise AssertionError(
+                'Expected 1 file in directory ' + str(parent) +
+                ' with name "' + str(name) +
+                '", but found ' + str(found))
+
 class TestDataFile(unittest.TestCase):
     def test_create_typical_main(self):
         tree = FakeTree()
@@ -303,43 +405,9 @@ class TestDataFile(unittest.TestCase):
             ('path', 'to', 'db', 'content'),
             testdata.dbfiledata('content-1'))
         content = datafile.open_content(tree, ('path', 'to', 'db'))
-        expect = (
-            {'kind': 'magic', 'value': b'ebakup content data'},
-            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
-            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
-            { 'kind':'content',
-              'cid':b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y'
-                  b'\x00\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
-              'checksum':b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y'
-                  b'\x00\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
-              'first':0x55154078, 'last':0x55216909,
-              'updates':() },
-            { 'kind':'content',
-              'cid':b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
-                  b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
-              'checksum':b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
-                  b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
-              'first':0x55154078, 'last':0x55154078,
-              'updates': (
-                  { 'kind':'changed',
-                    'checksum':b'k\x8c\xba\x8b\x17\x8b\rL\x13\xde\xc9$<\x90\x04'
-                        b'\xeb\xc3\x03\xcbJ\xaf\xe93\x0c\x8d\x12^.\x94yS\xae',
-                    'first':0x55183045, 'last':0x551bea4b },
-                  { 'kind':'restored',
-                    'first':0x551beb3b, 'last':0x55216909 } ) },
-            { 'kind':'content',
-              'cid':b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
-                  b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98\x37\x73",
-              'checksum':b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
-                  b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98",
-              'first':0x5513d6d1, 'last':0x55168fac,
-              'updates': (
-                  { 'kind':'changed',
-                    'checksum':b'\x01\xfa\x04^\x9c\x11\xd5\x8d\xfe\x19]}\xd1(('
-                       b'\x0c\x00h\xad0\x13\xa3(\xb5\xe8\xb3\xac\xa3\x9e_\xfbb',
-                    'first':0x5517b191, 'last':0x551d1200 }, ) },
-            )
-        for x in expect:
+        expect = StandardItemData()
+        expect.load_content_1()
+        for x in expect.items:
             item = next(content)
             for key, value in x.items():
                 if key == 'updates':
@@ -517,53 +585,21 @@ class TestDataFile(unittest.TestCase):
             datafile.ItemContent(
                 b'this is another one', b'this is another one',
                 1402611839, 1402611839))
-        expect = (
-            {'kind': 'magic', 'value': b'ebakup content data'},
-            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
-            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
-            { 'kind':'content',
-              'cid':b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y'
-                  b'\x00\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
-              'checksum':b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y'
-                  b'\x00\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
-              'first':0x55154078, 'last':0x55216909,
-              'updates':() },
-            { 'kind':'content',
-              'cid':b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
-                  b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
-              'checksum':b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
-                  b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
-              'first':0x55154078, 'last':0x55154078,
-              'updates': (
-                  { 'kind':'changed',
-                    'checksum':b'k\x8c\xba\x8b\x17\x8b\rL\x13\xde\xc9$<\x90\x04'
-                        b'\xeb\xc3\x03\xcbJ\xaf\xe93\x0c\x8d\x12^.\x94yS\xae',
-                    'first':0x55183045, 'last':0x551bea4b },
-                  { 'kind':'restored',
-                    'first':0x551beb3b, 'last':0x55216909 } ) },
-            { 'kind':'content',
-              'cid':b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
-                  b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98\x37\x73",
-              'checksum':b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
-                  b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98",
-              'first':0x5513d6d1, 'last':0x55168fac,
-              'updates': (
-                  { 'kind':'changed',
-                    'checksum':b'\x01\xfa\x04^\x9c\x11\xd5\x8d\xfe\x19]}\xd1(('
-                       b'\x0c\x00h\xad0\x13\xa3(\xb5\xe8\xb3\xac\xa3\x9e_\xfbb',
-                    'first':0x5517b191, 'last':0x551d1200 }, ) },
+        expect = StandardItemData()
+        expect.load_content_1()
+        expect.append_item(
             { 'kind':'content',
               'cid':b'this is a new file',
               'checksum':b'this is a new file',
               'first':1409428462, 'last':1409428462,
-              'updates': () },
+              'updates': () })
+        expect.append_item(
             { 'kind':'content',
               'cid':b'this is another one',
               'checksum':b'this is another one',
               'first':1402611839, 'last':1402611839,
-              'updates': () },
-            )
-        for x in expect:
+              'updates': () } )
+        for x in expect.items:
             item = next(content)
             for key, value in x.items():
                 if key == 'updates':
@@ -581,7 +617,7 @@ class TestDataFile(unittest.TestCase):
             (('path', 'to', 'db', 'content'),), tree._files_modified)
         tree._files_modified = []
         content = datafile.open_content(tree, ('path', 'to', 'db'))
-        for x in expect:
+        for x in expect.items:
             item = next(content)
             for key, value in x.items():
                 if key == 'updates':
@@ -675,44 +711,10 @@ class TestDataFile(unittest.TestCase):
             ('path', 'to', 'db', 'content'),
             testdata.dbfiledata('content-1'))
         content = datafile.get_unopened_content(tree, ('path', 'to', 'db'))
-        expect = (
-            {'kind': 'magic', 'value': b'ebakup content data'},
-            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
-            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
-            { 'kind':'content',
-              'cid':b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y'
-                  b'\x00\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
-              'checksum':b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y'
-                  b'\x00\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
-              'first':0x55154078, 'last':0x55216909,
-              'updates':() },
-            { 'kind':'content',
-              'cid':b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
-                  b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
-              'checksum':b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
-                  b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
-              'first':0x55154078, 'last':0x55154078,
-              'updates': (
-                  { 'kind':'changed',
-                    'checksum':b'k\x8c\xba\x8b\x17\x8b\rL\x13\xde\xc9$<\x90\x04'
-                        b'\xeb\xc3\x03\xcbJ\xaf\xe93\x0c\x8d\x12^.\x94yS\xae',
-                    'first':0x55183045, 'last':0x551bea4b },
-                  { 'kind':'restored',
-                    'first':0x551beb3b, 'last':0x55216909 } ) },
-            { 'kind':'content',
-              'cid':b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
-                  b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98\x37\x73",
-              'checksum':b"(n\x1a\x8bM\xf0\x98\xfe\xbc[\xea\x9b{Soi\x9e\xaf\x00"
-                  b"\x8e\xca\x93\xf7\x8c\xc5'y\x15\xab5\xee\x98",
-              'first':0x5513d6d1, 'last':0x55168fac,
-              'updates': (
-                  { 'kind':'changed',
-                    'checksum':b'\x01\xfa\x04^\x9c\x11\xd5\x8d\xfe\x19]}\xd1(('
-                       b'\x0c\x00h\xad0\x13\xa3(\xb5\xe8\xb3\xac\xa3\x9e_\xfbb',
-                    'first':0x5517b191, 'last':0x551d1200 }, ) },
-            )
+        expect = StandardItemData()
+        expect.load_content_1()
         content.open_and_lock_readonly()
-        for x in expect:
+        for x in expect.items:
             if x.get('updates'):
                 break
             item = next(content)
@@ -728,7 +730,7 @@ class TestDataFile(unittest.TestCase):
                     self.assertEqual(value, getattr(item, key), msg=key)
         content.close()
         content.open_and_lock_readonly()
-        for x in expect:
+        for x in expect.items:
             item = next(content)
             for key, value in x.items():
                 if key == 'updates':
@@ -796,28 +798,9 @@ class TestDataFile(unittest.TestCase):
             testdata.dbfiledata('backup-1'))
         backup = datafile.open_backup(
             tree, ('path', 'to', 'db'), datetime.datetime(2015, 4, 3, 10, 46))
-        expect = (
-            {'kind': 'magic', 'value': b'ebakup backup data'},
-            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
-            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
-            {'kind': 'setting',
-             'key': b'start', 'value': b'2015-04-03T10:46:06'},
-            {'kind': 'setting',
-             'key': b'end', 'value': b'2015-04-03T10:47:59'},
-            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path' },
-            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to' },
-            {'kind': 'file', 'parent': 9, 'name': b'file',
-             'cid': b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
-                    b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
-             'size': 7850, 'mtime_year': 2015, 'mtime_second': 0x42a042,
-             'mtime_ns': 765430000 },
-            {'kind': 'file', 'parent': 0, 'name': b'file',
-             'cid': b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
-                    b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
-             'size': 23, 'mtime_year': 2013, 'mtime_second': 0x10adba0,
-             'mtime_ns': 0 },
-            )
-        for x in expect:
+        expect = StandardItemData()
+        expect.load_backup_1()
+        for x in expect.items:
             item = next(backup)
             for key, value in x.items():
                 self.assertEqual(value, getattr(item, key), msg=key)
@@ -841,6 +824,8 @@ class TestDataFile(unittest.TestCase):
         starttime = datetime.datetime(2015, 9, 5, 21, 22, 42)
         backup = datafile.create_backup_in_replacement_mode(
             tree, ('path', 'to', 'db'), starttime)
+        # This one is not replaced with StandardItemData to preserve
+        # the particular choices of data and their comments.
         items = (
             {'kind': 'magic', 'value': b'ebakup backup data'},
             {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
@@ -906,30 +891,11 @@ class TestDataFile(unittest.TestCase):
         starttime = datetime.datetime(2015, 9, 5, 21, 22, 42)
         backup = datafile.create_backup_in_replacement_mode(
             tree, ('path', 'to', 'db'), starttime)
-        items = (
-            {'kind': 'magic', 'value': b'ebakup backup data'},
-            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
-            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
-            {'kind': 'setting',
-             'key': b'start', 'value': b'2015-09-05T21:22:42'},
-            {'kind': 'setting',
-             'key': b'end', 'value': b'2015-09-05T21:24:06'},
-            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path',
-             'extra_data': 0 },
-            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to',
-             'extra_data': 0 },
-            {'kind': 'file', 'parent': 9, 'name': b'file',
-             'cid': b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
-                    b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
-             'size': 7850, 'mtime_year': 2015, 'mtime_second': 0x42a042,
-             'mtime_ns': 765430000, 'extra_data': 0 },
-            {'kind': 'file', 'parent': 0, 'name': b'file',
-             'cid': b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
-                    b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
-             'size': 23, 'mtime_year': 2013, 'mtime_second': 0x10adba0,
-             'mtime_ns': 0, 'extra_data': 0 },
-            )
-        for item in items:
+        items = StandardItemData()
+        items.load_backup_1()
+        items.change_setting(b'start', b'2015-09-05T21:22:42')
+        items.change_setting(b'end', b'2015-09-05T21:24:06')
+        for item in items.items:
             if item['kind'] in ('magic', 'setting'):
                 continue
             dataitem = datafile.Item(item['kind'])
@@ -956,41 +922,22 @@ class TestDataFile(unittest.TestCase):
     def test_create_simple_backup_with_special_files(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to', 'db'))
-        starttime = datetime.datetime(2015, 9, 5, 21, 22, 42)
+        starttime = datetime.datetime(2015, 4, 3, 10, 46, 6)
         backup = datafile.create_backup_in_replacement_mode(
             tree, ('path', 'to', 'db'), starttime)
-        items = (
-            {'kind': 'magic', 'value': b'ebakup backup data'},
-            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
-            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
-            {'kind': 'setting',
-             'key': b'start', 'value': b'2015-09-05T21:22:42'},
-            {'kind': 'setting',
-             'key': b'end', 'value': b'2015-09-05T21:24:06'},
-            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path',
-             'extra_data': 0 },
-            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to',
-             'extra_data': 0 },
-            {'kind': 'file', 'parent': 9, 'name': b'file',
-             'cid': b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
-                    b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
-             'size': 23, 'mtime_year': 2015, 'mtime_second': 0x42a042,
-             'mtime_ns': 765430000, 'extra_data': 0 },
-            {'kind': 'file', 'parent': 0, 'name': b'file',
-             'cid': b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
-                    b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
-             'size': 7850, 'mtime_year': 2013, 'mtime_second': 0x10adba0,
-             'mtime_ns': 0, 'extra_data': 0 },
+        items = StandardItemData()
+        items.load_backup_1()
+        items.append_item(
             {'kind': 'file-symlink', 'parent': 0, 'name': b'symbolic_link',
              'cid': b':&h)\x02-\xaf`\x92\xde\x11\xbb\xd7\xaaK4\xb7\xa0E\xa1\x8d'
                     b'\xb8#(\x02"\xc2s\x01\xd6\x03\xd1',
              'size': 27, 'mtime_year': 2014, 'mtime_second': 29899012,
-             'mtime_ns': 259388602, 'extra_data': 0 },
+             'mtime_ns': 259388602, 'extra_data': 0 })
+        items.append_item(
             {'kind': 'file-socket', 'parent': 0, 'name': b'fs_socket',
              'cid': b'', 'size': 0, 'mtime_year': 2014,
-             'mtime_second': 24395803, 'mtime_ns': 946662039, 'extra_data': 0},
-            )
-        for item in items:
+             'mtime_second': 24395803, 'mtime_ns': 946662039, 'extra_data': 0})
+        for item in items.items:
             if item['kind'] in ('magic', 'setting'):
                 continue
             if item['kind'] in ('file', 'directory'):
@@ -1008,23 +955,23 @@ class TestDataFile(unittest.TestCase):
                 raise AssertionError('Unexpected kind: ' + item['kind'])
             backup.append_item(dataitem)
         backup.insert_item(
-            0, -1, datafile.ItemSetting(b'end', b'2015-09-05T21:24:06'))
+            0, -1, datafile.ItemSetting(b'end', b'2015-04-03T10:47:59'))
         self.assertNotIn(
-            ('path', 'to', 'db', '2015', '09-05T21:22'), tree._files)
+            ('path', 'to', 'db', '2015', '04-03T10:46'), tree._files)
         self.assertEqual(
             True,
-            tree._files[('path', 'to', 'db', '2015', '09-05T21:22.new')].locked)
+            tree._files[('path', 'to', 'db', '2015', '04-03T10:46.new')].locked)
         backup.commit_and_close()
         self.assertCountEqual(
             (('path', 'to', 'db', '2015'),
-             ('path', 'to', 'db', '2015', '09-05T21:22.new'),
-             ('path', 'to', 'db', '2015', '09-05T21:22')),
+             ('path', 'to', 'db', '2015', '04-03T10:46.new'),
+             ('path', 'to', 'db', '2015', '04-03T10:46')),
             set(tree._files_modified))
         tree._files_modified = []
         self.assertNotIn(
-            ('path', 'to', 'db', '2015', '09-05T21:22.new'), tree._files)
+            ('path', 'to', 'db', '2015', '04-03T10:46.new'), tree._files)
         backup = datafile.open_backup(tree, ('path', 'to', 'db'), starttime)
-        for x in items:
+        for x in items.items:
             item = next(backup)
             for key, value in x.items():
                 self.assertEqual(value, getattr(item, key), msg=key)
@@ -1035,54 +982,37 @@ class TestDataFile(unittest.TestCase):
     def test_create_simple_backup_with_extra_file_data(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to', 'db'))
-        starttime = datetime.datetime(2015, 9, 5, 21, 22, 42)
+        starttime = datetime.datetime(2015, 4, 3, 10, 46, 6)
         backup = datafile.create_backup_in_replacement_mode(
             tree, ('path', 'to', 'db'), starttime)
-        items = (
-            {'kind': 'magic', 'value': b'ebakup backup data'},
-            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
-            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
-            {'kind': 'setting',
-             'key': b'start', 'value': b'2015-09-05T21:22:42'},
-            {'kind': 'setting',
-             'key': b'end', 'value': b'2015-09-05T21:24:06'},
-            {'kind': 'directory', 'dirid': 8, 'parent': 0, 'name': b'path',
-             'extra_data': {
-                 'owner': 'me', 'group': 'me', 'unix-access': 0o755 } },
-            {'kind': 'directory', 'dirid': 9, 'parent': 8, 'name': b'to',
-             'extra_data': {
-                 'owner': 'me', 'group': 'me', 'unix-access': 0o755 } },
-            {'kind': 'file', 'parent': 9, 'name': b'file',
-             'cid': b'\x92!G\xa0\xbfQ\x8bQL\xb5\xc1\x1e\x1a\x10\xbf\xeb;y\x00'
-                    b'\xe3/~\xd7\x1b\xf4C\x04\xd1a*\xf2^',
-             'size': 23, 'mtime_year': 2015, 'mtime_second': 0x42a042,
-             'mtime_ns': 765430000,
-             'extra_data': {
-                 'owner': 'me', 'group': 'me', 'unix-access': 0o644 } },
-            {'kind': 'file', 'parent': 0, 'name': b'file',
-             'cid': b'P\xcd\x91\x14\x0b\x0c\xd9\x95\xfb\xd1!\xe3\xf3\x05'
-                    b'\xe7\xd1[\xe6\xc8\x1b\xc5&\x99\xe3L\xe9?\xdaJ\x0eF\xde',
-             'size': 7850, 'mtime_year': 2013, 'mtime_second': 0x10adba0,
-             'mtime_ns': 0,
-             'extra_data': {
-                 'owner': 'me', 'group': 'me', 'unix-access': 0o755 } },
+        items = StandardItemData()
+        items.load_backup_1()
+        items.change_extra_data_for_dirid(
+            8, { 'owner': 'me', 'group': 'me', 'unix-access': 0o755 })
+        items.change_extra_data_for_dirid(
+            9, { 'owner': 'me', 'group': 'me', 'unix-access': 0o755 })
+        items.change_extra_data_for_file(
+            9, b'file', { 'owner': 'me', 'group': 'me', 'unix-access': 0o644 })
+        items.change_extra_data_for_file(
+            0, b'file', { 'owner': 'me', 'group': 'me', 'unix-access': 0o755 })
+        items.append_item(
             {'kind': 'file-symlink', 'parent': 0, 'name': b'symbolic_link',
              'cid': b':&h)\x02-\xaf`\x92\xde\x11\xbb\xd7\xaaK4\xb7\xa0E\xa1\x8d'
                     b'\xb8#(\x02"\xc2s\x01\xd6\x03\xd1',
              'size': 27, 'mtime_year': 2014, 'mtime_second': 29899012,
              'mtime_ns': 259388602,
              'extra_data': {
-                 'owner': 'other', 'group': 'other', 'unix-access': 0o644 } },
+                 'owner': 'other', 'group': 'other', 'unix-access': 0o644 } })
+        items.append_item(
             {'kind': 'file-socket', 'parent': 0, 'name': b'fs_socket',
              'cid': b'', 'size': 0, 'mtime_year': 2014,
              'mtime_second': 24395803, 'mtime_ns': 946662039,
              'extra_data': {
-                 'owner': 'root', 'group': 'staff', 'unix-access': 0o640 } },
-            )
+                 'owner': 'root', 'group': 'staff', 'unix-access': 0o640 } })
         kvs = KeyValueDict()
         extradefs = ExtraDataDict()
         xidblock = None
-        for item in items:
+        for item in items.items:
             if item['kind'] in ('magic', 'setting'):
                 continue
             if item['kind'] == 'directory':
@@ -1131,25 +1061,25 @@ class TestDataFile(unittest.TestCase):
                 dataitem.set_extra_data(xid)
             backup.append_item(dataitem)
         backup.insert_item(
-            0, -1, datafile.ItemSetting(b'end', b'2015-09-05T21:24:06'))
+            0, -1, datafile.ItemSetting(b'end', b'2015-04-03T10:47:59'))
         self.assertNotIn(
-            ('path', 'to', 'db', '2015', '09-05T21:22'), tree._files)
+            ('path', 'to', 'db', '2015', '04-03T10:46'), tree._files)
         self.assertEqual(
             True,
-            tree._files[('path', 'to', 'db', '2015', '09-05T21:22.new')].locked)
+            tree._files[('path', 'to', 'db', '2015', '04-03T10:46.new')].locked)
         backup.commit_and_close()
         self.assertCountEqual(
             (('path', 'to', 'db', '2015'),
-             ('path', 'to', 'db', '2015', '09-05T21:22.new'),
-             ('path', 'to', 'db', '2015', '09-05T21:22')),
+             ('path', 'to', 'db', '2015', '04-03T10:46.new'),
+             ('path', 'to', 'db', '2015', '04-03T10:46')),
             set(tree._files_modified))
         tree._files_modified = []
         self.assertNotIn(
-            ('path', 'to', 'db', '2015', '09-05T21:22.new'), tree._files)
+            ('path', 'to', 'db', '2015', '04-03T10:46.new'), tree._files)
         backup = datafile.open_backup(tree, ('path', 'to', 'db'), starttime)
         kvids = {}
         xids = { 0: tuple() }
-        for x in items:
+        for x in items.items:
             item = next(backup)
             while item.kind in ('key-value', 'extradef'):
                 if item.kind == 'key-value':
