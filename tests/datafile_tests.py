@@ -1090,6 +1090,36 @@ class TestDataFile(unittest.TestCase):
         backup.close()
         self.assertCountEqual((), tree._files_modified)
 
+    def test_move_block_to_end(self):
+        items = StandardItemData()
+        items.load_backup_1()
+        tree = FakeTree()
+        tree._add_directory(('path', 'to', 'db'))
+        starttime = datetime.datetime(2015, 4, 3, 10, 46, 6)
+
+        backup = datafile.create_backup_in_replacement_mode(
+            tree, ('path', 'to', 'db'), starttime)
+        self.assertEqual('setting', items.items[4]['kind'])
+        self.assertEqual('directory', items.items[5]['kind'])
+        self.append_item_sequence(items.items[5:], backup)
+        self.assertEqual(1, backup.get_last_block_index())
+        backup.move_block(1, -1)
+        self.assertEqual(2, backup.get_last_block_index())
+        backup.insert_item(
+            1, -1, datafile.ItemKeyValue(0, b'extra key', b'extra value'))
+        backup.insert_item(
+            0, -1, datafile.ItemSetting(b'end', b'2015-04-03T10:47:59'))
+        backup.commit_and_close()
+        backup = datafile.open_backup(tree, ('path', 'to', 'db'), starttime)
+        self.assertEqual(2, backup.get_last_block_index())
+        self.assertItemSequence(items.items[:5], backup)
+        item = next(backup)
+        self.assertEqual('key-value', item.kind)
+        self.assertEqual(b'extra key', item.key)
+        self.assertEqual(b'extra value', item.value)
+        self.assertItemSequence(items.items[5:], backup)
+        backup.close()
+
 class KeyValueDict(object):
     def __init__(self):
         self.next_kvid = 0

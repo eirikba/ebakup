@@ -83,6 +83,7 @@ expected_tests = set((
     'datafile_tests.TestDataFile.test_create_simple_backup_without_commit_will_abort',
     'datafile_tests.TestDataFile.test_create_typical_main',
     'datafile_tests.TestDataFile.test_main_with_non_matching_checksum',
+    'datafile_tests.TestDataFile.test_move_block_to_end',
     'datafile_tests.TestDataFile.test_open_backup_with_wrong_name',
     'datafile_tests.TestDataFile.test_open_main_does_not_exist',
     'datafile_tests.TestDataFile.test_raw_create_main_with_non_default_block_size',

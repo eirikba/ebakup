@@ -666,7 +666,6 @@ class DataFile(object):
         '''
         if self._file is None:
             raise AssertionError('File is not open')
-        raise NotTestedError()
         sourceblock = self._load_block(source)
         if target == -1:
             targetblock = self._create_block()
