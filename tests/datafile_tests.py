@@ -325,6 +325,55 @@ class TestDataFile(unittest.TestCase):
             x[k] = (self.encodeKvKey(v[0]), self.encodeKvValue(v[1]))
         self.assertEqual(x, actual)
 
+    def append_item_sequence_with_extras(self, items, output, kvids, xids):
+        xidblock = None
+        for item in items:
+            if item['kind'] == 'directory':
+                dataitem = datafile.ItemDirectory(
+                    item['dirid'], item['parent'], item['name'])
+            elif item['kind'] == 'file':
+                dataitem = datafile.ItemFile(
+                    item['parent'], item['name'], item['cid'],
+                    item['size'],
+                    (item['mtime_year'], item['mtime_second'],
+                     item['mtime_ns']))
+            elif item['kind'].startswith('file-'):
+                kind = item['kind'][5:]
+                dataitem = datafile.ItemSpecialFile(
+                    kind, item['parent'], item['name'], item['cid'],
+                    item['size'],
+                    (item['mtime_year'], item['mtime_second'],
+                     item['mtime_ns']))
+            else:
+                raise AssertionError('Unexpected kind: ' + item['kind'])
+            if 'extra_data' in item:
+                itemkvids = []
+                for key, value in item['extra_data'].items():
+                    kvid = kvids.get(key, value)
+                    if kvid is None:
+                        kvid = kvids.add(key,value)
+                        if xidblock is None:
+                            xidblock = 1
+                            if output.does_block_exist(1):
+                                output.move_block(1, -1)
+                            else:
+                                output.create_block()
+                                # And create the first data block, too
+                                # (so we don't put data in the
+                                # definition block).
+                                output.create_block()
+                        output.insert_item(
+                            xidblock, -1, datafile.ItemKeyValue(
+                                kvid, key, value))
+                    itemkvids.append(kvid)
+                xid = xids.get(itemkvids)
+                if xid is None:
+                    xid = xids.add(itemkvids)
+                    output.insert_item(
+                        xidblock, -1, datafile.ItemExtraDef(xid, itemkvids))
+                dataitem.set_extra_data(xid)
+            output.append_item(dataitem)
+
     def test_read_typical_main(self):
         tree = FakeTree()
         tree._add_file(
@@ -995,55 +1044,10 @@ class TestDataFile(unittest.TestCase):
                  'owner': 'root', 'group': 'staff', 'unix-access': 0o640 } })
         kvs = KeyValueDict()
         extradefs = ExtraDataDict()
-        xidblock = None
-        for item in items.items:
-            if item['kind'] in ('magic', 'setting'):
-                continue
-            if item['kind'] == 'directory':
-                dataitem = datafile.ItemDirectory(
-                    item['dirid'], item['parent'], item['name'])
-            elif item['kind'] == 'file':
-                dataitem = datafile.ItemFile(
-                    item['parent'], item['name'], item['cid'],
-                    item['size'],
-                    (item['mtime_year'], item['mtime_second'],
-                     item['mtime_ns']))
-            elif item['kind'].startswith('file-'):
-                kind = item['kind'][5:]
-                dataitem = datafile.ItemSpecialFile(
-                    kind, item['parent'], item['name'], item['cid'],
-                    item['size'],
-                    (item['mtime_year'], item['mtime_second'],
-                     item['mtime_ns']))
-            else:
-                raise AssertionError('Unexpected kind: ' + item['kind'])
-            if 'extra_data' in item:
-                itemkvids = []
-                for key, value in item['extra_data'].items():
-                    kvid = kvs.get(key, value)
-                    if kvid is None:
-                        kvid = kvs.add(key,value)
-                        if xidblock is None:
-                            xidblock = 1
-                            if backup.does_block_exist(1):
-                                backup.move_block(1, -1)
-                            else:
-                                backup.create_block()
-                                # And create the first data block, too
-                                # (so we don't put data in the
-                                # definition block).
-                                backup.create_block()
-                        backup.insert_item(
-                            xidblock, -1, datafile.ItemKeyValue(
-                                kvid, key, value))
-                    itemkvids.append(kvid)
-                xid = extradefs.get(itemkvids)
-                if xid is None:
-                    xid = extradefs.add(itemkvids)
-                    backup.insert_item(
-                        xidblock, -1, datafile.ItemExtraDef(xid, itemkvids))
-                dataitem.set_extra_data(xid)
-            backup.append_item(dataitem)
+        self.assertEqual('setting', items.items[4]['kind'])
+        self.assertEqual('directory', items.items[5]['kind'])
+        self.append_item_sequence_with_extras(
+            items.items[5:], backup, kvs, extradefs)
         backup.insert_item(
             0, -1, datafile.ItemSetting(b'end', b'2015-04-03T10:47:59'))
         self.assertNotIn(
