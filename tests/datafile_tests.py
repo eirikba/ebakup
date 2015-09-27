@@ -325,6 +325,9 @@ class TestDataFile(unittest.TestCase):
             x[k] = (self.encodeKvKey(v[0]), self.encodeKvValue(v[1]))
         self.assertEqual(x, actual)
 
+    def append_item_sequence(self, items, output):
+        self.append_item_sequence_with_extras(items, output, None, None)
+
     def append_item_sequence_with_extras(self, items, output, kvids, xids):
         xidblock = None
         for item in items:
@@ -347,8 +350,11 @@ class TestDataFile(unittest.TestCase):
             else:
                 raise AssertionError('Unexpected kind: ' + item['kind'])
             if 'extra_data' in item:
+                extra_data = item['extra_data']
+                if extra_data == 0:
+                    extra_data = {}
                 itemkvids = []
-                for key, value in item['extra_data'].items():
+                for key, value in extra_data.items():
                     kvid = kvids.get(key, value)
                     if kvid is None:
                         kvid = kvids.add(key,value)
@@ -366,7 +372,10 @@ class TestDataFile(unittest.TestCase):
                             xidblock, -1, datafile.ItemKeyValue(
                                 kvid, key, value))
                     itemkvids.append(kvid)
-                xid = xids.get(itemkvids)
+                if not itemkvids:
+                    xid = 0
+                else:
+                    xid = xids.get(itemkvids)
                 if xid is None:
                     xid = xids.add(itemkvids)
                     output.insert_item(
@@ -892,13 +901,7 @@ class TestDataFile(unittest.TestCase):
              'size': 7850, 'mtime_year': 2013, 'mtime_second': 0x10adba0,
              'mtime_ns': 0, 'extra_data': 0 },
             )
-        for item in items:
-            if item['kind'] in ('magic', 'setting'):
-                continue
-            dataitem = datafile.Item(item['kind'])
-            for name, value in item.items():
-                setattr(dataitem, name, value)
-            backup.append_item(dataitem)
+        self.append_item_sequence(items[5:], backup)
         backup.insert_item(
             0, -1, datafile.ItemSetting(b'end', b'2015-09-05T21:24:06'))
         self.assertNotIn(
@@ -931,13 +934,9 @@ class TestDataFile(unittest.TestCase):
         items.load_backup_1()
         items.change_setting(b'start', b'2015-09-05T21:22:42')
         items.change_setting(b'end', b'2015-09-05T21:24:06')
-        for item in items.items:
-            if item['kind'] in ('magic', 'setting'):
-                continue
-            dataitem = datafile.Item(item['kind'])
-            for name, value in item.items():
-                setattr(dataitem, name, value)
-            backup.append_item(dataitem)
+        self.assertEqual('setting', items.items[4]['kind'])
+        self.assertEqual('directory', items.items[5]['kind'])
+        self.append_item_sequence(items.items[5:], backup)
         backup.insert_item(
             0, -1, datafile.ItemSetting(b'end', b'2015-09-05T21:24:06'))
         self.assertNotIn(
@@ -973,23 +972,9 @@ class TestDataFile(unittest.TestCase):
             {'kind': 'file-socket', 'parent': 0, 'name': b'fs_socket',
              'cid': b'', 'size': 0, 'mtime_year': 2014,
              'mtime_second': 24395803, 'mtime_ns': 946662039, 'extra_data': 0})
-        for item in items.items:
-            if item['kind'] in ('magic', 'setting'):
-                continue
-            if item['kind'] in ('file', 'directory'):
-                dataitem = datafile.Item(item['kind'])
-                for name, value in item.items():
-                    setattr(dataitem, name, value)
-            elif item['kind'].startswith('file-'):
-                kind = item['kind'][5:]
-                dataitem = datafile.ItemSpecialFile(
-                    kind, item['parent'], item['name'], item['cid'],
-                    item['size'],
-                    (item['mtime_year'], item['mtime_second'],
-                     item['mtime_ns']))
-            else:
-                raise AssertionError('Unexpected kind: ' + item['kind'])
-            backup.append_item(dataitem)
+        self.assertEqual('setting', items.items[4]['kind'])
+        self.assertEqual('directory', items.items[5]['kind'])
+        self.append_item_sequence(items.items[5:], backup)
         backup.insert_item(
             0, -1, datafile.ItemSetting(b'end', b'2015-04-03T10:47:59'))
         self.assertNotIn(
