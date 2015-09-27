@@ -247,26 +247,6 @@ class StandardItemData(object):
                 '", but found ' + str(found))
 
 class TestDataFile(unittest.TestCase):
-    def test_create_typical_main(self):
-        tree = FakeTree()
-        tree._add_directory(('path', 'to'))
-        main = datafile.create_main_in_replacement_mode(
-            tree, ('path', 'to', 'db'))
-        main.append_item(datafile.ItemSetting(b'checksum', b'sha256'))
-        self.assertCountEqual(
-            (('path', 'to', 'db', 'main.new'), ('path', 'to', 'db')),
-            tree._files_modified)
-        main.commit_and_close()
-        self.assertCountEqual(
-            (('path', 'to', 'db'),
-             ('path', 'to', 'db', 'main'),
-             ('path', 'to', 'db', 'main.new')),
-            tree._files_modified)
-        self.assertNotIn(('path', 'to', 'db', 'main.new'), tree._files)
-        self.assertEqual(
-            testdata.dbfiledata('main-1'),
-            tree._files[('path', 'to', 'db', 'main')].content)
-
     def assertItemSequence(self, expect, actual):
         for x in expect:
             item = next(actual)
@@ -383,17 +363,39 @@ class TestDataFile(unittest.TestCase):
                 dataitem.set_extra_data(xid)
             output.append_item(dataitem)
 
-    def test_read_typical_main(self):
+    def test_create_typical_main(self):
         tree = FakeTree()
-        tree._add_file(
-            ('path', 'to', 'db', 'main'),
-            testdata.dbfiledata('main-1'))
-        main = datafile.open_main(tree, ('path', 'to', 'db'))
+        tree._add_directory(('path', 'to'))
+
+        main = datafile.create_main_in_replacement_mode(
+            tree, ('path', 'to', 'db'))
+        main.append_item(datafile.ItemSetting(b'checksum', b'sha256'))
+        self.assertCountEqual(
+            (('path', 'to', 'db', 'main.new'), ('path', 'to', 'db')),
+            tree._files_modified)
+        main.commit_and_close()
+        self.assertCountEqual(
+            (('path', 'to', 'db'),
+             ('path', 'to', 'db', 'main'),
+             ('path', 'to', 'db', 'main.new')),
+            tree._files_modified)
+        self.assertNotIn(('path', 'to', 'db', 'main.new'), tree._files)
+        self.assertEqual(
+            testdata.dbfiledata('main-1'),
+            tree._files[('path', 'to', 'db', 'main')].content)
+
+    def test_read_typical_main(self):
         expect = (
             {'kind': 'magic', 'value': b'ebakup database v1'},
             {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
             {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
             {'kind': 'setting', 'key': b'checksum', 'value': b'sha256'} )
+        tree = FakeTree()
+        tree._add_file(
+            ('path', 'to', 'db', 'main'),
+            testdata.dbfiledata('main-1'))
+
+        main = datafile.open_main(tree, ('path', 'to', 'db'))
         self.assertItemSequence(expect, main)
         self.assertRaises(StopIteration, next, main)
         self.assertRaises(StopIteration, next, main)
@@ -404,6 +406,7 @@ class TestDataFile(unittest.TestCase):
     def test_create_main_directory_already_exists(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to', 'db'))
+
         self.assertRaisesRegex(
             FileExistsError, 'exists.*path.*to.*db',
             datafile.create_main_in_replacement_mode,
@@ -412,19 +415,21 @@ class TestDataFile(unittest.TestCase):
 
     def test_open_main_does_not_exist(self):
         tree = FakeTree()
+
         self.assertRaisesRegex(
             FileNotFoundError, 'path.*to.*db.*main',
             datafile.open_main, tree, ('path', 'to', 'db'))
         self.assertEqual([], tree._files_modified)
 
     def test_main_with_non_matching_checksum(self):
-        tree = FakeTree()
         dbdata = testdata.dbfiledata('main-1')
         self.assertEqual(4096, len(dbdata))
         dbdata = dbdata[:-3] + b'xxx'
+        tree = FakeTree()
         tree._add_file(
             ('path', 'to', 'db', 'main'),
             dbdata)
+
         self.assertRaisesRegex(
             datafile.InvalidDataError, 'hecksum mismatch',
             datafile.open_main, tree, ('path', 'to', 'db'))
@@ -433,6 +438,7 @@ class TestDataFile(unittest.TestCase):
     def test_raw_create_main_with_non_default_block_size(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to'))
+
         main = datafile.DataFile(tree, ('path', 'to', 'db', 'main'))
         main.create_and_lock()
         main.append_item(datafile.ItemMagic(b'ebakup database v1'))
@@ -452,6 +458,7 @@ class TestDataFile(unittest.TestCase):
     def test_raw_create_main_with_non_default_block_sum(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to'))
+
         main = datafile.DataFile(tree, ('path', 'to', 'db', 'main'))
         main.create_and_lock()
         main.append_item(datafile.ItemMagic(b'ebakup database v1'))
@@ -469,6 +476,11 @@ class TestDataFile(unittest.TestCase):
             tree._files[('path', 'to', 'db', 'main')].content)
 
     def test_read_main_with_non_default_block_size(self):
+        expect = (
+            {'kind': 'magic', 'value': b'ebakup database v1'},
+            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'1387'},
+            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
+            {'kind': 'setting', 'key': b'checksum', 'value': b'sha256'} )
         data = testdata.dbfiledata('main-1')[:1355].replace(
             b'blocksize:4096', b'blocksize:1387')
         data += hashlib.sha256(data).digest()
@@ -476,18 +488,19 @@ class TestDataFile(unittest.TestCase):
         tree._add_file(
             ('path', 'to', 'db', 'main'),
             data)
+
         main = datafile.open_main(tree, ('path', 'to', 'db'))
-        expect = (
-            {'kind': 'magic', 'value': b'ebakup database v1'},
-            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'1387'},
-            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
-            {'kind': 'setting', 'key': b'checksum', 'value': b'sha256'} )
         self.assertItemSequence(expect, main)
         self.assertRaises(StopIteration, next, main)
         main.close()
         self.assertCountEqual((), tree._files_modified)
 
     def test_read_main_with_non_default_block_sum(self):
+        expect = (
+            {'kind': 'magic', 'value': b'ebakup database v1'},
+            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
+            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'md5'},
+            {'kind': 'setting', 'key': b'checksum', 'value': b'sha256'} )
         tree = FakeTree()
         data = testdata.dbfiledata('main-1')[:4064].replace(
             b'blocksum:sha256', b'blocksum:md5') + b'\x00' * 19
@@ -495,12 +508,8 @@ class TestDataFile(unittest.TestCase):
         tree._add_file(
             ('path', 'to', 'db', 'main'),
             data)
+
         main = datafile.open_main(tree, ('path', 'to', 'db'))
-        expect = (
-            {'kind': 'magic', 'value': b'ebakup database v1'},
-            {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
-            {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'md5'},
-            {'kind': 'setting', 'key': b'checksum', 'value': b'sha256'} )
         self.assertItemSequence(expect, main)
         self.assertRaises(StopIteration, next, main)
         main.close()
@@ -511,9 +520,10 @@ class TestDataFile(unittest.TestCase):
         tree._add_file(
             ('path', 'to', 'db', 'content'),
             testdata.dbfiledata('content-1'))
-        content = datafile.open_content(tree, ('path', 'to', 'db'))
         expect = StandardItemData()
         expect.load_content_1()
+
+        content = datafile.open_content(tree, ('path', 'to', 'db'))
         self.assertItemSequence(expect.items, content)
         self.assertRaises(StopIteration, next, content)
         self.assertRaises(StopIteration, next, content)
@@ -524,6 +534,7 @@ class TestDataFile(unittest.TestCase):
     def test_create_content_db(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to', 'db'))
+
         content = datafile.create_content_in_replacement_mode(
             tree, ('path', 'to', 'db'))
         cid1 = b'010----hhhh'
@@ -593,6 +604,7 @@ class TestDataFile(unittest.TestCase):
     def test_create_content_db_then_open_and_write_to_it(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to', 'db'))
+
         content = datafile.create_content_in_replacement_mode(
             tree, ('path', 'to', 'db'))
         self.assertCountEqual(
@@ -667,20 +679,6 @@ class TestDataFile(unittest.TestCase):
         self.assertCountEqual((), tree._files_modified)
 
     def test_read_and_write_content_db(self):
-        tree = FakeTree()
-        tree._add_file(
-            ('path', 'to', 'db', 'content'),
-            testdata.dbfiledata('content-1'))
-        content = datafile.open_content(
-            tree, ('path', 'to', 'db'), writable=True)
-        content.append_item(
-            datafile.ItemContent(
-                b'this is a new file', b'this is a new file',
-                1409428462, 1409428462))
-        content.append_item(
-            datafile.ItemContent(
-                b'this is another one', b'this is another one',
-                1402611839, 1402611839))
         expect = StandardItemData()
         expect.load_content_1()
         expect.append_item(
@@ -695,6 +693,21 @@ class TestDataFile(unittest.TestCase):
               'checksum':b'this is another one',
               'first':1402611839, 'last':1402611839,
               'updates': () } )
+        tree = FakeTree()
+        tree._add_file(
+            ('path', 'to', 'db', 'content'),
+            testdata.dbfiledata('content-1'))
+
+        content = datafile.open_content(
+            tree, ('path', 'to', 'db'), writable=True)
+        content.append_item(
+            datafile.ItemContent(
+                b'this is a new file', b'this is a new file',
+                1409428462, 1409428462))
+        content.append_item(
+            datafile.ItemContent(
+                b'this is another one', b'this is another one',
+                1402611839, 1402611839))
         self.assertItemSequence(expect.items, content)
         self.assertRaises(StopIteration, next, content)
         content.close()
@@ -710,6 +723,7 @@ class TestDataFile(unittest.TestCase):
     def test_create_multi_block_content_db(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to', 'db'))
+
         content = datafile.create_content_in_replacement_mode(
             tree, ('path', 'to', 'db'))
         # This item is sized so that the first data block is exactly filled.
@@ -780,15 +794,18 @@ class TestDataFile(unittest.TestCase):
         self.assertEqual(b'\x00' * 2658, data[12288 + 74 * 19 : 12288 + 4064])
 
     def test_get_unopened_content(self):
+        expect = StandardItemData()
+        expect.load_content_1()
         tree = FakeTree()
         tree._add_file(
             ('path', 'to', 'db', 'content'),
             testdata.dbfiledata('content-1'))
+
         content = datafile.get_unopened_content(tree, ('path', 'to', 'db'))
-        expect = StandardItemData()
-        expect.load_content_1()
         content.open_and_lock_readonly()
         self.assertEqual(6, len(expect.items))
+        # Don't read to the end before closing, to test that
+        # re-opening the file really starts at the beginning.
         self.assertItemSequence(expect.items[:4], content)
         content.close()
         content.open_and_lock_readonly()
@@ -804,6 +821,7 @@ class TestDataFile(unittest.TestCase):
         tree._add_file(
             ('path', 'to', 'db', 'content'),
             testdata.dbfiledata('content-1'))
+
         content = datafile.get_unopened_content(tree, ('path', 'to', 'db'))
         self.assertRaisesRegex(AssertionError, 'is not open', next, content)
         self.assertRaisesRegex(
@@ -815,6 +833,7 @@ class TestDataFile(unittest.TestCase):
         tree._add_file(
             ('path', 'to', 'db', 'content'),
             testdata.dbfiledata('content-1'))
+
         content = datafile.get_unopened_content(tree, ('path', 'to', 'db'))
         content.open_and_lock_readonly()
         item = next(content)
@@ -831,6 +850,7 @@ class TestDataFile(unittest.TestCase):
         tree._add_file(
             ('path', 'to', 'db', 'content'),
             testdata.dbfiledata('content-1'))
+
         content = datafile.get_unopened_content(tree, ('path', 'to', 'db'))
         content.open_and_lock_readonly()
         self.assertRaisesRegex(
@@ -839,18 +859,20 @@ class TestDataFile(unittest.TestCase):
     def test_get_and_open_content_when_it_does_not_exist(self):
         tree = FakeTree()
         tree._add_directory(('path', 'to', 'db'))
+
         content = datafile.get_unopened_content(tree, ('path', 'to', 'db'))
         self.assertRaises(FileNotFoundError, content.open_and_lock_readonly)
 
     def test_read_simple_backup(self):
+        expect = StandardItemData()
+        expect.load_backup_1()
         tree = FakeTree()
         tree._add_file(
             ('path', 'to', 'db', '2015', '04-03T10:46'),
             testdata.dbfiledata('backup-1'))
+
         backup = datafile.open_backup(
             tree, ('path', 'to', 'db'), datetime.datetime(2015, 4, 3, 10, 46))
-        expect = StandardItemData()
-        expect.load_backup_1()
         self.assertItemSequence(expect.items, backup)
         self.assertRaises(StopIteration, next, backup)
         backup.close()
@@ -861,18 +883,14 @@ class TestDataFile(unittest.TestCase):
         tree._add_file(
             ('path', 'to', 'db', '2015', '04-03T10:45'),
             testdata.dbfiledata('backup-1'))
+
         self.assertRaisesRegex(
             datafile.InvalidDataError, 'non-matching start time.*10:46.*10:45',
             datafile.open_backup,
             tree, ('path', 'to', 'db'), datetime.datetime(2015, 4, 3, 10, 45))
 
     def test_create_simple_backup(self):
-        tree = FakeTree()
-        tree._add_directory(('path', 'to', 'db'))
-        starttime = datetime.datetime(2015, 9, 5, 21, 22, 42)
-        backup = datafile.create_backup_in_replacement_mode(
-            tree, ('path', 'to', 'db'), starttime)
-        # This one is not replaced with StandardItemData to preserve
+        # This one is not using StandardItemData in order to preserve
         # the particular choices of data and their comments.
         items = (
             {'kind': 'magic', 'value': b'ebakup backup data'},
@@ -901,6 +919,12 @@ class TestDataFile(unittest.TestCase):
              'size': 7850, 'mtime_year': 2013, 'mtime_second': 0x10adba0,
              'mtime_ns': 0, 'extra_data': 0 },
             )
+        tree = FakeTree()
+        tree._add_directory(('path', 'to', 'db'))
+        starttime = datetime.datetime(2015, 9, 5, 21, 22, 42)
+
+        backup = datafile.create_backup_in_replacement_mode(
+            tree, ('path', 'to', 'db'), starttime)
         self.append_item_sequence(items[5:], backup)
         backup.insert_item(
             0, -1, datafile.ItemSetting(b'end', b'2015-09-05T21:24:06'))
@@ -925,15 +949,16 @@ class TestDataFile(unittest.TestCase):
         self.assertCountEqual((), tree._files_modified)
 
     def test_create_simple_backup_without_commit_will_abort(self):
-        tree = FakeTree()
-        tree._add_directory(('path', 'to', 'db'))
-        starttime = datetime.datetime(2015, 9, 5, 21, 22, 42)
-        backup = datafile.create_backup_in_replacement_mode(
-            tree, ('path', 'to', 'db'), starttime)
         items = StandardItemData()
         items.load_backup_1()
         items.change_setting(b'start', b'2015-09-05T21:22:42')
         items.change_setting(b'end', b'2015-09-05T21:24:06')
+        tree = FakeTree()
+        tree._add_directory(('path', 'to', 'db'))
+        starttime = datetime.datetime(2015, 9, 5, 21, 22, 42)
+
+        backup = datafile.create_backup_in_replacement_mode(
+            tree, ('path', 'to', 'db'), starttime)
         self.assertEqual('setting', items.items[4]['kind'])
         self.assertEqual('directory', items.items[5]['kind'])
         self.append_item_sequence(items.items[5:], backup)
@@ -955,11 +980,6 @@ class TestDataFile(unittest.TestCase):
             ('path', 'to', 'db', '2015', '09-05T21:22'), tree._files)
 
     def test_create_simple_backup_with_special_files(self):
-        tree = FakeTree()
-        tree._add_directory(('path', 'to', 'db'))
-        starttime = datetime.datetime(2015, 4, 3, 10, 46, 6)
-        backup = datafile.create_backup_in_replacement_mode(
-            tree, ('path', 'to', 'db'), starttime)
         items = StandardItemData()
         items.load_backup_1()
         items.append_item(
@@ -972,6 +992,12 @@ class TestDataFile(unittest.TestCase):
             {'kind': 'file-socket', 'parent': 0, 'name': b'fs_socket',
              'cid': b'', 'size': 0, 'mtime_year': 2014,
              'mtime_second': 24395803, 'mtime_ns': 946662039, 'extra_data': 0})
+        tree = FakeTree()
+        tree._add_directory(('path', 'to', 'db'))
+        starttime = datetime.datetime(2015, 4, 3, 10, 46, 6)
+
+        backup = datafile.create_backup_in_replacement_mode(
+            tree, ('path', 'to', 'db'), starttime)
         self.assertEqual('setting', items.items[4]['kind'])
         self.assertEqual('directory', items.items[5]['kind'])
         self.append_item_sequence(items.items[5:], backup)
@@ -998,11 +1024,6 @@ class TestDataFile(unittest.TestCase):
         self.assertCountEqual((), tree._files_modified)
 
     def test_create_simple_backup_with_extra_file_data(self):
-        tree = FakeTree()
-        tree._add_directory(('path', 'to', 'db'))
-        starttime = datetime.datetime(2015, 4, 3, 10, 46, 6)
-        backup = datafile.create_backup_in_replacement_mode(
-            tree, ('path', 'to', 'db'), starttime)
         items = StandardItemData()
         items.load_backup_1()
         items.change_extra_data_for_dirid(
@@ -1027,6 +1048,12 @@ class TestDataFile(unittest.TestCase):
              'mtime_second': 24395803, 'mtime_ns': 946662039,
              'extra_data': {
                  'owner': 'root', 'group': 'staff', 'unix-access': 0o640 } })
+        tree = FakeTree()
+        tree._add_directory(('path', 'to', 'db'))
+        starttime = datetime.datetime(2015, 4, 3, 10, 46, 6)
+
+        backup = datafile.create_backup_in_replacement_mode(
+            tree, ('path', 'to', 'db'), starttime)
         kvs = KeyValueDict()
         extradefs = ExtraDataDict()
         self.assertEqual('setting', items.items[4]['kind'])
