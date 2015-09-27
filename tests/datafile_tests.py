@@ -267,6 +267,64 @@ class TestDataFile(unittest.TestCase):
             testdata.dbfiledata('main-1'),
             tree._files[('path', 'to', 'db', 'main')].content)
 
+    def assertItemSequence(self, expect, actual):
+        for x in expect:
+            item = next(actual)
+            for key, value in x.items():
+                if key == 'updates':
+                    self.assertEqual(len(item.updates), len(value))
+                    for itemupd, expectupd in zip(item.updates, value):
+                        for upkey, upvalue in expectupd.items():
+                            self.assertEqual(
+                                upvalue, getattr(itemupd, upkey),
+                                msg='key:' + upkey)
+                else:
+                    self.assertEqual(value, getattr(item, key), msg=key)
+
+    def assertItemSequenceWithExtras(self, expect, actual, kvids, xids):
+        for x in expect:
+            item = next(actual)
+            while item.kind in ('key-value', 'extradef'):
+                if item.kind == 'key-value':
+                    self.assertNotIn(item.kvid, kvids)
+                    kvids[item.kvid] = (item.key, item.value)
+                else:
+                    self.assertNotIn(item.xid, xids)
+                    xids[item.xid] = item.kvids
+                item = next(actual)
+            for key, value in x.items():
+                if key == 'extra_data':
+                    extra = {}
+                    for kvid in xids[item.extra_data]:
+                        k, v = kvids[kvid]
+                        extra[k] = v
+                    self.assertExtraDataEqual(value, extra)
+                else:
+                    self.assertEqual(value, getattr(item, key), msg=key)
+
+    def assertExtraDataEqual(self, expected, actual):
+        x = {}
+        for k,v in expected.items():
+            x[self.encodeKvKey(k)] = self.encodeKvValue(v)
+        self.assertEqual(x, actual)
+
+    def encodeKvKey(self, k):
+        if isinstance(k, str):
+            return k.encode('utf-8')
+        return k
+
+    def encodeKvValue(self, v):
+        if isinstance(v, bytes):
+            return v
+        return str(v).encode('utf-8')
+
+    def assertKeyValueDictsEqual(self, expected, actual):
+        x = {}
+        for k,v in expected.items():
+            self.assertEqual(2, len(v))
+            x[k] = (self.encodeKvKey(v[0]), self.encodeKvValue(v[1]))
+        self.assertEqual(x, actual)
+
     def test_read_typical_main(self):
         tree = FakeTree()
         tree._add_file(
@@ -278,10 +336,7 @@ class TestDataFile(unittest.TestCase):
             {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
             {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
             {'kind': 'setting', 'key': b'checksum', 'value': b'sha256'} )
-        for x in expect:
-            item = next(main)
-            for key, value in x.items():
-                self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertItemSequence(expect, main)
         self.assertRaises(StopIteration, next, main)
         self.assertRaises(StopIteration, next, main)
         self.assertRaises(StopIteration, next, main)
@@ -369,10 +424,7 @@ class TestDataFile(unittest.TestCase):
             {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'1387'},
             {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'sha256'},
             {'kind': 'setting', 'key': b'checksum', 'value': b'sha256'} )
-        for x in expect:
-            item = next(main)
-            for key, value in x.items():
-                self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertItemSequence(expect, main)
         self.assertRaises(StopIteration, next, main)
         main.close()
         self.assertCountEqual((), tree._files_modified)
@@ -391,10 +443,7 @@ class TestDataFile(unittest.TestCase):
             {'kind': 'setting', 'key': b'edb-blocksize', 'value': b'4096'},
             {'kind': 'setting', 'key': b'edb-blocksum', 'value': b'md5'},
             {'kind': 'setting', 'key': b'checksum', 'value': b'sha256'} )
-        for x in expect:
-            item = next(main)
-            for key, value in x.items():
-                self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertItemSequence(expect, main)
         self.assertRaises(StopIteration, next, main)
         main.close()
         self.assertCountEqual((), tree._files_modified)
@@ -407,18 +456,7 @@ class TestDataFile(unittest.TestCase):
         content = datafile.open_content(tree, ('path', 'to', 'db'))
         expect = StandardItemData()
         expect.load_content_1()
-        for x in expect.items:
-            item = next(content)
-            for key, value in x.items():
-                if key == 'updates':
-                    self.assertEqual(len(item.updates), len(value))
-                    for itemupd, expectupd in zip(item.updates, value):
-                        for upkey, upvalue in expectupd.items():
-                            self.assertEqual(
-                                upvalue, getattr(itemupd, upkey),
-                                msg='key:' + upkey)
-                else:
-                    self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertItemSequence(expect.items, content)
         self.assertRaises(StopIteration, next, content)
         self.assertRaises(StopIteration, next, content)
         self.assertRaises(StopIteration, next, content)
@@ -599,36 +637,14 @@ class TestDataFile(unittest.TestCase):
               'checksum':b'this is another one',
               'first':1402611839, 'last':1402611839,
               'updates': () } )
-        for x in expect.items:
-            item = next(content)
-            for key, value in x.items():
-                if key == 'updates':
-                    self.assertEqual(len(item.updates), len(value))
-                    for itemupd, expectupd in zip(item.updates, value):
-                        for upkey, upvalue in expectupd.items():
-                            self.assertEqual(
-                                upvalue, getattr(itemupd, upkey),
-                                msg='key:' + upkey)
-                else:
-                    self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertItemSequence(expect.items, content)
         self.assertRaises(StopIteration, next, content)
         content.close()
         self.assertCountEqual(
             (('path', 'to', 'db', 'content'),), tree._files_modified)
         tree._files_modified = []
         content = datafile.open_content(tree, ('path', 'to', 'db'))
-        for x in expect.items:
-            item = next(content)
-            for key, value in x.items():
-                if key == 'updates':
-                    self.assertEqual(len(item.updates), len(value))
-                    for itemupd, expectupd in zip(item.updates, value):
-                        for upkey, upvalue in expectupd.items():
-                            self.assertEqual(
-                                upvalue, getattr(itemupd, upkey),
-                                msg='key:' + upkey)
-                else:
-                    self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertItemSequence(expect.items, content)
         self.assertRaises(StopIteration, next, content)
         content.close()
         self.assertCountEqual((), tree._files_modified)
@@ -714,34 +730,11 @@ class TestDataFile(unittest.TestCase):
         expect = StandardItemData()
         expect.load_content_1()
         content.open_and_lock_readonly()
-        for x in expect.items:
-            if x.get('updates'):
-                break
-            item = next(content)
-            for key, value in x.items():
-                if key == 'updates':
-                    self.assertEqual(len(item.updates), len(value))
-                    for itemupd, expectupd in zip(item.updates, value):
-                        for upkey, upvalue in expectupd.items():
-                            self.assertEqual(
-                                upvalue, getattr(itemupd, upkey),
-                                msg='key:' + upkey)
-                else:
-                    self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertEqual(6, len(expect.items))
+        self.assertItemSequence(expect.items[:4], content)
         content.close()
         content.open_and_lock_readonly()
-        for x in expect.items:
-            item = next(content)
-            for key, value in x.items():
-                if key == 'updates':
-                    self.assertEqual(len(item.updates), len(value))
-                    for itemupd, expectupd in zip(item.updates, value):
-                        for upkey, upvalue in expectupd.items():
-                            self.assertEqual(
-                                upvalue, getattr(itemupd, upkey),
-                                msg='key:' + upkey)
-                else:
-                    self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertItemSequence(expect.items, content)
         self.assertRaises(StopIteration, next, content)
         self.assertRaises(StopIteration, next, content)
         self.assertRaises(StopIteration, next, content)
@@ -800,10 +793,7 @@ class TestDataFile(unittest.TestCase):
             tree, ('path', 'to', 'db'), datetime.datetime(2015, 4, 3, 10, 46))
         expect = StandardItemData()
         expect.load_backup_1()
-        for x in expect.items:
-            item = next(backup)
-            for key, value in x.items():
-                self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertItemSequence(expect.items, backup)
         self.assertRaises(StopIteration, next, backup)
         backup.close()
         self.assertCountEqual((), tree._files_modified)
@@ -877,10 +867,7 @@ class TestDataFile(unittest.TestCase):
         self.assertNotIn(
             ('path', 'to', 'db', '2015', '09-05T21:22.new'), tree._files)
         backup = datafile.open_backup(tree, ('path', 'to', 'db'), starttime)
-        for x in items:
-            item = next(backup)
-            for key, value in x.items():
-                self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertItemSequence(items, backup)
         self.assertRaises(StopIteration, next, backup)
         backup.close()
         self.assertCountEqual((), tree._files_modified)
@@ -971,10 +958,7 @@ class TestDataFile(unittest.TestCase):
         self.assertNotIn(
             ('path', 'to', 'db', '2015', '04-03T10:46.new'), tree._files)
         backup = datafile.open_backup(tree, ('path', 'to', 'db'), starttime)
-        for x in items.items:
-            item = next(backup)
-            for key, value in x.items():
-                self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertItemSequence(items.items, backup)
         self.assertRaises(StopIteration, next, backup)
         backup.close()
         self.assertCountEqual((), tree._files_modified)
@@ -1079,53 +1063,12 @@ class TestDataFile(unittest.TestCase):
         backup = datafile.open_backup(tree, ('path', 'to', 'db'), starttime)
         kvids = {}
         xids = { 0: tuple() }
-        for x in items.items:
-            item = next(backup)
-            while item.kind in ('key-value', 'extradef'):
-                if item.kind == 'key-value':
-                    self.assertNotIn(item.kvid, kvids)
-                    kvids[item.kvid] = (item.key, item.value)
-                else:
-                    self.assertNotIn(item.xid, xids)
-                    xids[item.xid] = item.kvids
-                item = next(backup)
-            for key, value in x.items():
-                if key == 'extra_data':
-                    extra = {}
-                    for kvid in xids[item.extra_data]:
-                        k, v = kvids[kvid]
-                        extra[k] = v
-                    self.assertExtraDataEqual(value, extra)
-                else:
-                    self.assertEqual(value, getattr(item, key), msg=key)
+        self.assertItemSequenceWithExtras(items.items, backup, kvids, xids)
         self.assertRaises(StopIteration, next, backup)
         self.assertKeyValueDictsEqual(kvs.kvids, kvids)
         self.assertEqual(extradefs.xids, xids)
         backup.close()
         self.assertCountEqual((), tree._files_modified)
-
-    def assertExtraDataEqual(self, expected, actual):
-        x = {}
-        for k,v in expected.items():
-            x[self.encodeKvKey(k)] = self.encodeKvValue(v)
-        self.assertEqual(x, actual)
-
-    def encodeKvKey(self, k):
-        if isinstance(k, str):
-            return k.encode('utf-8')
-        return k
-
-    def encodeKvValue(self, v):
-        if isinstance(v, bytes):
-            return v
-        return str(v).encode('utf-8')
-
-    def assertKeyValueDictsEqual(self, expected, actual):
-        x = {}
-        for k,v in expected.items():
-            self.assertEqual(2, len(v))
-            x[k] = (self.encodeKvKey(v[0]), self.encodeKvValue(v[1]))
-        self.assertEqual(x, actual)
 
 class KeyValueDict(object):
     def __init__(self):
