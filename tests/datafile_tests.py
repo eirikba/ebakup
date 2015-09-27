@@ -262,9 +262,11 @@ class TestDataFile(unittest.TestCase):
                     self.assertEqual(value, getattr(item, key), msg=key)
 
     def assertItemSequenceWithExtras(self, expect, actual, kvids, xids):
+        has_seen_data_item = False
         for x in expect:
             item = next(actual)
             while item.kind in ('key-value', 'extradef'):
+                self.assertFalse(has_seen_data_item)
                 if item.kind == 'key-value':
                     self.assertNotIn(item.kvid, kvids)
                     kvids[item.kvid] = (item.key, item.value)
@@ -272,6 +274,8 @@ class TestDataFile(unittest.TestCase):
                     self.assertNotIn(item.xid, xids)
                     xids[item.xid] = item.kvids
                 item = next(actual)
+            if item.kind not in ('magic', 'setting'):
+                has_seen_data_item = True
             for key, value in x.items():
                 if key == 'extra_data':
                     extra = {}
