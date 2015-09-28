@@ -245,7 +245,8 @@ class FakeBackupBuilder(object):
         self._backup = FakeBackup(start_time)
 
     def add_file(
-            self, path, contentid, size, mtime, mtime_nsec, filetype='file'):
+            self, path, contentid, size, mtime, mtime_nsec, filetype='file',
+            extra={}):
         if path in self._backup._files:
             raise FileExistsError('File already exists: ' + str(path))
         for i in range(1, len(path)):
@@ -254,7 +255,7 @@ class FakeBackupBuilder(object):
                     'Path is not a directory: ' + str(path[:i]))
             self._backup._directories.add(path[:i])
         self._backup._files[path] = FakeFileData(
-            contentid, size, mtime, mtime_nsec, filetype)
+            contentid, size, mtime, mtime_nsec, filetype, extra)
 
     def commit(self, end_time):
         backup = self._backup
@@ -337,12 +338,13 @@ class FakeContentTimelineItem(object):
         self.restored = restored
 
 class FakeFileData(object):
-    def __init__(self, contentid, size, mtime, mtime_nsec, filetype):
+    def __init__(self, contentid, size, mtime, mtime_nsec, filetype, extra):
         self.contentid = contentid
         self.size = size
         self.mtime = mtime
         self.mtime_nsec = mtime_nsec
         self.filetype = filetype
+        self.extra_data = extra
 
 class TestUtilities(unittest.TestCase):
     def test_make_path_from_contentid_in_new_collection(self):

@@ -300,7 +300,7 @@ class FakeFileSystem(object):
 
     def _add_file(
             self, path, content=None, mtime=None, mtime_ns=None,
-            filetype='file',
+            filetype='file', owner=None, group=None, access=None,
             perms=None, update=False):
         if not update and path in self._paths:
             raise FileExistsError('File already exists: ' + str(path))
@@ -325,6 +325,14 @@ class FakeFileSystem(object):
         if mtime_ns is not None:
             assert mtime is not None
             item.mtime_ns = mtime_ns
+        if owner is not None:
+            item.owner = owner
+        if group is not None:
+            item.group_owner = group
+        if access is not None:
+            assert access >= 0
+            assert access <= 0o777
+            item.unix_access = access
         if perms is not None:
             item.perms = perms
         assert filetype in ('file', 'symlink', 'socket', 'pipe', 'device')
@@ -334,11 +342,12 @@ class FakeFileSystem(object):
 
     def _add_symlink(
             self, path, target=None, mtime=None, mtime_ns=None,
+            owner=None, group=None, access=None,
             perms=None, update=False):
         assert isinstance(target, bytes)
         item = self._add_file(
             path=path, content=None, mtime=mtime, mtime_ns=mtime_ns,
-            filetype='symlink',
+            filetype='symlink', owner=owner, group=group, access=access,
             perms=perms, update=update)
         item.link_target = target
 
@@ -445,6 +454,13 @@ class FakeFile(object):
             self._lock = 0
         assert self._lock == 0
 
+    def get_backup_extra_data(self):
+        self._tree._check_access(self._path, 'stat')
+        return {
+            'owner': self._item.owner,
+            'group': self._item.group_owner,
+            'unix-access': self._item.unix_access }
+
 class FakeTempFile(FakeFile):
     def __init__(self, tree, path, item):
         FakeFile.__init__(self, tree, path, item)
@@ -476,6 +492,9 @@ class FileItem(object):
     def make_empty_regular_file(filesys):
         item = FileItem()
         item.filetype = 'file'
+        item.owner = 'fileowner'
+        item.group_owner = 'fileownergroup'
+        item.unix_access = 0o644
         item.data = b''
         item.mtime = filesys._utcnow()
         us = item.mtime.microsecond
@@ -493,6 +512,9 @@ class FileItem(object):
         assert len(data) == size
         item = FileItem()
         item.filetype = 'file'
+        item.owner = 'fileowner'
+        item.group_owner = 'fileownergroup'
+        item.unix_access = 0o644
         item.data = data
         item.mtime = (
             filesys._utcnow() -

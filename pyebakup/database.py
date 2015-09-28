@@ -495,6 +495,11 @@ class BackupInfoBuilder(object):
         self._directories = { (): 0 }
         self._dbfile = datafile.create_backup_in_replacement_mode(
             self._db._tree, self._db._path, start)
+        self._extra_kvids = {}
+        self._extra_next_kvid = 0
+        self._extra_xids = { tuple(): 0 }
+        self._extra_next_xid = 8
+        self._defblock = None  # The block index of the last "definition" block
 
     def __enter__(self):
         '''Using a BackupInfoBuilder as a context will make it call abort()
@@ -526,7 +531,8 @@ class BackupInfoBuilder(object):
         self._dbfile.close()
 
     def add_file(
-            self, path, contentid, size, mtime, mtime_nsec, filetype='file'):
+            self, path, contentid, size, mtime, mtime_nsec, filetype='file',
+            extra={}):
         '''Add a file to the backup data object.
 
         Note: mtime.microsecond will be ignored! (But should be either
@@ -548,7 +554,58 @@ class BackupInfoBuilder(object):
                 filetype,
                 dirid, component, contentid, size,
                 (mtime.year, mtime_second, mtime_nsec))
+        if extra:
+            item.set_extra_data(self._get_or_create_extra_data(extra))
         self._dbfile.append_item(item)
+
+    def _get_or_create_extra_data(self, extra):
+        kvids = []
+        for key, value in extra.items():
+            key, value = self._encode_key_value(key, value)
+            kv = (key, value)
+            kvid = self._extra_kvids.get(kv)
+            item = datafile.ItemKeyValue(kvid, key, value)
+            if item.kvid is None:
+                item.kvid = self._extra_next_kvid
+                self._extra_next_kvid += 1
+                self._add_definition_to_dbfile(item)
+                self._extra_kvids[kv] = item.kvid
+            kvids.append(item.kvid)
+        kvids = tuple(kvids)
+        xid = self._extra_xids.get(kvids)
+        if xid is None:
+            xid = self._extra_next_xid
+            self._extra_next_xid += 1
+            self._add_definition_to_dbfile(datafile.ItemExtraDef(xid, kvids))
+            self._extra_xids[kvids] = xid
+        return xid
+
+    def _encode_key_value(self, key, value):
+        if key == 'owner':
+            value = value.encode('utf-8')
+        elif key == 'group':
+            value = value.encode('utf-8')
+        elif key == 'unix-access':
+            v = value
+            value = b''
+            for i in range(4):
+                value = str(v % 8).encode('utf-8') + value
+                v = v // 8
+        else:
+            raise NotImplementedError('Unknown key: ' + str(key))
+        key = key.encode('utf-8')
+        return key, value
+
+    def _add_definition_to_dbfile(self, item):
+        if self._defblock is None:
+            self._defblock = 1
+            if self._dbfile.does_block_exist(self._defblock):
+                self._dbfile.move_block(self._defblock, -1)
+            else:
+                self._dbfile.create_block()
+            if not self._dbfile.does_block_exist(self._defblock + 1):
+                self._dbfile.create_block()
+        self._dbfile.insert_item(self._defblock, -1, item)
 
     def add_directory(self, path):
         dirid = self._directories.get(path)
@@ -578,7 +635,7 @@ class DirectoryData(object):
 FileData = collections.namedtuple(
     'FileData',
     ('name', 'parentid', 'contentid', 'size', 'mtime', 'mtime_nsec',
-     'filetype'))
+     'filetype', 'extra_data'))
 
 class BackupInfo(object):
     def __init__(self, db, name):
@@ -597,6 +654,8 @@ class BackupInfo(object):
         start = _datetime_from_backup_name(self._name)
         with datafile.open_backup(self._db._tree, self._db._path, start) as f:
             self.settings = {}
+            self.extra_kvids = {}
+            self.extra_xids = {}
             self.directories = {}
             self.directories[0] = DirectoryData(None, None)
             self.files = []
@@ -616,20 +675,47 @@ class BackupInfo(object):
                     assert item.key not in self.settings
                     self.settings[item.key] = item.value
                 else:
-                    if state == 1:
-                        state = 2
-                    assert state == 2
                     if item.kind == 'directory':
+                        if state in (1, 2):
+                            state = 3
+                        assert state == 3
                         self._add_directory(item.parent, item.dirid, item.name)
                     elif item.kind == 'file':
+                        if state in (1, 2):
+                            state = 3
+                        assert state == 3
                         self._add_file(item)
                     elif item.kind.startswith('file-'):
+                        if state in (1, 2):
+                            state = 3
+                        assert state == 3
                         self._add_file(item)
+                    elif item.kind == 'key-value':
+                        if state == 1:
+                            state = 2
+                        assert state == 2
+                        assert item.kvid not in self.extra_kvids
+                        self.extra_kvids[item.kvid] = self._decode_key_value(
+                            item.key, item.value)
+                    elif item.kind == 'extradef':
+                        if state == 1:
+                            state = 2
+                        assert state == 2
+                        assert item.xid not in self.extra_xids
+                        self.extra_xids[item.xid] = item.kvids
                     else:
                         raise NotTestedError(
                             'Unknown data entry (' + str(item.kind) + ')')
             self._build_tree()
 
+    def _decode_key_value(self, key, value):
+        key = key.decode('utf-8')
+        if key == 'unix-access':
+            assert len(value) == 4
+            value = int(value, 8)
+        elif key in ('group', 'owner'):
+            value = value.decode('utf-8')
+        return key, value
 
     def _add_directory(self, parentid, dirid, name):
         assert dirid not in self.directories
@@ -655,7 +741,23 @@ class BackupInfo(object):
                 item.size,
                 mtime,
                 item.mtime_ns,
-                filetype))
+                filetype,
+                self._decode_extra_data(item.extra_data)))
+
+    def _decode_extra_data(self, xid):
+        if xid == 0:
+            return {}
+        kvids = self.extra_xids.get(xid)
+        if kvids is None:
+            raise DataCorruptError('Unknown extra-data id: ' + str(xid))
+        extra = {}
+        for kvid in kvids:
+            kv = self.extra_kvids.get(kvid)
+            if kv is None:
+                raise DataCorruptError('Unknown key-value id: ' + str(kvid))
+            assert kv[0] not in extra
+            extra[kv[0]] = kv[1]
+        return extra
 
     def _build_tree(self):
         for d in self.directories.values():
@@ -752,7 +854,7 @@ class BackupInfo(object):
         'path' is not a file.
 
         The returned object has (at least) the properties 'contentid',
-        'size', 'mtime', 'mtime_nsec'.
+        'size', 'mtime', 'mtime_nsec', 'filetype', 'extra_data'.
 
         'mtime.microsecond' and 'mtime_nsec' SHALL agree to
         microsecond precision: mtime.microsecond == mtime_nsec // 1000

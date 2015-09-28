@@ -289,24 +289,16 @@ class TestDataFile(unittest.TestCase):
     def assertExtraDataEqual(self, expected, actual):
         x = {}
         for k,v in expected.items():
-            x[self.encodeKvKey(k)] = self.encodeKvValue(v)
+            k,v = self._encode_key_value(k, v)
+            x[k] = v
         self.assertEqual(x, actual)
-
-    def encodeKvKey(self, k):
-        if isinstance(k, str):
-            return k.encode('utf-8')
-        return k
-
-    def encodeKvValue(self, v):
-        if isinstance(v, bytes):
-            return v
-        return str(v).encode('utf-8')
 
     def assertKeyValueDictsEqual(self, expected, actual):
         x = {}
         for k,v in expected.items():
             self.assertEqual(2, len(v))
-            x[k] = (self.encodeKvKey(v[0]), self.encodeKvValue(v[1]))
+            key, value = self._encode_key_value(v[0], v[1])
+            x[k] = (key, value)
         self.assertEqual(x, actual)
 
     def append_item_sequence(self, items, output):
@@ -352,6 +344,7 @@ class TestDataFile(unittest.TestCase):
                                 # (so we don't put data in the
                                 # definition block).
                                 output.create_block()
+                        key, value = self._encode_key_value(key, value)
                         output.insert_item(
                             xidblock, -1, datafile.ItemKeyValue(
                                 kvid, key, value))
@@ -366,6 +359,24 @@ class TestDataFile(unittest.TestCase):
                         xidblock, -1, datafile.ItemExtraDef(xid, itemkvids))
                 dataitem.set_extra_data(xid)
             output.append_item(dataitem)
+
+    def _encode_key_value(self, key, value):
+        if key in ('owner', 'group'):
+            value = value.encode('utf-8')
+        elif key == 'unix-access':
+            if value == 0o644:
+                value = b'0644'
+            elif value == 0o755:
+                value = b'0755'
+            elif value == 0o640:
+                value = b'0640'
+            else:
+                raise NotImplementedError(
+                    'Unhandled access value: ' + str(oct(value)))
+        else:
+            raise NotImplementedError('Unhandled key: ' + key)
+        key = key.encode('utf-8')
+        return key, value
 
     def test_create_typical_main(self):
         tree = FakeTree()

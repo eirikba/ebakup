@@ -26,15 +26,10 @@ def ItemSetting(key, value):
 def ItemKeyValue(kvid, key, value):
     item = Item('key-value')
     item.kvid = kvid
-    if isinstance(key, str):
-        item.key = key.encode('utf-8')
-    else:
-        item.key = key
-    assert b':' not in item.key
-    if isinstance(value, bytes):
-        item.value = value
-    else:
-        item.value = str(value).encode('utf-8')
+    assert isinstance(key, bytes)
+    assert isinstance(value, bytes)
+    item.key = key
+    item.value = value
     return item
 
 def ItemExtraDef(xid, kvids):

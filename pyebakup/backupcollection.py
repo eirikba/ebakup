@@ -396,11 +396,12 @@ class BackupBuilder(object):
         self.abort()
 
     def add_file(
-            self, path, contentid, size, mtime, mtime_nsec, filetype='file'):
+            self, path, contentid, size, mtime, mtime_nsec, filetype='file',
+            extra={}):
         '''Add the file at 'path' to the backup, with the given attributes.
         '''
         self._backup.add_file(
-            path, contentid, size, mtime, mtime_nsec, filetype)
+            path, contentid, size, mtime, mtime_nsec, filetype, extra)
         if contentid != b'':
             # TODO: Figure out what to do with special files. This
             # code will avoid making shadow copies of special files
@@ -458,7 +459,8 @@ class BackupData(object):
         exist or is not a file, None is returned.
 
         The returned object has at least the attributes 'contentid',
-        'good_checksum', 'size', 'mtime' and 'mtime_nsec'.
+        'good_checksum', 'size', 'mtime', 'mtime_nsec', 'filetype' and
+        'extra_data'.
         '''
         filedata = self._info.get_file_info(path)
         if not filedata:
@@ -469,16 +471,19 @@ class BackupData(object):
             size = filedata.size,
             mtime = filedata.mtime,
             mtime_nsec = filedata.mtime_nsec,
-            filetype = filedata.filetype)
+            filetype = filedata.filetype,
+            extra_data = filedata.extra_data)
 
 class FileData(object):
-    def __init__(self, db, contentid, size, mtime, mtime_nsec, filetype):
+    def __init__(
+            self, db, contentid, size, mtime, mtime_nsec, filetype, extra_data):
         self._db = db
         self.contentid = contentid
         self.size = size
         self.mtime = mtime
         self.mtime_nsec = mtime_nsec
         self.filetype = filetype
+        self.extra_data = extra_data
         self._good_checksum = None
 
     @property

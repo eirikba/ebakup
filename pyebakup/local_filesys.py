@@ -2,7 +2,9 @@
 
 import datetime
 import fcntl
+import grp
 import os
+import pwd
 import stat
 import tempfile
 
@@ -276,6 +278,16 @@ class LocalFile(object):
         self._openfile.flush()
         assert amt == len(data)
         return start + amt
+
+    def get_backup_extra_data(self):
+        st = self._lstat()
+        access = stat.S_IMODE(st.st_mode)
+        pwitem = pwd.getpwuid(st.st_uid)
+        gritem = grp.getgrgid(st.st_gid)
+        return {
+            'unix-access': access,
+            'owner': pwitem.pw_name,
+            'group': gritem.gr_name }
 
 class LocalTempFile(LocalFile):
     def __init__(self, tree, stringpath, openfile):

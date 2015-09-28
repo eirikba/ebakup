@@ -51,14 +51,14 @@ class FakeBackupBuilder(object):
         self._done = True
         self._collection._backups.append(self._backup)
 
-    def add_file(self, path, contentid, size, mtime, mtime_ns, filetype):
+    def add_file(self, path, contentid, size, mtime, mtime_ns, filetype, extra):
         assert path not in self._backup._files
         self._backup._files[path] = FakeBackupFileInfo(
-            contentid, size, mtime, mtime_ns, filetype)
+            contentid, size, mtime, mtime_ns, filetype, extra)
 
 FakeBackupFileInfo = collections.namedtuple(
     'FakeBackupFileInfo',
-    ('contentid', 'size', 'mtime', 'mtime_nsec', 'filetype'))
+    ('contentid', 'size', 'mtime', 'mtime_nsec', 'filetype', 'extra_data'))
 class FakeBackup(object):
     def __init__(self):
         self._files = {} # { path: FakeBackupFileInfo }
@@ -192,6 +192,9 @@ class FakeFile(object):
         self._register_access('readsymlink')
         assert self._filetype == 'symlink'
         return self._get_raw_content()
+
+    def get_backup_extra_data(self):
+        return {}
 
 def add_backup_handlers(tree, ignore=None, dynamic=None, static=None):
     root = tree.subtrees

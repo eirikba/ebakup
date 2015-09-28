@@ -94,9 +94,10 @@ class BackupOperation(object):
             else:
                 raise AssertionError(
                     'Unknown file type: ' + str(sourcepath))
+            extra = sourcefile.get_backup_extra_data()
             if cid is not None:
                 backup.add_file(
-                    targetpath, cid, size, mtime, mtime_ns, filetype)
+                    targetpath, cid, size, mtime, mtime_ns, filetype, extra)
             if how == 'static':
                 old_cid = self._get_old_cid_for_path(targetpath)
                 if old_cid is None:

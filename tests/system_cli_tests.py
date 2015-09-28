@@ -76,7 +76,10 @@ class TestFullSequenceOfOperations(unittest.TestCase):
                            static
                 ''').encode('utf-8'),
             mtime=datetime.datetime(2014, 7, 14, 15, 11, 9, 912451),
-            mtime_ns = 912451337)
+            mtime_ns = 912451337,
+            owner='the owner',
+            group='the owning group',
+            access=0o644)
         self.advance_utcnow(seconds=1)
         self.time_backup1_start = self._utcnow
         cli.main(

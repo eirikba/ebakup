@@ -220,6 +220,11 @@ class FileInterface(object):
         special files.
         '''
 
+    def get_backup_extra_data(self):
+        '''Return a dict containing the "extra" data about this file that the
+        backup operation may want to store in the backup database.
+        '''
+
 class TemporaryFileInterface(FileInterface):
     '''Abstract class documenting the interface to the TemporaryFile
     interface.

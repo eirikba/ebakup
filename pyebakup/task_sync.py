@@ -103,7 +103,12 @@ class SyncTask(object):
             targetinfo.collection.create_backup_file_in_replacement_mode(
                 starttime))
         prevkind = 'setting'
+        kvids = set()
+        xids = set()
         for item in source:
+            if (self._group_for_itemkind(prevkind) == 'definitions' and
+                    self._group_for_itemkind(item.kind) == 'data'):
+                target.create_block()
             if self._is_valid_itemkind_progression(prevkind, item.kind):
                 prevkind = item.kind
             else:
@@ -112,6 +117,12 @@ class SyncTask(object):
             if item.kind == 'setting':
                 if item.key in (b'edb-blocksize', b'edb-blocksum', b'start'):
                     continue
+            elif item.kind == 'key-value':
+                assert item.kvid not in kvids
+                kvids.add(item.kvid)
+            elif item.kind == 'extradef':
+                assert item.xid not in xids
+                xids.add(item.xid)
             elif item.kind == 'directory':
                 pass
             elif (item.kind == 'file' or item.kind.startswith('file-')):
@@ -157,6 +168,8 @@ class SyncTask(object):
     def _group_for_itemkind(self, kind):
         if kind == 'setting':
             return 'settings'
+        if kind in ('key-value', 'extradef'):
+            return 'definitions'
         if kind in ('file', 'directory'):
             return 'data'
         if kind.startswith('file-'):

@@ -53,7 +53,8 @@ class TestFullSequence(unittest.TestCase):
         fs._add_file(
             ('home', 'me', '.config', 'ebakup', 'config'),
             content=self.get_initial_config_file_content(),
-            mtime=datetime.datetime(1994, 12, 31, 23, 58))
+            mtime=datetime.datetime(1994, 12, 31, 23, 58),
+            owner='fileowner', group='fileownergroup', access=0o644)
         self._check_info_before_first_backup()
         self.assertRaisesRegex(
             fake_filesys.ForbiddenActionError,
@@ -118,27 +119,58 @@ class TestFullSequence(unittest.TestCase):
             ('home', 'me', 'notes.txt'),
             content=b'Some quick notes\n',
             mtime=datetime.datetime(1994, 11, 28, 16, 48, 56),
-            mtime_ns=394323854)
+            mtime_ns=394323854,
+            owner='me',
+            group='me',
+            access=0o644)
         fs._add_file(
             ('home', 'me', 'My Pictures', 'DSC_1886.JPG'),
             content=b'A photo!',
             mtime=datetime.datetime(1994, 1, 17, 0, 12, 0),
-            mtime_ns=748391204)
+            mtime_ns=748391204,
+            owner='me',
+            group='me',
+            access=0o644)
         fs._add_file(
             ('home', 'me', 'My Pictures', 'DSC_1903.JPG'),
             content=b'A different photo',
             mtime=datetime.datetime(1994, 4, 5, 2, 36, 23),
-            mtime_ns=34763519)
+            mtime_ns=34763519,
+            owner='me',
+            group='me',
+            access=0o644)
+        fs._add_file(
+            ('home', 'me', 'system', 'notes.txt'),
+            content=b'Some notes by root',
+            mtime=datetime.datetime(1994, 6, 2, 21, 36, 54),
+            mtime_ns=419844710,
+            owner='root',
+            group='root',
+            access=0o644)
         fs._add_file(
             ('home', 'me', 'socket'),
             filetype='socket',
             mtime=datetime.datetime(1994, 2, 20, 3, 59, 16),
-            mtime_ns=60446634)
+            mtime_ns=60446634,
+            owner='me',
+            group='me',
+            access=0o644)
+        fs._add_file(
+            ('home', 'me', 'runme'),
+            content=b'An executable!',
+            mtime=datetime.datetime(1994, 5, 29, 9, 28, 58),
+            mtime_ns=751700129,
+            owner='me',
+            group='me',
+            access=0o755)
         fs._add_symlink(
             ('home', 'me', 'symlink'),
             target=b'system/notes.txt',
             mtime=datetime.datetime(1994, 6, 15, 14, 2, 47),
-            mtime_ns=145225216)
+            mtime_ns=145225216,
+            owner='me',
+            group='me',
+            access=0o644)
 
 
     def get_initial_config_file_content(self):
@@ -221,6 +253,8 @@ class TestFullSequence(unittest.TestCase):
             '9a56e724abdbeafb3c206603f085d887323695e4cbfabedbb25597d5d43012e0',
             '384d1cd1ecf7cbd6dfbd82894af0922bc113589d14d06c465eb145922ae00dd7',
             '5e16a40318f071df23a3d2fb600f7943764bca4896020ba9a54a00c10f49e99e',
+            'f4cefbc7f79d42224e638b1f1c9f26ec5e463d4258941ffb0159c2a97b846dc8',
+            '49a95841301c58087a0b7b31bbed2d4bee95dda74a58a513457b7cd262f8759a',
             '9266be2ad9656a674b89ee113851aa31773a8c5414e6329fb9e605ea3d9415ac',
             ):
             expected.add((cid[:2],))
@@ -248,11 +282,15 @@ class TestFullSequence(unittest.TestCase):
             coll.get_oldest_backup_after(
                 datetime.datetime(1995, 1, 1, 0, 0, 20)))
         dirs, files = bkup.list_directory(())
-        self.assertCountEqual(('.config', 'My Pictures'), dirs)
-        self.assertCountEqual(('notes.txt', 'socket', 'symlink'), files)
+        self.assertCountEqual(('.config', 'My Pictures', 'system'), dirs)
+        self.assertCountEqual(
+            ('notes.txt', 'socket', 'runme', 'symlink'), files)
         dirs, files = bkup.list_directory(('My Pictures',))
         self.assertCountEqual((), dirs)
         self.assertCountEqual(('DSC_1886.JPG', 'DSC_1903.JPG'), files)
+        dirs, files = bkup.list_directory(('system',))
+        self.assertCountEqual((), dirs)
+        self.assertCountEqual(('notes.txt',), files)
         info = bkup.get_file_info(('notes.txt',))
         self.assertEqual(
             datetime.datetime(1994, 11, 28, 16, 48, 56, 394323), info.mtime)
@@ -263,6 +301,9 @@ class TestFullSequence(unittest.TestCase):
             b"\xf4J\x83lj\xd86\xad3\x1e\xa2v\xd0\xa4\xb7\x85\x847\t\x1a",
             info.good_checksum)
         self.assertEqual('file', info.filetype)
+        self.assertEqual(
+            {'owner': 'me', 'group': 'me', 'unix-access': 0o644},
+            info.extra_data)
         info = bkup.get_file_info(('My Pictures', 'DSC_1903.JPG'))
         self.assertEqual(
             datetime.datetime(1994, 4, 5, 2, 36, 23, 34763), info.mtime)
@@ -273,6 +314,9 @@ class TestFullSequence(unittest.TestCase):
             b'J\xf0\x92+\xc1\x13X\x9d\x14\xd0lF^\xb1E\x92*\xe0\r\xd7',
             info.good_checksum)
         self.assertEqual('file', info.filetype)
+        self.assertEqual(
+            {'owner': 'me', 'group': 'me', 'unix-access': 0o644},
+            info.extra_data)
         cid = info.contentid
         reader = coll.get_content_reader(cid)
         self.assertEqual(17, reader.get_size())
@@ -296,6 +340,19 @@ class TestFullSequence(unittest.TestCase):
             datetime.datetime(1995, 1, 1, 0, 0, 20), timeline[0].first)
         self.assertEqual(
             datetime.datetime(1995, 1, 1, 0, 0, 20), timeline[0].last)
+        info = bkup.get_file_info(('system', 'notes.txt'))
+        self.assertEqual(
+            datetime.datetime(1994, 6, 2, 21, 36, 54, 419844), info.mtime)
+        self.assertEqual(419844710, info.mtime_nsec)
+        self.assertEqual(18, info.size)
+        self.assertEqual(
+            b'\xf4\xce\xfb\xc7\xf7\x9dB"Nc\x8b\x1f\x1c\x9f&'
+            b'\xec^F=BX\x94\x1f\xfb\x01Y\xc2\xa9{\x84m\xc8',
+            info.good_checksum)
+        self.assertEqual('file', info.filetype)
+        self.assertEqual(
+            {'owner': 'root', 'group': 'root', 'unix-access': 0o644},
+            info.extra_data)
         info = bkup.get_file_info(('socket',))
         self.assertEqual(
             datetime.datetime(1994, 2, 20, 3, 59, 16, 60446), info.mtime)
@@ -303,12 +360,31 @@ class TestFullSequence(unittest.TestCase):
         self.assertEqual(0, info.size)
         self.assertEqual(b'', info.good_checksum)
         self.assertEqual('socket', info.filetype)
+        self.assertEqual(
+            {'owner': 'me', 'group': 'me', 'unix-access': 0o644},
+            info.extra_data)
+        info = bkup.get_file_info(('runme',))
+        self.assertEqual(
+            datetime.datetime(1994, 5, 29, 9, 28, 58, 751700), info.mtime)
+        self.assertEqual(751700129, info.mtime_nsec)
+        self.assertEqual(14, info.size)
+        self.assertEqual(
+            b'I\xa9XA0\x1cX\x08z\x0b{1\xbb\xed-K\xee\x95\xdd\xa7J'
+            b'X\xa5\x13E{|\xd2b\xf8u\x9a',
+            info.good_checksum)
+        self.assertEqual('file', info.filetype)
+        self.assertEqual(
+            {'owner': 'me', 'group': 'me', 'unix-access': 0o755},
+            info.extra_data)
         info = bkup.get_file_info(('symlink',))
         self.assertEqual(
             datetime.datetime(1994, 6, 15, 14, 2, 47, 145225), info.mtime)
         self.assertEqual(145225216, info.mtime_nsec)
         self.assertEqual(16, info.size)
         self.assertEqual('symlink', info.filetype)
+        self.assertEqual(
+            {'owner': 'me', 'group': 'me', 'unix-access': 0o644},
+            info.extra_data)
 
     def _check_info_after_initial_backup(self):
         out = io.StringIO()
@@ -320,7 +396,7 @@ class TestFullSequence(unittest.TestCase):
             'Backup definitions:\n  backup home\n'
             '    collection local:/backups/home\n'
             '      Least recently verified: 1995-01-01 00:00:20\n'
-            '      Total number of content files: 5\n'
+            '      Total number of content files: 7\n'
             '    collection local:/backups/second\n'
             '      (Does not exist)\n'
             '    source local:/home/me\n',
@@ -330,24 +406,33 @@ class TestFullSequence(unittest.TestCase):
     def _update_sources_before_second_backup(self):
         fs = self.fs
         # Invalid utf-8 in file name
-        invalid_unicode = b'invalid utf-8 \xbd <--'.decode(
+        self.invalid_unicode = b'invalid utf-8 \xbd <--'.decode(
             'utf-8', errors='surrogateescape')
         fs._add_file(
-            ('home', 'me', 'other', invalid_unicode),
+            ('home', 'me', 'other', self.invalid_unicode),
             content=b'File with invalid utf-8 in its file name',
             mtime=datetime.datetime(1995, 1, 2, 7, 48, 24),
-            mtime_ns=769151409)
+            mtime_ns=769151409,
+            owner='other',
+            group='me',
+            access=0o640)
         fs._add_file(
             ('home', 'me', 'notes.txt'),
             content=b'Some quick notes\nWith some extra stuff added\n',
             mtime=datetime.datetime(1995, 1, 3, 11, 2, 28),
             mtime_ns=149212583,
+            owner='me',
+            group='me',
+            access=0o644,
             update=True)
         fs._add_file(
             ('home', 'me', 'rootnotes.txt'),
             content=b'Notes made by root\n',
             mtime=datetime.datetime(1995, 1, 2, 18, 22, 40),
             mtime_ns=628691057,
+            owner='root',
+            group='root',
+            access=0o644,
             perms='')
         fs._add_directory(
             ('home', 'me', 'rootdata'),
@@ -356,9 +441,16 @@ class TestFullSequence(unittest.TestCase):
             ('home', 'me', 'unstable'),
             content=b'initial content',
             mtime=datetime.datetime(1995, 1, 4, 21, 49, 29),
-            mtime_ns=743283546)
+            mtime_ns=743283546,
+            owner='me',
+            group='me',
+            access=0o644)
 
     def _check_result_of_second_backup(self, stdout):
+        self._check_output_of_second_backup(stdout)
+        self._check_db_after_second_backup()
+
+    def _check_output_of_second_backup(self, stdout):
         output = stdout
         first, second, rest = output.split('\n', 2)
         self.assertRegex(first, r'Web ui started on port \d+')
@@ -372,12 +464,26 @@ class TestFullSequence(unittest.TestCase):
             "(('home', 'me', 'rootdata'))" ' - No "r" permission for '
             "('home', 'me', 'rootdata')\n",
             rest)
+
+    def _check_db_after_second_backup(self):
         coll = backupcollection.open_collection(self.fs, ('backups', 'home'))
         bkup = coll.get_most_recent_backup()
         self.assertEqual(
             datetime.datetime(1995, 1, 5, 0, 44, 0), bkup.get_start_time())
         self.assertEqual(
             datetime.datetime(1995, 1, 5, 0, 44, 0), bkup.get_end_time())
+        info = bkup.get_file_info(('other', self.invalid_unicode))
+        self.assertEqual(
+            datetime.datetime(1995, 1, 2, 7, 48, 24, 769151), info.mtime)
+        self.assertEqual(40, info.size)
+        self.assertEqual(
+            b'\x92\xc7\xa7|(v2T\x9dmN9 (\x93\xe5\xe7\x7f\x823'
+            b'Er\xc9:M\xcfZR\xa1b\x08\xf6',
+            info.good_checksum)
+        self.assertEqual('file', info.filetype)
+        self.assertEqual(
+            {'owner': 'other', 'group': 'me', 'unix-access': 0o640},
+            info.extra_data)
 
     def _check_result_of_sync(self, stdout):
         self.assertRegex(stdout, r'Web ui started on port \d{4}\n')
@@ -395,7 +501,7 @@ class TestFullSequence(unittest.TestCase):
                 self.assertEqual(item1.is_directory, item2.is_directory)
                 if not item1.is_directory:
                     self.assertEqual(item1.data, item2.data, path[2:])
-        self.assertEqual(29, count)
+        self.assertEqual(35, count)
         cids1 = []
         with datafile.open_content(self.fs, ('backups', 'home', 'db')) as cf:
             for item in cf:

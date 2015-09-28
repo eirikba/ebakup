@@ -4,12 +4,15 @@
 # system.
 
 import datetime
+import grp
 import hashlib
 import io
 import os
+import pwd
 import re
 import shutil
 import socket
+import stat
 import textwrap
 import unittest
 
@@ -59,23 +62,33 @@ class TestBackup(unittest.TestCase):
 
     def _make_source_tree(self):
         sourcedir = os.path.join(root_path, 'sources')
-        self._make_file(
-            os.path.join(sourcedir, 'toplevel'),
+        self._stats = {}
+        self._make_file_add_stat(
+            sourcedir, ('toplevel',),
             content=b'This is a file')
-        self._make_file(
-            os.path.join(sourcedir, 'subdir', 'data'),
+        self._make_file_add_stat(
+            sourcedir, ('subdir', 'data'),
             content=b'More info')
-        self._make_file(
-            os.path.join(sourcedir, 'Pictures', 'funny.jpg'),
+        self._make_file_add_stat(
+            sourcedir, ('Pictures', 'funny.jpg'),
             content=b'This is a funny image')
-        self._make_file(
-            os.path.join(sourcedir, 'subdir', 'copy'),
+        self._make_file_add_stat(
+            sourcedir, ('subdir', 'copy'),
             content=b'This is a file')
         self._make_file(
             os.path.join(sourcedir, 'tmp', 'boring.txt'),
             content=b'Ignore this file')
         os.symlink('data', os.path.join(sourcedir, 'subdir', 'symlink'))
+        self._stats[('subdir', 'symlink')] = os.lstat(
+            os.path.join(sourcedir, 'subdir', 'symlink'))
         os.symlink('dead', os.path.join(sourcedir, 'dangling'))
+        self._stats[('dangling',)] = os.lstat(
+            os.path.join(sourcedir, 'dangling'))
+
+    def _make_file_add_stat(self, basepath, relpath, content):
+        path = os.path.join(basepath, *relpath)
+        self._make_file(path, content)
+        self._stats[relpath] = os.lstat(path)
 
     def _make_file(self, path, content):
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -186,6 +199,31 @@ class TestBackup(unittest.TestCase):
         self.assertEqual('symlink', info.filetype)
         info = backup.get_file_info(('home', 'dangling'))
         self.assertEqual('symlink', info.filetype)
+        for path, st in self._stats.items():
+            info = backup.get_file_info(('home',) + path)
+            self.assertNotEqual(None, info, msg='path: ' + str(path))
+            self.assertEqual(info.filetype, self._filetype_from_stat(st))
+            self.assertEqual(
+                int(info.extra_data['unix-access']), stat.S_IMODE(st.st_mode),
+                msg='path: ' + str(path))
+            self.assertEqual(
+                info.extra_data['owner'], pwd.getpwuid(st.st_uid).pw_name)
+            self.assertEqual(
+                info.extra_data['group'], grp.getgrgid(st.st_gid).gr_name)
+
+    def _filetype_from_stat(self, st):
+        if stat.S_ISREG(st.st_mode):
+            return 'file'
+        elif stat.S_ISDIR(st.st_mode):
+            return 'directory'
+        elif stat.S_ISLNK(st.st_mode):
+            return 'symlink'
+        elif stat.S_ISSOCK(st.st_mode):
+            return 'socket'
+        elif stat.S_ISFIFO(st.st_mode):
+            return 'pipe'
+        else:
+            raise NotImplementedError('Unknown file type')
 
 @unittest.skipUnless(
     tests.settings.run_live_tests,
