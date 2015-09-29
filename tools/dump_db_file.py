@@ -7,7 +7,7 @@ import dump_early_format
 
 def main():
     ap = argparse.ArgumentParser(
-        'Dump the full content of an ebakup database file in a '
+        description='Dump the full content of an ebakup database file in a '
         'human-readable text format')
     ap.add_argument('file', help='Path to database file to be dumped')
     ap.add_argument(
