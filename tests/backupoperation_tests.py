@@ -161,7 +161,7 @@ class FakeFile(object):
 
     def _change(self):
         global filenum
-        self._override_content = None
+        self._overrides['content'] = None
         self._fileid = filenum
         filenum += 1
 
