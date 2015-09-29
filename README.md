@@ -84,9 +84,10 @@ The backup system stores snapshots of the source files. The content of
 each file is stored in the "content storage", without duplicates. All
 other information (the files' paths and any metadata) are stored in
 the "database". Each snapshot has this information (for robustness
-reasons) stored in its own, standalone, immutable file. In addition,
-the backup system will by default create a "shadow tree" that
-recreates the backup's tree structure using hard links into the
+reasons) stored in its own, standalone, immutable file.
+
+In addition, the backup system will by default create a "shadow tree"
+that recreates the backup's tree structure using hard links into the
 content storage. The shadow tree is only for convenience and can be
 trivially reconstructed from the database (and the content storage).
 
