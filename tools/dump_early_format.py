@@ -99,13 +99,44 @@ class Helpers(object):
                 if data[done:].strip(b'\x00') != b'':
                     raise ParseError('Trailing garbage in backup block')
                 return
-            elif data[done] == 0x90:
+            elif data[done] == 0x21:
+                done += 1
+                length, done = _parse_varuint(data, done)
+                end = done + length
+                kvid, done = _parse_varuint(data, done)
+                kv = data[done:end]
+                if b'\n' in kv:
+                    raise MissingFeatureError(
+                        'LF in keys or values is not implemented')
+                key, value = kv.split(b':', 1)
+                done = end
+                self.outf.write(
+                    b'key-value: (' + str(kvid).encode('utf-8') + b')' +
+                    key + b':' + value + b'\n')
+            elif data[done] == 0x22:
+                done += 1
+                length, done = _parse_varuint(data, done)
+                end = done + length
+                xid, done = _parse_varuint(data, done)
+                kvids = []
+                while done < end:
+                    kvid, done = _parse_varuint(data, done)
+                    kvids.append(kvid)
+                if done != end:
+                    raise ParseError('kvid overshot item size')
+                self.outf.write(
+                    b'extradef: (' + str(xid).encode('utf-8') + b')' +
+                    str(kvids).encode('utf-8') + b'\n')
+            elif data[done] in (0x90, 0x92):
+                itemtype = data[done]
                 done += 1
                 dirid, done = _parse_varuint(data, done)
                 parent, done = _parse_varuint(data, done)
                 namelen, done = _parse_varuint(data, done)
                 name = data[done:done+namelen]
                 done += namelen
+                if itemtype == 0x92:
+                    xid, done = _parse_varuint(data, done)
                 self.outf.write(
                     b'dir: (' + str(parent).encode('utf-8') + b'-' +
                     str(dirid).encode('utf-8') + b')')
@@ -113,8 +144,11 @@ class Helpers(object):
                     raise MissingFeatureError(
                         'LF in file names not implemented')
                 self.outf.write(name)
+                if itemtype == 0x92:
+                    self.outf.write(b'\nextra: ' + str(xid).encode('utf-8'))
                 self.outf.write(b'\n')
-            elif data[done] == 0x91:
+            elif data[done] in (0x91, 0x93, 0x94):
+                itemtype = data[done]
                 done += 1
                 parent, done = _parse_varuint(data, done)
                 namelen, done = _parse_varuint(data, done)
@@ -125,6 +159,11 @@ class Helpers(object):
                 done += cidlen
                 size, done = _parse_varuint(data, done)
                 mtime, nsec, done = _parse_mtime(data, done)
+                if itemtype == 0x94:
+                    filetype = data[done]
+                    done += 1
+                if itemtype in (0x93, 0x94):
+                    xid, done = _parse_varuint(data, done)
                 self.outf.write(b'file: (' + str(parent).encode('utf-8') + b')')
                 if b'\n' in name:
                     raise MissingFeatureError(
@@ -143,9 +182,28 @@ class Helpers(object):
                     str(mtime.replace(microsecond=0)).encode('utf-8'))
                 if nsec != 0:
                     self.outf.write(b'.' + '{:09}'.format(nsec).encode('utf-8'))
+                if itemtype == 0x94:
+                    self.outf.write(
+                        b'\nfile type: ' +
+                        self._decode_file_type(filetype).encode('utf-8'))
+                if itemtype in (0x93, 0x94):
+                    self.outf.write(b'\nextra: ' + str(xid).encode('utf-8'))
                 self.outf.write(b'\n')
             else:
                 raise ParseError('Unknown data item type: ' + str(data[done]))
+
+    def _decode_file_type(self, filetype):
+        if filetype == ord('L'):
+            return 'symlink'
+        if filetype == ord('S'):
+            return 'socket'
+        if filetype == ord('P'):
+            return 'pipe'
+        if filetype == ord('D'):
+            return 'device'
+        if filetype == ord('?'):
+            return 'unknown'
+        raise NotImplementedError('Unknown file type: ' + str(filetype))
 
     def dump_content_block(self):
         data = self.inf.read(self.datasize)
