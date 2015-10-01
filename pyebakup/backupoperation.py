@@ -65,7 +65,9 @@ class BackupOperation(object):
             'backup',
             'Starting backup of ' +
             source.tree.path_to_full_string(source.sourcepath))
-        for sourcepath, targetpath, how in source.iterate_source_files():
+        if source.targetpath:
+            backup.add_directory(source.targetpath)
+        for sourcepath, targetpath, how in source.iterate_sources():
             self._ui.set_status('backup', 'Backing up ' + str(sourcepath))
             self._ui.set_status('files backed up', str(self._files_backed_up))
             self._files_backed_up += 1
@@ -91,14 +93,18 @@ class BackupOperation(object):
                 cid = self._try_add_content_from_data(data)
                 if cid is None:
                     self._logger.log_error('Symlink not backed up', sourcepath)
+            elif filetype == 'directory':
+                pass
             else:
                 raise AssertionError(
                     'Unknown file type: ' + str(sourcepath))
             extra = sourcefile.get_backup_extra_data()
-            if cid is not None:
+            if filetype == 'directory':
+                backup.add_directory(targetpath, extra)
+            elif cid is not None:
                 backup.add_file(
                     targetpath, cid, size, mtime, mtime_ns, filetype, extra)
-            if how == 'static':
+            if filetype != 'directory' and how == 'static':
                 old_cid = self._get_old_cid_for_path(targetpath)
                 if old_cid is None:
                     self._added_static_contentids.add(cid)
@@ -213,7 +219,7 @@ class BackupSource(object):
             raise AssertionError('Should only set backup handlers once')
         self.subtrees = subtrees
 
-    def iterate_source_files(self, subtree=()):
+    def iterate_sources(self, subtree=()):
         try:
             dirs, files = self.tree.get_directory_listing(
                 self.sourcepath + subtree)
@@ -223,6 +229,14 @@ class BackupSource(object):
                 self.sourcepath + subtree,
                 str(e))
             return
+        if subtree:
+            how = self._how_should_path_be_handled(subtree)
+            if how == 'ignore':
+                # Since we got here, there's most likely something in
+                # the subtree that should not be ignored. Thus we can
+                # not ignore this directory itself.
+                how = 'dynamic'
+            yield self.sourcepath + subtree, self.targetpath + subtree, how
         for f in files:
             path = subtree + (f,)
             how = self._how_should_path_be_handled(path)
@@ -232,7 +246,7 @@ class BackupSource(object):
         for d in dirs:
             dpath = subtree + (d,)
             if not self._is_whole_subtree_ignored(dpath):
-                yield from self.iterate_source_files(dpath)
+                yield from self.iterate_sources(dpath)
 
     def _how_should_path_be_handled(self, path):
         handler = self.subtrees.get_handler_for_path(path)

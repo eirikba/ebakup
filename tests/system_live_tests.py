@@ -89,6 +89,11 @@ class TestBackup(unittest.TestCase):
         path = os.path.join(basepath, *relpath)
         self._make_file(path, content)
         self._stats[relpath] = os.lstat(path)
+        for i in range(1, len(relpath)):
+            dirrel = relpath[:i]
+            dirpath = os.path.join(basepath, *dirrel)
+            if dirrel not in self._stats:
+                self._stats[dirrel] = os.lstat(dirpath)
 
     def _make_file(self, path, content):
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -201,8 +206,12 @@ class TestBackup(unittest.TestCase):
         self.assertEqual('symlink', info.filetype)
         for path, st in self._stats.items():
             info = backup.get_file_info(('home',) + path)
+            if info is not None:
+                self.assertEqual(info.filetype, self._filetype_from_stat(st))
+            else:
+                info = backup.get_dir_info(('home',) + path)
+                self.assertEqual('directory', self._filetype_from_stat(st))
             self.assertNotEqual(None, info, msg='path: ' + str(path))
-            self.assertEqual(info.filetype, self._filetype_from_stat(st))
             self.assertEqual(
                 int(info.extra_data['unix-access']), stat.S_IMODE(st.st_mode),
                 msg='path: ' + str(path))
@@ -255,10 +264,9 @@ class TestLocalFileSys(unittest.TestCase):
         fs = filesys.get_file_system('local')
         root = fs.path_from_string(root_path)
         os.mkdir(os.path.join(root_path, 'subdir'))
-        self.assertRaisesRegex(
-            IsADirectoryError,
-            'is a directory.*DELETEME_testebakup.*subdir',
-            fs.get_item_at_path, root + ('subdir',))
+        item = fs.get_item_at_path(root + ('subdir',))
+        self.assertNotEqual(None, item)
+        self.assertEqual('directory', item.get_filetype())
 
     def test_delete_file_at_path(self):
         fs = filesys.get_file_system('local')

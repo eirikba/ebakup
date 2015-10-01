@@ -411,6 +411,11 @@ class BackupBuilder(object):
             self._collection._make_shadow_copy(
                 self._shadow_root + path, contentid)
 
+    def add_directory(self, path, extra={}):
+        '''Add the directory at 'path' to the backup, with the given attributes.
+        '''
+        self._backup.add_directory(path, extra)
+
     def commit(self, end_time=None):
         '''Finish up the backup and publish it in the database.
 
@@ -473,6 +478,15 @@ class BackupData(object):
             mtime_nsec = filedata.mtime_nsec,
             filetype = filedata.filetype,
             extra_data = filedata.extra_data)
+
+    def get_dir_info(self, path):
+        '''Get the stored data about the directory at 'path'. If 'path' does
+        not exist or is not a directory, None is returned.
+
+        The returned object has at least the attribute 'extra_data'.
+        '''
+        return self._info.get_dir_info(path)
+
 
 class FileData(object):
     def __init__(

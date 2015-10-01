@@ -538,9 +538,10 @@ class BackupInfoBuilder(object):
         Note: mtime.microsecond will be ignored! (But should be either
         0 or match mtime_nsec)
         '''
-        dirid = 0
-        for i in range(1, len(path)):
-            dirid = self.add_directory(path[:i])
+        dirid = self._directories.get(path[:-1])
+        if dirid is None:
+            raise NotTestedError(
+                'Parent directory does not exist: ' + str(path))
         name = path[-1]
         component = valuecodecs.path_component_to_bytes(name)
         mtime_second = int(
@@ -607,10 +608,10 @@ class BackupInfoBuilder(object):
                 self._dbfile.create_block()
         self._dbfile.insert_item(self._defblock, -1, item)
 
-    def add_directory(self, path):
+    def add_directory(self, path, extra_data={}):
         dirid = self._directories.get(path)
         if dirid is not None:
-            return dirid
+            raise NotTestedError('Directory already exists')
         name = path[-1]
         parent = path[:-1]
         parentid = self._directories.get(parent)
@@ -622,13 +623,18 @@ class BackupInfoBuilder(object):
         self._directories[path] = dirid
         component = valuecodecs.path_component_to_bytes(name)
         item = datafile.ItemDirectory(dirid, parentid, component)
+        if extra_data:
+            item.set_extra_data(self._get_or_create_extra_data(extra_data))
         self._dbfile.append_item(item)
         return dirid
 
 class DirectoryData(object):
-    def __init__(self, name, parentid):
+    def __init__(self, name, parentid, extra_data=None):
+        if extra_data is None:
+            extra_data = {}
         self.name = name
         self.parentid = parentid
+        self.extra_data = extra_data
         self.directories = {}
         self.files = {}
 
@@ -679,7 +685,8 @@ class BackupInfo(object):
                         if state in (1, 2):
                             state = 3
                         assert state == 3
-                        self._add_directory(item.parent, item.dirid, item.name)
+                        self._add_directory(
+                            item.parent, item.dirid, item.name, item.extra_data)
                     elif item.kind == 'file':
                         if state in (1, 2):
                             state = 3
@@ -717,10 +724,12 @@ class BackupInfo(object):
             value = value.decode('utf-8')
         return key, value
 
-    def _add_directory(self, parentid, dirid, name):
+    def _add_directory(self, parentid, dirid, name, extra_data):
         assert dirid not in self.directories
         self.directories[dirid] = DirectoryData(
-            valuecodecs.bytes_to_path_component(name), parentid)
+            valuecodecs.bytes_to_path_component(name),
+            parentid,
+            self._decode_extra_data(extra_data))
 
     def _add_file(self, item):
         mtime = (
@@ -871,3 +880,16 @@ class BackupInfo(object):
                     return None
                 filedata = dirdata.files[comp]
         return filedata
+
+    def get_dir_info(self, path):
+        '''Return an object describing the directory at 'path'. Return None if
+        'path' is not a directory.
+
+        The returned object has (at least) the property 'extra_data'.
+        '''
+        dirdata = self.directories[0]
+        for comp in path:
+            if comp not in dirdata.directories:
+                return None
+            dirdata = dirdata.directories[comp]
+        return dirdata

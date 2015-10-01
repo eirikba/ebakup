@@ -48,8 +48,6 @@ class LocalFileSystem(object):
         f = LocalFile(stringpath)
         if not f._exists():
             raise FileNotFoundError('No such file or directory: ' + stringpath)
-        if f._isdir():
-            raise IsADirectoryError('Path is a directory: ' + stringpath)
         return f
 
     def get_modifiable_item_at_path(self, path):

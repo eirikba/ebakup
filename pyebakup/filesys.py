@@ -364,6 +364,9 @@ class FileSystemInterface(object):
     def get_item_at_path(self, path):
         '''Return a File object representing the node at 'path'.
 
+        This method will also return a suitable File object if 'path'
+        is a directory.
+
         The returned object can not be used to modify the underlying
         file.
 
@@ -372,8 +375,7 @@ class FileSystemInterface(object):
         this object.
 
         If the object at 'path' does not exist in the tree, a
-        FileNotFoundError will be raised. If 'path' is a Directory,
-        IsADirectoryError will be raised.
+        FileNotFoundError will be raised.
         '''
 
     def get_modifiable_item_at_path(self, path):

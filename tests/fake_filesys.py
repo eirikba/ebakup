@@ -184,7 +184,7 @@ class FakeFileSystem(object):
                     'File is not a directory: ' + str(path[:i]))
         for i in range(1, len(path) + 1):
             if path[:i] not in self._paths:
-                self._paths[path[:i]] = DirectoryItem()
+                self._paths[path[:i]] = DirectoryItem.make_plain_dir()
 
     def create_regular_file(self, path):
         self._check_access(path, 'create')
@@ -271,9 +271,6 @@ class FakeFileSystem(object):
         item = self._paths.get(path)
         if item is None:
             raise FileNotFoundError('No such file: ' + str(path))
-        if item.is_directory:
-            raise NotImplementedError(
-                'Not supporting get_item_at_path() for directories')
         return FakeFile(self, path, item)
 
     def get_modifiable_item_at_path(self, path):
@@ -331,7 +328,7 @@ class FakeFileSystem(object):
             item.group_owner = group
         if access is not None:
             assert access >= 0
-            assert access <= 0o777
+            assert access <= 0o7777
             item.unix_access = access
         if perms is not None:
             item.perms = perms
@@ -351,12 +348,21 @@ class FakeFileSystem(object):
             perms=perms, update=update)
         item.link_target = target
 
-    def _add_directory(self, path, perms=None):
+    def _add_directory(
+            self, path, owner=None, group=None, access=None, perms=None):
         if path in self._paths:
             raise FileExistsError('File already exists: ' + str(path))
         self._make_directory(path)
         if perms is not None:
             self._paths[path].perms = perms
+        if owner is not None:
+            self._paths[path].owner = owner
+        if group is not None:
+            self._paths[path].group_owner = group
+        if access is not None:
+            assert access >= 0
+            assert access <= 0o7777
+            self._paths[path].unix_access = access
 
     def get_config_paths_for(self, application):
         return (
@@ -398,6 +404,8 @@ class FakeFile(object):
         self._lock = 1
 
     def get_filetype(self):
+        if self._item.is_directory:
+            return 'directory'
         ft = self._item.filetype
         assert ft in ('file', 'socket', 'pipe', 'symlink', 'device', 'other')
         return ft
@@ -481,6 +489,15 @@ class DirectoryItem(object):
     def __init__(self):
         self.is_directory = True
         self.perms = 'rwx'
+
+    @staticmethod
+    def make_plain_dir():
+        item = DirectoryItem()
+        item.filetype = 'directory'
+        item.owner = 'dirowner'
+        item.group_owner = 'dirownergroup'
+        item.unix_access = 0o755
+        return item
 
 class FileItem(object):
     def __init__(self):

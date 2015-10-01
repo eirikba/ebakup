@@ -297,6 +297,12 @@ class TestSimpleDatabase(unittest.TestCase):
         self.assertCountEqual(('file',), dirlist[1])
         self.assertFalse(backup.is_directory(('path','to','file')))
         self.assertTrue(backup.is_file(('path', 'to','file')))
+        info = backup.get_dir_info(('path', 'to'))
+        self.assertEqual(8, info.parentid)
+        info = backup.get_dir_info(('file,',))
+        self.assertEqual(None, info)
+        info = backup.get_file_info(('path', 'to'))
+        self.assertEqual(None, info)
         info = backup.get_file_info(('file',))
         self.assertEqual(23, info.size)
         self.assertEqual(
@@ -607,6 +613,9 @@ class TestWriteDatabase(unittest.TestCase):
             tree._allow_modification(('path', 'to', 'db', 'content'))
             cid = db.add_content_item(
                 datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
+            backup.add_directory(('home',))
+            backup.add_directory(('home', 'me'))
+            backup.add_directory(('home', 'me', 'important'))
             backup.add_file(
                 ('home', 'me', 'important', 'stuff.txt'),
                 cid, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
@@ -730,6 +739,9 @@ class TestWriteDatabase(unittest.TestCase):
             tree._allow_modification(('path', 'to', 'db', 'content'))
             cid = db.add_content_item(
                 datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
+            backup.add_directory(('home',))
+            backup.add_directory(('home', 'me'))
+            backup.add_directory(('home', 'me', 'important'))
             backup.add_file(
                 ('home', 'me', 'important', 'stuff.txt'),
                 cid, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
@@ -763,6 +775,9 @@ class TestWriteDatabase(unittest.TestCase):
             tree._allow_modification(('path', 'to', 'db', 'content'))
             cid = db.add_content_item(
                 datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
+            backup.add_directory(('home',))
+            backup.add_directory(('home', 'me'))
+            backup.add_directory(('home', 'me', 'important'))
             backup.add_file(
                 ('home', 'me', 'important', 'stuff.txt'),
                 cid, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
@@ -793,6 +808,9 @@ class TestWriteDatabase(unittest.TestCase):
             cid1 = db.add_content_item(
                 datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
             cids.append(cid1)
+            backup.add_directory(('home',))
+            backup.add_directory(('home', 'me'))
+            backup.add_directory(('home', 'me', 'important'))
             backup.add_file(
                 ('home', 'me', 'important', 'stuff.txt'),
                 cid1, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
@@ -821,6 +839,7 @@ class TestWriteDatabase(unittest.TestCase):
             cid5 = db.add_content_item(
                 datetime.datetime(2009, 4, 14, 21, 36, 36), b'05' + b'0' * 30)
             tree._disallow_modification(('path', 'to', 'db', 'content'))
+            backup.add_directory(('store',))
             backup.add_file(
                 ('store', 'big'),
                 cid5, 2291407333111,
@@ -836,6 +855,9 @@ class TestWriteDatabase(unittest.TestCase):
             tree._allow_modification(('path', 'to', 'db', 'content'))
             cid1 = db.add_content_item(
                 datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
+            backup.add_directory(('home',))
+            backup.add_directory(('home', 'me'))
+            backup.add_directory(('home', 'me', 'important'))
             backup.add_file(
                 ('home', 'me', 'important', 'stuff.txt'),
                 cid1, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
@@ -861,6 +883,9 @@ class TestWriteDatabase(unittest.TestCase):
             tree._allow_modification(('path', 'to', 'db', 'content'))
             cid4 = db.add_content_item(
                 datetime.datetime(2015, 4, 16, 19, 50, 42), b'04' + b'0' * 30)
+            backup.add_directory(('home',))
+            backup.add_directory(('home', 'me'))
+            backup.add_directory(('home', 'me', 'important'))
             backup.add_file(
                 ('home', 'me', 'important', 'stuff.txt'),
                 cid4, 5111,
@@ -885,6 +910,9 @@ class TestWriteDatabase(unittest.TestCase):
             tree._allow_modification(('path', 'to', 'db', 'content'))
             cid6 = db.add_content_item(
                 datetime.datetime(2015, 4, 16, 21, 2, 11), b'06' + b'0' * 30)
+            backup.add_directory(('home',))
+            backup.add_directory(('home', 'me'))
+            backup.add_directory(('home', 'me', 'important'))
             backup.add_file(
                 ('home', 'me', 'important', 'stuff.txt'),
                 cid6, 128,
@@ -986,11 +1014,15 @@ class TestWriteDatabase(unittest.TestCase):
             tree._allow_modification(('path', 'to', 'db', 'content'))
             cid = db.add_content_item(
                 datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
+            backup.add_directory(('home',))
+            backup.add_directory(('home', 'me'))
+            backup.add_directory(('home', 'me', 'important'))
             backup.add_file(
                 ('home', 'me', 'important', test_filename),
                 cid, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
             cid = db.add_content_item(
                 datetime.datetime(2015, 4, 14, 21, 36, 38), b'02' + b'0' * 30)
+            backup.add_directory(('home', 'me', test_dirname))
             backup.add_file(
                 ('home', 'me', test_dirname, 'other.txt'),
                 cid, 2323, datetime.datetime(2014, 5, 5, 19, 23, 2), 0)
@@ -1036,11 +1068,15 @@ class TestWriteDatabase(unittest.TestCase):
             tree._allow_modification(('path', 'to', 'db', 'content'))
             cid = db.add_content_item(
                 datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
+            backup.add_directory(('home',))
+            backup.add_directory(('home', 'me'))
+            backup.add_directory(('home', 'me', 'important'))
             backup.add_file(
                 ('home', 'me', 'important', test_filename),
                 cid, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
             cid = db.add_content_item(
                 datetime.datetime(2015, 4, 14, 21, 36, 38), b'02' + b'0' * 30)
+            backup.add_directory(('home', 'me', test_dirname))
             backup.add_file(
                 ('home', 'me', test_dirname, 'other.txt'),
                 cid, 2323, datetime.datetime(2014, 5, 5, 19, 23, 2), 0)
@@ -1167,6 +1203,9 @@ class TestWriteDatabase(unittest.TestCase):
             cid = db.add_content_item(
                 datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
             cids.append(cid)
+            backup.add_directory(('home',))
+            backup.add_directory(('home', 'me'))
+            backup.add_directory(('home', 'me', 'important'))
             backup.add_file(
                 ('home', 'me', 'important', 'stuff.txt'),
                 cid, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)

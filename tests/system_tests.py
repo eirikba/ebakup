@@ -123,6 +123,11 @@ class TestFullSequence(unittest.TestCase):
             owner='me',
             group='me',
             access=0o644)
+        fs._add_directory(
+            ('home', 'me', 'My Pictures'),
+            owner='me',
+            group='me',
+            access=0o755)
         fs._add_file(
             ('home', 'me', 'My Pictures', 'DSC_1886.JPG'),
             content=b'A photo!',
@@ -139,6 +144,11 @@ class TestFullSequence(unittest.TestCase):
             owner='me',
             group='me',
             access=0o644)
+        fs._add_directory(
+            ('home', 'me', 'system'),
+            owner='root',
+            group='root',
+            access=0o755)
         fs._add_file(
             ('home', 'me', 'system', 'notes.txt'),
             content=b'Some notes by root',
@@ -291,6 +301,14 @@ class TestFullSequence(unittest.TestCase):
         dirs, files = bkup.list_directory(('system',))
         self.assertCountEqual((), dirs)
         self.assertCountEqual(('notes.txt',), files)
+        info = bkup.get_dir_info(('My Pictures',))
+        self.assertEqual(
+            {'owner': 'me', 'group': 'me', 'unix-access': 0o755},
+            info.extra_data)
+        info = bkup.get_dir_info(('system',))
+        self.assertEqual(
+            {'owner': 'root', 'group': 'root', 'unix-access': 0o755},
+            info.extra_data)
         info = bkup.get_file_info(('notes.txt',))
         self.assertEqual(
             datetime.datetime(1994, 11, 28, 16, 48, 56, 394323), info.mtime)

@@ -56,6 +56,14 @@ class FakeBackupBuilder(object):
         self._backup._files[path] = FakeBackupFileInfo(
             contentid, size, mtime, mtime_ns, filetype, extra)
 
+    def add_directory(self, path, extra={}):
+        assert path not in self._backup._files
+        parent = path[:-1]
+        if parent and parent not in self._backup._files:
+            self.add_directory(parent)
+        self._backup._files[path] = FakeBackupFileInfo(
+            None, None, None, None, 'directory', extra)
+
 FakeBackupFileInfo = collections.namedtuple(
     'FakeBackupFileInfo',
     ('contentid', 'size', 'mtime', 'mtime_nsec', 'filetype', 'extra_data'))
@@ -72,9 +80,10 @@ class FakeBackup(object):
         pathlen = len(path)
         for cand in self._files:
             if cand[:-1] == path:
-                files.add(cand[-1])
-            elif cand[:pathlen] == path:
-                dirs.add(cand[pathlen])
+                if self._files[cand].filetype == 'directory':
+                    dirs.add(cand[-1])
+                else:
+                    files.add(cand[-1])
         return tuple(dirs), tuple(files)
 
 filenum = 0
@@ -88,16 +97,28 @@ class FakeTree(object):
 
     def _copy_tree_with_new_objects(self, other):
         for path, item in other._files.items():
-            self._files[path] = FakeFile(item._fileid)
+            if hasattr(item, '_fileid'):
+                fileid = item._fileid
+            else:
+                fileid = None
+            self._files[path] = FakeFile(fileid, item._filetype)
+
+    def _add_directory(self, path):
+        if not path:
+            return
+        self._add_directory(path[:-1])
+        self._files[path] = FakeFile(None, filetype='directory')
 
     def _add_files(self, folder, files):
         global filenum
+        self._add_directory(folder)
         for name in files:
             self._files[folder + (name,)] = FakeFile(filenum)
             filenum += 1
 
     def _add_symlink(self, path, content):
         global filenum
+        self._add_directory(path[:-1])
         filenum += 1
         f = FakeFile(filenum, 'symlink')
         f._override(content=content)
@@ -105,6 +126,7 @@ class FakeTree(object):
 
     def _add_special_file(self, path, filetype):
         global filenum
+        self._add_directory(path[:-1])
         filenum += 1
         self._files[path] = FakeFile(filenum, filetype)
 
@@ -119,20 +141,24 @@ class FakeTree(object):
         for cand in self._files:
             if len(cand) > pathlen and cand[:pathlen] == path:
                 if len(cand) == pathlen + 1:
-                    files.add(cand[-1])
+                    if self._files[cand]._filetype == 'directory':
+                        dirs.add(cand[-1])
+                    else:
+                        files.add(cand[-1])
                 else:
                     dirs.add(cand[pathlen])
         return tuple(dirs), tuple(files)
 
     def get_item_at_path(self, path):
-        if path not in self._files:
-            raise AssertionError('Directories not supported')
-        return self._files[path]
+        if path in self._files:
+            return self._files[path]
+
 
 class FakeFile(object):
     def __init__(self, fileid, filetype='file'):
         self._filetype = filetype
-        self._fileid = fileid
+        if fileid is not None:
+            self._fileid = fileid
         self._overrides = {}
         self._access = {}
 
@@ -195,6 +221,7 @@ class FakeFile(object):
 
     def get_backup_extra_data(self):
         return {}
+
 
 def add_backup_handlers(tree, ignore=None, dynamic=None, static=None):
     root = tree.subtrees
@@ -279,6 +306,12 @@ class TestBasicBackup(unittest.TestCase):
             ('main', 'myfiles', 'sock'),
             ('main', 'tmp', 'stuff'),
             ('main', 'toplevel')]
+        self.expected_backed_up_dirs = [
+            ('main',),
+            ('main', 'myfiles'),
+            ('main', 'myfiles', 'static'),
+            ('main', 'myfiles', 'static', 'more'),
+            ('main', 'tmp')]
 
     def assertNoLoggedProblems(self):
         for event in self.logger.raw_log:
@@ -296,7 +329,9 @@ class TestBasicBackup(unittest.TestCase):
     def test_correct_files_are_backed_up(self):
         self.assertEqual(1, len(self.backupcollection._backups))
         backup = self.backupcollection._backups[-1]
-        self.assertCountEqual(self.expected_backed_up_files, backup._files)
+        self.assertCountEqual(
+            self.expected_backed_up_files + self.expected_backed_up_dirs,
+            backup._files)
         self.assertNoLoggedProblems()
 
     def test_files_are_backed_up_with_correct_content(self):
@@ -712,7 +747,14 @@ class TestTwoBackups(unittest.TestCase):
             ('main', 'myfiles', 'static', 'more', 'four'),
             ('main', 'tmp', 'stuff'),
             ('main', 'toplevel')]
-        self.assertCountEqual(expected_files, backup._files)
+        expected_dirs = [
+            ('main',),
+            ('main', 'myfiles'),
+            ('main', 'myfiles', 'static'),
+            ('main', 'myfiles', 'static', 'more'),
+            ('main', 'tmp')]
+
+        self.assertCountEqual(expected_files + expected_dirs, backup._files)
         self.assertNoLoggedProblems()
 
     def test_correct_files_are_backed_up_2(self):
@@ -729,7 +771,14 @@ class TestTwoBackups(unittest.TestCase):
             ('main', 'myfiles', 'static', 'more', 'four'),
             ('main', 'tmp', 'stuff'),
             ('main', 'toplevel')]
-        self.assertCountEqual(expected_files, backup._files)
+        expected_dirs = [
+            ('main',),
+            ('main', 'myfiles'),
+            ('main', 'myfiles', 'static'),
+            ('main', 'myfiles', 'static', 'more'),
+            ('main', 'new dir'),
+            ('main', 'tmp')]
+        self.assertCountEqual(expected_files + expected_dirs, backup._files)
         self.assertNoLoggedProblems()
 
     def test_files_are_backed_up_with_correct_content_1(self):
