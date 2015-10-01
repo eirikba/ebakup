@@ -36,16 +36,6 @@ enough. If the file has changed, read it in again.
 
 ---------------------------------------------------------------------------
 
-Record access rights and executable status
-
-Currently I only back up the content of each file. For the shadow
-trees, there are good reasons to do that. For example, hard links all
-share the same access rights. However, that information is potentially
-interesting and surely useful for large-scale restore operations. So I
-should at least record this information in the database.
-
----------------------------------------------------------------------------
-
 Shadow copies of special files
 
 Currently the code will make shadow copies of every file that has

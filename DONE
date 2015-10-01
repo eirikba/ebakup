@@ -1,3 +1,15 @@
+Record access rights and executable status
+
+Status: FIXED
+
+Currently I only back up the content of each file. For the shadow
+trees, there are good reasons to do that. For example, hard links all
+share the same access rights. However, that information is potentially
+interesting and surely useful for large-scale restore operations. So I
+should at least record this information in the database.
+
+---------------------------------------------------------------------------
+
 Handle special files
 
 Status: FIXED (special files are registered with their file type.
