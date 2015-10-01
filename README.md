@@ -5,16 +5,32 @@ The official site for ebakup is on
 [eirikba.org](http://eirikba.org/projects/ebakup).
 
 ebakup is a simple backup system based on my personal wishes for what
-the backup system I want to use should provide:
+the backup system I want to use should provide. And that means it
+isn't really a "backup" system at all.
 
-- Back up a specific set of files
-- Easy to look at any version of each file
-- Reliable long-term storage of all history
-- Robust verification of non-corruptness of backups
-- Multiple copies of the backup
-- Support for tracking files that should not change
-- Resilience to minor corruptness of backups (a few bit errors should
-  not make large parts of the backups broken).
+What I want is a system where I can find copies of all the data I have
+at any time designated as "precious". This system must store both the
+data, any important meta-data as well as the structure of the data.
+Once something is stored in the backup storage, it should remain there
+until it is explicitly removed again. And it should protect all that
+data (and meta-data) from corruptions.
+
+And of course, the system should make all of this as easy as possible.
+
+In bullet point form:
+
+- Configuration specifies which parts of the file system are "precious"
+- A "backup" stores all the "precious" data at that time
+  - The content of each file
+  - The tree structure of files and directories
+  - Any relevant/important meta-data for both files and directories
+- All data added to the backup storage remains until explicitly removed
+- All information in the backup storage can be checked for corruptions
+- All information is stored in multiple copies (so that if any one
+  copy is destroyed, it can be restored from another copy).
+- Small corruptions in the backup storage does not cause large-scale
+  corruptions of the stored data.
+- Support for tracking files that should never change
 
 Features I don't particularly care about (and so I'm not bothering to
 implement support for it):
@@ -26,7 +42,7 @@ implement support for it):
 Status
 ------
 
-(As of 2015-08-09)
+(As of 2015-10-01)
 
 The backup system makes backups successfully. I'm using it myself for
 that purpose (though that's not a very strong endorsement, given that
@@ -38,10 +54,21 @@ make tools to upgrade (and verify correctness of upgrade) in that
 case.
 
 The main missing piece now is verification (make sure all data has
-been checked for corruption "recently"). And better UI.
+been checked for corruption "recently"). And the support for
+retrieving files out of the backup again is somewhat rudimentary. And
+it would be nice with a better UI.
 
 The current python code is painfully slow at decoding the database
 files. I need to do something about that.
+
+I will most likely do a large-scale clean-up once I have basic
+verification in place. I think the code is showing signs that some of
+the early design decisions were less than perfect. This will almost
+certainly lead to some changes in the underlying model, and will quite
+possibly lead to changes in how things are stored on disk. I'm pretty
+sure the current disk format will still be readable by the new code.
+But it is possible I will decide to just make an "upgrade" tool
+instead.
 
 
 Requirements background
