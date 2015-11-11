@@ -29,6 +29,12 @@ file stores:
 
 - When the content item was added
 - What its checksum was at that time (the "good" checksum)
+
+
+The following used to be tracked here, but are now deprecated. No
+implementation of ebakup (to my knowledge) ever did anything with
+them, so they should be safe to ignore.
+
 - When the checksum was last checked
 - What the checksum was at that time
 - When (every time) the checksum of the file was found to have changed
@@ -42,6 +48,11 @@ The data entries that occur in this file are:
 
 - Content item entries: Each of these describe one item in the content
   storage.
+
+
+The following have been deprecated. No implementation of ebakup (to my
+knowledge) ever created one of these entries, so they should be safe
+to ignore.
 
 - Update entries: Each of these add one "observation" to one item in
   the content storage.
@@ -68,6 +79,13 @@ Content item entries
 <checksumdata> =
     0xa0 <first> <last> |
     0xa1 <checksum> <first> <last>
+
+DEPRECATED: <last>, <checksumdata>
+
+   As far as I know, no implementation of ebakup ever set <last> to
+   anything different than <first>, and no implementation ever created
+   any <checksumdata>. Thus it should be safe to just ignore those
+   values.
 
 Each <dataentry> describes a single content item. The content item in
 question is the one with the content id equal to the first <cidlength>
@@ -99,8 +117,12 @@ originally. If the checksum just happens to be the same as the
 original, use an 0xa1 entry with that checksum.
 
 
+
 Update entries
 ==============
+
+DEPRECATED: I don't think any implementation of ebakup ever created
+    one of these, so they should be safe to ignore.
 
 <dataentry> =
     0xd0 <cidlength> <checksumlength> <cid/goodcheck> <tag> <checksum> <when>
@@ -125,6 +147,9 @@ the same, and this indicates that the file has been restored from a
 
 End of data entry
 =================
+
+DEPRECATED: I don't think any implementation of ebakup ever created
+    one of these, so they should be safe to ignore.
 
 <dataentry> = 0xcc "closed"
 
@@ -160,7 +185,7 @@ One way of making changes to the file is to replace it in whole. That
 should be done as follows:
 
 - Take a write lock on the whole file
-- Add an "end of data entry" to the end of the file
+- Optional: Add an "end of data entry" to the end of the file
 - Create a new temporary file called content.new
 - Write the new data to content.new
 - Rotate old content backup files (see below)

@@ -1,0 +1,386 @@
+===========================
+Files: lastcheck and issues
+===========================
+
+These files contain all the information related to maintaining an
+error-free ebakup storage. It also keeps track of all errors and
+corruptions that has been detected as well as every case where an
+issue has been fixed.
+
+
+Data stored
+===========
+
+- For each backup
+  - Last time it was checked
+  - Last time it was checked before each change
+  - First time it was checked after each change
+  - What kind of change each change was
+- For each content item
+  - Last time it was checked
+  - Last time it was checked before each change
+  - First time it was checked after each change
+  - What kind of change each change was
+  - Checksum of data after each change
+
+Times may be approximate.
+
+
+Files
+=====
+
+The files described in this document are:
+
+"lastcheck": Lists the last time each monitored item was checked,
+    regardless of the result of that check.
+
+"issues": Lists all changes that have been detected.
+
+These files only list data about the backup storage they are part of
+and are not synced. This means that they are not themselves protected
+from corruptions. But they are checksummed, so corruptions will
+usually be detected.
+
+The files are in the "common data file format" (see [common.txt]).
+These files are fully modifiable, so proper locking is essential.
+
+
+Data encoding: timestamp
+========================
+
+<year:12> <month:4> <day:5> <pad:2> <second-of-day:17>
+
+Year: 1-4095
+Month: 1-12
+Day: 1-31
+Pad: 0
+Second-of-day: 0-86399
+
+The maximum valid value for the day depends on the month number, of
+course. This leaves a lot of invalid values that can be used to
+indicate special conditions. Note in particular that any value with
+year=0 is invalid.
+
+Examples:
+
+2015-10-28T18:47:51: df a7 9c 2b 84
+   2015: 7df
+   10: a
+   28: 1c
+   18:47:51 = 67671: 10857 (10857 << 3 = 842b8)
+
+
+
+File: lastcheck
+===============
+
+First block
+-----------
+
+The "magic" line is:
+
+   "ebakup last-check data"
+
+There are no extra key-value keys defined yet.
+
+
+Data blocks
+-----------
+
+The rest of the blocks are data blocks containing items on the forms:
+
+backuplastcheck: "B" <size> <time> <backuprange>*
+contentlastcheck: "C" <size> <time> <cidrange>*
+
+
+Item: backuplastcheck
+---------------------
+
+   "B" <size> <time> <backuprange>*
+
+<size>: varuint, the size of the rest of the item (after <size>) in
+   octets.
+<time>: timestamp, lower bound for the time at which the check
+   started.
+<backuprange>: <first> <last>
+<first>: <namelen> <bkname>
+<last>: <namelen> <bkname>
+<namelen>: varuint, the length of the following <bkname> in octets
+<bkname>: utf-8 encoded string, the (partial) name of a backup
+
+One of these entries indicate that the backups named by <first> and
+<last> as well as any backups whose names sort between those two were
+checked some time after <time>.
+
+Typically, ebakup will check a sequence of backups. <time> will then
+indicate a time just before ebakup starts checking the first one.
+
+Backup names are sorted lexically on their utf-8 encodings.
+
+<first> and <last> does not actually have to be existing backup names.
+The important point is that they indicate a range within which all
+backups were checked. It is also not a problem that new backups may
+get created with a name within the range. If that happens the new
+backup will have been checked when it was created, which should be
+after <time> anyway.
+
+Multiple entries can apply to the same backup. That would indicate
+that the backup was checked in all those time frames. It is expected
+that entries are removed when all the backups it applies to are also
+covered by entries with newer time frames. But there is not much point
+in modifying old entries to remove backups that are covered by newer
+entries.
+
+
+Item: contentlastcheck
+----------------------
+
+   "C" <size> <time> <cidrange>*
+
+<size>: varuint, the size of the rest of the item (after <size>) in
+   octets.
+<time>: timestamp, lower bound for the time at which the check
+   started.
+<cidrange>: <first> <last>
+<first>: <cidlen> <cid>
+<last>: <cidlen> <cid>
+<cidlen>: varuint, the length of the following <cid> in octets
+<cid>: raw octets, the (partial) cid of a content item
+
+One of these items indicates that the content items with cid <first>
+and <last> as well as any content item with a cid that sorts between
+<first> and <last> were checked for changes some time after <time>.
+
+Typically, ebakup will check a sequence of content items in one go.
+<time> will then indicate a time just before ebakup starts checking
+the first content item.
+
+Content ids are sorted lexically on their raw representation.
+
+<first> and <last> does not actually have to be existing content ids.
+The important point is that <first> and <last> establishes a range
+where all cids in that range were checked in the given timeframe. It
+is also not a problem that new content items may be created that would
+fall within that range, even though they weren't checked at that time.
+If a new content item is created, it will be checked as it is created.
+And that should happen after <time>.
+
+Multiple entries can apply to the same cid. That would indicate that
+the cid was checked in all those time frames. It is expected that
+entries are removed when all the cids it applies to are also covered
+by entries with newer time frames. But there is not much point in
+modifying old entries to remove cids that are covered by newer
+entries.
+
+
+File: issues
+============
+
+First block
+-----------
+
+The "magic" line is:
+
+   "ebakup issue data"
+
+There are no extra key-value keys defined yet.
+
+
+Data blocks
+-----------
+
+The rest of the blocks are data blocks containing items on the forms:
+
+contenthistory: "C" <size> <cidlen> <cid> <changeevent>*
+backuphistory: "B" <size> <namelen> <bkname> <bkchangeevent>*
+
+
+Requirements and expectations
+-----------------------------
+
+There should be no more than a single entry of each kind for each cid
+and backup. This means that some reorganization of the file will be
+required whenever an event happens to any cid or backup that is
+already mentioned in the file. Typically, the change will involve
+rewriting the block with the entry that changes. And if that makes the
+block's content too big, one of the entries in the block will be moved
+to another block with sufficient space. So the order of the entries
+could easily become very much arbitrary.
+
+On the other hand, as long as things are working properly, there
+shouldn't be any events in this file. If events start accumulating
+(and it is not caused by bugs in the ebakup software itself), then
+that should probably be taken as a hint that it is time to retire that
+particular hard drive. And probably get a new clone up and running.
+
+
+Item: contenthistory
+--------------------
+
+   "C" <size> <cidlen> <cid> <changeevent>*
+
+<size>: varuint, size of the rest of the item (after <size>) in
+   octets.
+<cidlen>: varuint, size of <cid> in octets.
+<cid>: raw octets, the content id of the content item in question
+<changeevent>: <before> <after> <state>
+<before>: timestamp, the last known check before the change was
+   discovered. (Typically picked up from "lastcheck")
+<after>: timestamp, the time at which the change was discovered.
+<state>: "g" | "k" | "m" | "w" <cklen> <checksum>
+<cklen>: varuint, length of <checksum>
+<checksum>: raw octets, the checksum of the new data
+
+This item describes all the changes that has been detected to the
+stored data of the content item with content id <cid>.
+
+<before> and <after> indicates the time at which the change happened.
+<after> is the time when the change was discovered. <before> is
+usually the last time the item was checked before the change was
+discovered. This is typically the value found in "lastcheck" before
+the check was run. However, if the time of the change is known, for
+example because the program just made the change itself, then <before>
+should usually be set to the same time stamp as <after>. Thus it
+describes the time of the change directly.
+
+
+The data of each content item is in exactly one of the following states:
+
+- Believed to be correct (g): A newly added content item is in this
+    state. Once a content item is no longer in this state, it will
+    only regain this state when the item has no detectable errors and
+    there is an extra reason to believe the content item is correct.
+
+- Checksum correct (k): The checksum of the data matches the expected
+    checksum. However, there used to be an error with the data and
+    there are no reasons beyond the fact that the checksum matches to
+    think that the item is correct.
+
+- Checksum is wrong (w): The item does not have the expected checksum,
+    so it is known that the data is corrupt.
+
+- Data is missing (m): The item's data is not found on disk.
+
+
+The <state> element describes which state the content item was found
+in at <after>. The first octet of the element describes the state (and
+matches the character in parentheses in the list above). The "w" state
+also includes the checksum the stored data had at the time.
+
+As mentioned above, the <before>/<after> values provide approximate
+bounds on when each change happened. As an example, if a broken data
+item is replaced with a believed-correct version, both <before> and
+<after> should be set to the time when the data item was replaced (if
+known). On the other hand, if a "checksum correct" data item is marked
+as "correct" without actually changing the data, <before> should be
+set to the <after> time of the "k" event that is believed to have
+repaired the data.
+
+
+Item: backuphistory
+-------------------
+
+   "B" <size> <namelen> <bkname> <timedstate>*
+
+<size>: varuint, size of the rest of the item (after <size>) in
+   octets.
+<namelen>: varuint, length of <bkname> in octets.
+<bkname>: utf-8 encoded string, the name of the backup in question.
+<timedstate>: <before> <after> <state>
+<before>: timestamp, the last time when it was believed that the
+    change had not yet happened. (Typically the "lastcheck" value)
+<after>: timestamp, the time at which the change was discovered.
+
+<state>: <rewritten>? ( <details> | <filebroken> )
+<details>: [ <blocksok> ] [ <logicerrors> ] <cidmissing>* <blockswrong>
+
+<rewritten> = "r"
+<blocksok> = "k" <count> <blockidx>{count}
+<logicerrors> = "l" <count> <blockidx>{count}
+<cidmissing> = "c" <cidlen> <cid>
+<blockswrong> = "w" <count> <blockidx>{count}
+<filebroken> = "b"
+
+<count>: varuint, number of affected blocks
+<blockidx>: varuint, the index of the affected block.
+<cidlen>: varuint
+<cid>: <cidlen> octets, the cid in question
+
+
+This item describes changes that have been detected to the backup item
+named <bkname>.
+
+<before> and <after> indicates the time at which the change happened.
+<after> is the time when the change was discovered. <before> is
+usually the last time the item was checked before the change was
+discovered. This is typically the value found in "lastcheck" before
+the check was run. However, if the time of the change is known, for
+example because the program just made the change itself, then <before>
+should usually be set to the same time stamp as <after>. Thus it
+describes the time of the change directly.
+
+
+Each block in a backup file is in exactly one of the following states:
+
+- Believed to be correct: All blocks in a new file are in this state.
+    Once a block is no longer in this state, it will only regain this
+    state when the block has no detectable errors and there is an
+    extra reason to believe the block is correct.
+
+- Known to be wrong: The checksum of the block is not correct.
+
+- Has logical errors: The checksum of the block is good, but the
+    information in the block has errors.
+
+- Could possibly be correct: No errors are detected in the block, but
+    the block was previously not "believed to be correct" and there
+    are no further reasons to believe that it is now correct.
+
+
+Typically when these files change only the content within blocks
+change. Information remains in the same block and is not moved between
+blocks. The <rewritten> marker indicates the opposite situation; that
+the information stored in the blocks have changed. The practical
+effect is that as long as the <rewritten> marker is not present, each
+block's history is independent of other blocks' history. For an entry
+where a <rewritten> marker is present, this independence breaks down
+compared to the previous entry.
+
+The <filebroken> production indicates that there are large amounts of
+problems in the file. So many that recording each problem individually
+is not worth it.
+
+Conversely, the <details> production records each problem
+individually.
+
+The <blocksok> production lists the blocks in "Could possibly be
+correct" state. That is, no errors were found now, but they had errors
+previously and thus are not trusted to be correct.
+
+The <logicerrors> production lists the blocks in the "Has logical
+errors" state. That is, the block's checksum is good, but the
+information in the block is not correct.
+
+The <cidmissing> production indicates that the given <cid> does not
+exist in the content database. This refers only to the entry in the
+database that describes the cid, including where to find the actual
+content data. The <cidmissing> production says nothing about whether
+the content data itself is missing from the content storage.
+
+Also, a <cidmissing> does not indicate a logic error for the block. If
+the checksum is good, the assumption is that the cid in the block is
+correct, but that the content database has an error.
+
+The <blockswrong> production lists the blocks in "Known to be wrong"
+state. That is, the blocks where the checksum does not match. It also
+marks the end of the <details> production (and so may be present with
+<count> = 0).
+
+The blocks that are not indicated has possibly having problems are
+considered to be in the "Believed to be correct" state.
+
+The <blockidx> values refer to specific blocks in the backup file.
+Block 0 is the first block in the file; the one that contains the
+magic value and the settings. Block 1 is the next block. Etc. Note
+that all of the above lists of block indexes (<blockidx>{count}) are
+unordered, so the indexes MUST be listed in increasing order.

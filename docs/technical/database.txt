@@ -98,3 +98,15 @@ The file format follows the "common format" described in db-common.txt.
    <magic> = "ebakup backup data"
 
 See db-backup.txt for details.
+
+
+The verification tracking files
+===============================
+
+The "lastcheck" file tracks the time when each piece of information
+in the backup storage was last checked for errors.
+
+The "issues" file tracks all potential problems and fixes that have
+been noticed.
+
+See db-verify.txt for details.
