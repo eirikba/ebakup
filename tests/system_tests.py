@@ -79,7 +79,7 @@ class TestFullSequence(unittest.TestCase):
             services=self.services,
             stdoutfile=out)
         self.advance_utcnow(seconds=20)
-        self.assertRegex(out.getvalue(), r'Web ui started on port \d+\n')
+        self.assertRegex(out.getvalue(), r'^Web ui started on port \d+$')
         self._check_result_of_initial_backup()
         self._check_info_after_initial_backup()
         self.advance_utcnow(days=4, seconds=2000)
@@ -212,7 +212,7 @@ class TestFullSequence(unittest.TestCase):
             '      (Does not exist)\n'
             '    source local:/home/me\n',
             outstr)
-        self.assertRegex(firstline, r'Web ui started on port \d+')
+        self.assertRegex(firstline, r'^Web ui started on port \d+$')
 
     def _check_result_of_initial_backup(self):
         self._check_filesys_after_initial_backup()
@@ -419,7 +419,7 @@ class TestFullSequence(unittest.TestCase):
             '      (Does not exist)\n'
             '    source local:/home/me\n',
             outstr)
-        self.assertRegex(firstline, r'Web ui started on port \d+')
+        self.assertRegex(firstline, r'^Web ui started on port \d+$')
 
     def _update_sources_before_second_backup(self):
         fs = self.fs
@@ -471,8 +471,8 @@ class TestFullSequence(unittest.TestCase):
     def _check_output_of_second_backup(self, stdout):
         output = stdout
         first, second, rest = output.split('\n', 2)
-        self.assertRegex(first, r'Web ui started on port \d+')
-        self.assertRegex(second, r'Web ui started on port \d+')
+        self.assertRegex(first, r'^Web ui started on port \d+$')
+        self.assertRegex(second, r'^Web ui started on port \d+$')
         self.assertEqual(
             '1995-01-05 00:44:00 ERROR: Permission denied to source file '
             "(('home', 'me', 'rootnotes.txt'))\n"
@@ -504,7 +504,7 @@ class TestFullSequence(unittest.TestCase):
             info.extra_data)
 
     def _check_result_of_sync(self, stdout):
-        self.assertRegex(stdout, r'Web ui started on port \d{4}\n')
+        self.assertRegex(stdout, r'^Web ui started on port \d{4}$')
         count = 0
         for path in self.fs._paths:
             if len(path) < 3:
