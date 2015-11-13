@@ -72,26 +72,11 @@ class ItemSpecialFile(ItemFile):
         self.kind = 'file-' + filetype
 
 class ItemContent(object):
-    def __init__(self, cid, checksum, first, last):
+    def __init__(self, cid, checksum, first):
         self.kind = 'content'
         self.cid = cid
         self.checksum = checksum
         self.first = first
-        self.last = last
-        self.updates = []
-
-    def content_changed(self, first, last, checksum):
-        update = Item('changed')
-        update.first = first
-        update.last = last
-        update.checksum = checksum
-        self.updates.append(update)
-
-    def content_restored(self, first, last):
-        update = Item('restored')
-        update.first = first
-        update.last = last
-        self.updates.append(update)
 
 def _get_checksum_by_name(name):
     if name == b'sha256':
@@ -931,18 +916,13 @@ class ContentBlock(object):
                     raise InvalidDataError('cid and checksum mismatch')
                 data.append(item.checksum)
             data.append(valuecodecs.make_uint32(item.first))
-            data.append(valuecodecs.make_uint32(item.last))
-            for update in item.updates:
-                if update.kind == 'changed':
-                    data.append(b'\xa1')
-                    data.append(update.checksum)
-                elif update.kind == 'restored':
-                    data.append(b'\xa0')
-                else:
-                    raise InvalidDataError(
-                        'Unknown update type: ' + update.kind)
-                data.append(valuecodecs.make_uint32(update.first))
-                data.append(valuecodecs.make_uint32(update.last))
+            if hasattr(item, 'last'):
+                self._logger.warn('deprecated', 'item.last')
+            # The "last" data item in the file is obsoleted, so just
+            # fill it with the first seen time instead.
+            data.append(valuecodecs.make_uint32(item.first))
+            if hasattr(item, 'updates'):
+                self._logger.warn('deprecated', 'item.updates')
             data = b''.join(data)
             if (self._blockdatasize is not None and
                     self._datasize + len(data) > self._blockdatasize):
@@ -978,11 +958,14 @@ class ContentHandler(object):
                     data[done] + data[done+1] * 0x100 +
                     data[done+2] * 0x10000 + data[done+3] * 0x1000000)
                 done += 4
-                item = ItemContent(cid, cksum, first, last)
+                if last != first:
+                    self._logger.warn('deprecated', 'item.last')
+                item = ItemContent(cid, cksum, first)
                 if done > size:
                     raise InvalidDataError(
                         'Content item overran block end at ' + str(done))
                 while data[done] in (0xa0, 0xa1):
+                    self._logger.warn('deprecated', 'item.update')
                     done += 1
                     checksum = None
                     if data[done-1] == 0xa1:
@@ -996,10 +979,6 @@ class ContentHandler(object):
                         data[done] + data[done+1] * 0x100 +
                         data[done+2] * 0x10000 + data[done+3] * 0x1000000)
                     done += 4
-                    if checksum is None:
-                        item.content_restored(first, last)
-                    else:
-                        item.content_changed(first, last, checksum)
                 if done > size:
                     raise InvalidDataError(
                         'Content item overran block end at ' + str(done))

@@ -291,51 +291,24 @@ class FakeBackup(object):
 class FakeContentInfo(object):
     def __init__(self, contentid, when, checksum):
         self._contentid = contentid
-        self._timeline = [FakeContentTimelineItem(checksum, when, when, True)]
+        self._first_seen = when
+        self._good_checksum = checksum
 
     def get_contentid(self):
         return self._contentid
 
     def get_good_checksum(self):
-        return self._timeline[0].checksum
+        return self._good_checksum
 
     def get_last_known_checksum(self):
-        return self._timeline[-1].checksum
+        return self._good_checksum
 
-    def get_checksum_timeline(self):
-        return self._timeline
+    def get_first_seen_time(self):
+        return self._first_seen
 
-    def register_checksum(self, when, checksum):
-        if when < self._timeline[-1].last:
-            raise AssertionError(
-                'Did not expect checksums registered non-chronologically')
-        if checksum == self._timeline[-1].checksum:
-            self._timeline[-1].last = when
-        else:
-            self._timeline.append(
-                FakeContentTimelineItem(checksum, when, when, False))
+    def get_last_verified_time(self):
+        return self._first_seen
 
-    def register_content_recovered(self, when, checksum):
-        if when < self._timeline[-1].last:
-            raise AssertionError(
-                'Did not expect checksums registered non-chronologically')
-        if checksum != self.get_good_checksum():
-            raise AssertionError(
-                'Recovered content must have checksum matching original')
-        if (checksum == self._timeline[-1].checksum and
-                self._timeline[-1].restored):
-            self._timeline[-1].last = when
-        else:
-            self._timeline.append(
-                FakeContentTimelineItem(checksum, when, when, True))
-
-
-class FakeContentTimelineItem(object):
-    def __init__(self, checksum, first, last, restored):
-        self.checksum = checksum
-        self.first = first
-        self.last = last
-        self.restored = restored
 
 class FakeFileData(object):
     def __init__(self, contentid, size, mtime, mtime_nsec, filetype, extra):
@@ -516,14 +489,8 @@ class TestBasicBackup(unittest.TestCase):
         bc = self.backupcollection
         info = bc.get_content_info(self.cid1)
         self.assertEqual(self.checksum1, info.goodsum)
-        self.assertEqual(self.checksum1, info.lastsum)
-        timeline = info.timeline
-        self.assertEqual(1, len(timeline))
-        cs = timeline[0]
-        self.assertEqual(self.checksum1, cs.checksum)
-        self.assertTrue(cs.restored)
-        self.assertEqual(datetime.datetime(2015, 2, 14, 19, 56, 7), cs.first)
-        self.assertEqual(datetime.datetime(2015, 2, 14, 19, 56, 7), cs.last)
+        self.assertEqual(
+            datetime.datetime(2015, 2, 14, 19, 56, 7), info.first_seen)
 
     def test_get_content_reader(self):
         bc = self.backupcollection
@@ -539,6 +506,7 @@ class TestBasicBackup(unittest.TestCase):
             now=datetime.datetime(2015, 2, 18, 5, 27, 43))
         self.assertEqual(self.cid1, contentid)
 
+    @unittest.skip('look into reviving when verification data is in place')
     def test_checksum_timeline(self):
         bc = backupcollection.open_collection(
             self.storetree, ('path', 'to', 'store'), services=self.services)

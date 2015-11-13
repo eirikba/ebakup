@@ -288,28 +288,7 @@ class Database(object):
 
 
 ContentData = collections.namedtuple(
-    'ContentData', ('contentid', 'checksum', 'timeline'))
-
-class ContentChecksum(object):
-    def __init__(self, checksum, first, last, restored):
-        self.checksum = checksum
-        self.first_sec = first
-        self.last_sec = last
-        self.restored = restored
-        self._first = None
-        self._last = None
-
-    @property
-    def first(self):
-        if self._first is None:
-            self._first = datetime.datetime.utcfromtimestamp(self.first_sec)
-        return self._first
-
-    @property
-    def last(self):
-        if self._last is None:
-            self._last = datetime.datetime.utcfromtimestamp(self.last_sec)
-        return self._last
+    'ContentData', ('contentid', 'checksum', 'first_seen'))
 
 class ContentInfoFile(object):
     def __init__(self, db):
@@ -341,22 +320,14 @@ class ContentInfoFile(object):
                         'Unexpected item kind: ' + str(item.kind))
 
     def _add_content_item(self, item):
-        timeline = [
-            ContentChecksum(item.checksum, item.first, item.last, True) ]
-        for update in item.updates:
-            if update.kind == 'restored':
-                checksum = item.checksum
-                restored = True
-            elif update.kind == 'changed':
-                checksum = update.checksum
-                restored = False
-            else:
-                raise AssertionError(
-                    'Unexpected update kind: ' + str(update.kind))
-            timeline.append(
-                ContentChecksum(checksum, update.first, update.last, restored))
+        if hasattr(item, 'updates'):
+            self._logger.warn('deprecated', 'item.updates')
+        if hasattr(item, 'last'):
+            self._logger.warn('deprecated', 'item.last')
         self.contentdata[item.cid] = ContentData(
-            item.cid, item.checksum, tuple(timeline))
+            item.cid,
+            item.checksum,
+            datetime.datetime.utcfromtimestamp(item.first))
 
     def get_all_content_infos_with_checksum(self, checksum):
         '''Return a sequence of ContentInfo objects for all the content items
@@ -394,13 +365,12 @@ class ContentInfoFile(object):
         item = datafile.ItemContent(
             contentid,
             checksum,
-            timestamp,
             timestamp)
         self._dbfile.open_and_lock_readwrite()
         with self._dbfile:
             self._dbfile.append_item(item)
         self.contentdata[contentid] = ContentData(
-            contentid, checksum, (ContentChecksum(checksum, when, when, True),))
+            contentid, checksum, when)
         return contentid
 
 
@@ -450,43 +420,10 @@ class ContentInfo(object):
         '''
         return self._data.checksum
 
-    def get_last_known_checksum(self):
-        '''Return the last registered checksum of this item.
-        '''
-        return self._data.timeline[-1].checksum
+    def get_first_seen_time(self):
+        # IMPLEMENTME
+        return self._data.first_seen
 
-    def get_checksum_timeline(self):
-        '''Return a list of objects describing how the checksum of this
-        content item has changed over time. Each object in the list
-        has (at least) the properties 'checksum', 'first', 'last' and
-        'restored'. 'checksum' is the checksum and 'first' and 'last'
-        gives the first and last time during this time span when the
-        item was verified to have this checksum. The 'restored' value
-        is True if the content was found to be the same as a "believed
-        good" source, and False otherwise. If 'restored' is True,
-        'checksum' MUST be the same as get_good_checksum().
-
-        The objects in the list are sorted on time, and the time spans
-        are not overlapping. (Thus the first object is the "good"
-        checksum and the last object is the last known checksum.)
-        '''
-        return self._data.timeline
-
-    def register_checksum(self, when, checksum):
-        '''Register that the checksum of the content item at 'when' was
-        'checksum'.
-        '''
-        raise NotImplementedError()
-
-    def register_content_recovered(self, when, checksum):
-        '''Register that the content item has been recovered from a "believed
-        good" source at 'when'. And that the checksum was 'checksum'
-        at that time.
-
-        If 'checksum' does not match the "good" checksum of the item
-        an exception will be raised.
-        '''
-        raise NotImplementedError()
 
 class BackupInfoBuilder(object):
     def __init__(self, db, start):

@@ -326,22 +326,7 @@ class BackupCollection(object):
         dbinfo = self._db.get_content_info(contentid)
         return ContentInfo(
             goodsum = dbinfo.get_good_checksum(),
-            lastsum = dbinfo.get_last_known_checksum(),
-            timeline = dbinfo.get_checksum_timeline())
-
-    def update_content_checksum(
-            self, contentid, when, checksum, restored=False):
-        '''Update the checksum timeline of the content item with content id
-        'contentid' to indicate that its checksum was 'checksum' at
-        the time 'when'. If 'restored' is True, it means that the
-        content item was somehow checked to be the same as a "believed
-        good" copy.
-        '''
-        info = self._db.get_content_info(contentid)
-        if restored:
-            info.register_content_recovered(when, checksum)
-        else:
-            info.register_checksum(when, checksum)
+            first_seen = dbinfo.get_first_seen_time())
 
     def get_content_reader(self, contentid):
         '''Return a FileInterface object that can be used to access the data
@@ -355,10 +340,9 @@ class BackupCollection(object):
 class ContentInfo(object):
     '''Provides information about a content item.
     '''
-    def __init__(self, goodsum, lastsum, timeline):
+    def __init__(self, goodsum, first_seen):
         self.goodsum = goodsum
-        self.lastsum = lastsum
-        self.timeline = timeline
+        self.first_seen = first_seen
 
 class ContentReader(object):
     '''Provides read-only access to a content item. See FileInterface for

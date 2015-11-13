@@ -111,14 +111,18 @@ class CollectionSummarizer(object):
         total_number_of_cids = 0
         for cid in self.collection.iterate_contentids():
             total_number_of_cids += 1
-            info = self.collection.get_content_info(cid)
-            if lrv_time is None or info.timeline[-1].last < lrv_time:
-                lrv_time = info.timeline[-1].last
+            # FIXME: get_last_check_* is not implemented yet
+            if False:
+                lastchecked = self.collection.get_last_check_for_content(cid)
+            else:
+                lastchecked = datetime.datetime(1, 1, 1, 0, 0, 0)
+            if lrv_time is None or lastchecked < lrv_time:
+                lrv_time = lastchecked
                 lrv = cid
             for t in times:
-                if t[1] >= info.timeline[-1].last:
+                if t[1] >= lastchecked:
                     t[2] += 1
-            if info.timeline[-1].last > now:
+            if lastchecked > now:
                 verified_in_the_future += 1
         self.least_recently_verified_timestamp = lrv_time
         self.time_verify_stats = times
