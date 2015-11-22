@@ -810,6 +810,7 @@ class DataFile(object):
         else:
             block = self._itemcodec.decode_block(
                 blockdata, self._blockdatasize)
+            block.set_blockdatasize(self._blockdatasize)
         self._blocks[index] = block
         block.blockno = index
         return block
