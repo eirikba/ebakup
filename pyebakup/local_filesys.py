@@ -101,7 +101,7 @@ class LocalFileSystem(object):
     def create_regular_file(self, path):
         stringpath = self.path_to_string(path)
         self._ensure_parent_directory_exists(stringpath)
-        f = open(stringpath, 'xb')
+        f = open(stringpath, 'x+b')
         return LocalFile(stringpath, openfile=f, writable=True)
 
     def _ensure_parent_directory_exists(self, stringpath):

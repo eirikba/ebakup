@@ -665,6 +665,7 @@ class DataFile(object):
         if target == -1:
             targetblock = self._create_block()
             targetblock.append_block_data(sourceblock)
+            sourceblock = self._load_block(source)
             sourceblock.clear_block_data()
             return
         raise NotImplementedError()
@@ -739,6 +740,7 @@ class DataFile(object):
 
     def _create_block(self):
         assert self._last_block_index >= 0
+        self._limit_block_cache()
         block = self._itemcodec.create_empty_block(self._blockdatasize)
         self._last_block_index += 1
         self._blocks[self._last_block_index] = block
@@ -796,6 +798,7 @@ class DataFile(object):
         block = self._blocks.get(index)
         if block is not None:
             return block
+        self._limit_block_cache()
         blockdata = self._file.get_data_slice(
             index * self._blocksize, (index+1) * self._blocksize)
         if blockdata == b'':
@@ -810,6 +813,12 @@ class DataFile(object):
         self._blocks[index] = block
         block.blockno = index
         return block
+
+    def _limit_block_cache(self):
+        if len(self._blocks) < 10:
+            return
+        self.flush()
+        self._blocks = {}
 
     def _check_blocksum(self, data):
         assert len(data) == self._blocksize
