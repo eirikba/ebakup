@@ -638,10 +638,95 @@ class DirectoryData(object):
         self.directories = {}
         self.files = {}
 
-FileData = collections.namedtuple(
-    'FileData',
-    ('name', 'parentid', 'contentid', 'size', 'mtime', 'mtime_nsec',
-     'filetype', 'extra_data'))
+class FileData(object):
+    __slots__ = ('_data', 'name')
+
+    def __init__(
+            self, name, parentid, contentid, size, mtime, mtime_nsec,
+            filetype, extra_data):
+        self.name = name
+        mtimestr = (
+            str(mtime.year) + '.' + str(mtime.month) + '.' + str(mtime.day) +
+            '.' + str(mtime.hour) + '.' + str(mtime.minute) + '.' +
+            str(mtime.second) + '.' + str(mtime.microsecond))
+        d = [
+            # 'name' is being extracted and stored by _build_tree, so
+            # there's a (tiny) net memory gain and a significant
+            # performance gain to just storing name directly. If
+            # _build_tree didn't need a copy of 'name', I believe
+            # there could be a significant memory gain from encoding
+            # 'name' in _data, too.
+
+            #self._encode(name.encode('utf-8', errors='surrogateescape')),
+            b'', # Placeholder for 'name'
+            str(parentid).encode('utf-8'),
+            self._encode(contentid),
+            str(size).encode('utf-8'),
+            mtimestr.encode('utf-8'),
+            str(mtime_nsec).encode('utf-8'),
+            filetype.encode('utf-8') ]
+        for k,v in extra_data.items():
+            d.append(
+                self._encode(k.encode('utf-8')) + b':' +
+                self._encode(str(v).encode('utf-8')))
+        self._data = b'&'.join(d)
+
+    def _decode(self, data):
+        return data.replace(b'%a', b'&').replace(b'%p', b'%')
+
+    def _encode(self, data):
+        return data.replace(
+            b'%p', b'%pp').replace(b'%a', b'%pa').replace(b'&', b'%a')
+
+    @property
+    def xname(self):
+        return self._decode(self._data.split(b'&', 1)[0]).decode(
+            'utf-8', errors='surrogateescape')
+
+    @property
+    def parentid(self):
+        return int(self._data.split(b'&', 2)[1])
+
+    @property
+    def contentid(self):
+        return self._decode(self._data.split(b'&', 3)[2])
+
+    @property
+    def size(self):
+        return int(self._data.split(b'&', 4)[3])
+
+    @property
+    def mtime(self):
+        mtimeparts = [
+            int(x) for x in
+            self._data.split(b'&', 5)[4].decode('utf-8').split('.') ]
+        return datetime.datetime(*mtimeparts)
+
+    @property
+    def mtime_nsec(self):
+        return int(self._data.split(b'&', 6)[5])
+
+    @property
+    def filetype(self):
+        return self._data.split(b'&', 7)[6].decode('utf-8')
+
+    @property
+    def extra_data(self):
+        items = self._data.split(b'&')[7:]
+        xd = {}
+        for item in items:
+            k, v = item.split(b':', 1)
+            # If an unknown key shows up here, it may need to be
+            # decoded to the proper type (similar to what is done with
+            # 'unix-access' already).
+            assert k in (b'owner', b'group', b'unix-access')
+            if k == b'unix-access':
+                value = int(v)
+            else:
+                value = v.decode('utf-8')
+            xd[k.decode('utf-8')] = value
+        return xd
+
 
 class BackupInfo(object):
     def __init__(self, db, name):
