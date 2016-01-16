@@ -269,7 +269,7 @@ class SyncTask(object):
         for item in reader:
             if item.kind == 'directory':
                 dirs[item.dirid] = dirs[item.parent] + (item.name,)
-            elif item.kind == 'file':
+            elif item.kind == 'file' or item.kind.startswith('file-'):
                 path = dirs[item.parent] + (item.name,)
                 if item.cid not in bkcids:
                     bkcids[item.cid] = path
