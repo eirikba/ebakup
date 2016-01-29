@@ -570,6 +570,42 @@ class TestDatabase(unittest.TestCase):
         tree._disallow_overwrite_file(path)
         tree._disallow_rename_file(newpath)
 
+    def create_simple_backup_1(self, db):
+        tree = db._tree
+        dbpath = db._path
+        self.allow_create_dbfile(
+            tree, dbpath + ('2015', '04-14T21:36'))
+        backup = db.start_backup(datetime.datetime(2015, 4, 14, 21, 36, 12))
+        cids = []
+        with backup:
+            tree._allow_modification(dbpath + ('content',))
+            cid = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
+            cids.append(cid)
+            backup.add_directory(('home',))
+            backup.add_directory(('home', 'me'))
+            backup.add_directory(('home', 'me', 'important'))
+            backup.add_file(
+                ('home', 'me', 'important', 'stuff.txt'),
+                cid, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
+            cid = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 38), b'02' + b'0' * 30)
+            cids.append(cid)
+            backup.add_file(
+                ('home', 'me', 'important', 'other.txt'),
+                cid, 2323, datetime.datetime(2014, 5, 5, 19, 23, 2), 0)
+            cid = db.add_content_item(
+                datetime.datetime(2015, 4, 14, 21, 36, 39), b'03' + b'0' * 30)
+            cids.append(cid)
+            backup.add_file(
+                ('toplevel',),
+                cid, 2323, datetime.datetime(2015, 4, 13, 13, 0, 0), 397261917)
+            tree._disallow_modification(dbpath + ('content',))
+            backup.commit(datetime.datetime(2015, 4, 14, 21, 36, 41))
+        self.disallow_create_dbfile(
+            tree, dbpath + ('2015', '04-14T21:36'))
+        return backup, cids
+
     def test_create_empty_database(self):
         tree = FakeDirectory()
         self.create_empty_database(tree, ('path', 'to', 'db'))
@@ -606,33 +642,7 @@ class TestDatabase(unittest.TestCase):
     def test_create_database_with_single_backup(self):
         tree = FakeDirectory()
         db = self.create_empty_database(tree, ('path', 'to', 'db'))
-        self.allow_create_dbfile(
-            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
-        backup = db.start_backup(datetime.datetime(2015, 4, 14, 21, 36, 12))
-        with backup:
-            tree._allow_modification(('path', 'to', 'db', 'content'))
-            cid = db.add_content_item(
-                datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
-            backup.add_directory(('home',))
-            backup.add_directory(('home', 'me'))
-            backup.add_directory(('home', 'me', 'important'))
-            backup.add_file(
-                ('home', 'me', 'important', 'stuff.txt'),
-                cid, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
-            cid = db.add_content_item(
-                datetime.datetime(2015, 4, 14, 21, 36, 38), b'02' + b'0' * 30)
-            backup.add_file(
-                ('home', 'me', 'important', 'other.txt'),
-                cid, 2323, datetime.datetime(2014, 5, 5, 19, 23, 2), 0)
-            cid = db.add_content_item(
-                datetime.datetime(2015, 4, 14, 21, 36, 39), b'03' + b'0' * 30)
-            backup.add_file(
-                ('toplevel',),
-                cid, 2323, datetime.datetime(2015, 4, 13, 13, 0, 0), 397261917)
-            tree._disallow_modification(('path', 'to', 'db', 'content'))
-            backup.commit(datetime.datetime(2015, 4, 14, 21, 36, 41))
-        self.disallow_create_dbfile(
-            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+        self.create_simple_backup_1(db)
 
         db = database.Database(tree, ('path', 'to', 'db'))
         backup = db.get_most_recent_backup()
@@ -732,33 +742,7 @@ class TestDatabase(unittest.TestCase):
     def test_new_database_with_a_few_files_has_small_data_files(self):
         tree = FakeDirectory()
         db = self.create_empty_database(tree, ('path', 'to', 'db'))
-        self.allow_create_dbfile(
-            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
-        backup = db.start_backup(datetime.datetime(2015, 4, 14, 21, 36, 12))
-        with backup:
-            tree._allow_modification(('path', 'to', 'db', 'content'))
-            cid = db.add_content_item(
-                datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
-            backup.add_directory(('home',))
-            backup.add_directory(('home', 'me'))
-            backup.add_directory(('home', 'me', 'important'))
-            backup.add_file(
-                ('home', 'me', 'important', 'stuff.txt'),
-                cid, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
-            cid = db.add_content_item(
-                datetime.datetime(2015, 4, 14, 21, 36, 38), b'02' + b'0' * 30)
-            backup.add_file(
-                ('home', 'me', 'important', 'other.txt'),
-                cid, 2323, datetime.datetime(2014, 5, 5, 19, 23, 2), 0)
-            cid = db.add_content_item(
-                datetime.datetime(2015, 4, 14, 21, 36, 39), b'03' + b'0' * 30)
-            backup.add_file(
-                ('toplevel',),
-                cid, 2323, datetime.datetime(2015, 4, 13, 13, 0, 0), 397261917)
-            tree._disallow_modification(('path', 'to', 'db', 'content'))
-            backup.commit(datetime.datetime(2015, 4, 14, 21, 36, 41))
-        self.disallow_create_dbfile(
-            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+        self.create_simple_backup_1(db)
         # Three entries in the content database should have plenty of
         # space in a single block. Add the initial block and there
         # should be 2 blocks of 4096 bytes in this file:
@@ -1194,37 +1178,7 @@ class TestDatabase(unittest.TestCase):
     def test_iterate_contentids(self):
         tree = FakeDirectory()
         db = self.create_empty_database(tree, ('path', 'to', 'db'))
-        self.allow_create_dbfile(
-            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
-        backup = db.start_backup(datetime.datetime(2015, 4, 14, 21, 36, 12))
-        cids = []
-        with backup:
-            tree._allow_modification(('path', 'to', 'db', 'content'))
-            cid = db.add_content_item(
-                datetime.datetime(2015, 4, 14, 21, 36, 36), b'01' + b'0' * 30)
-            cids.append(cid)
-            backup.add_directory(('home',))
-            backup.add_directory(('home', 'me'))
-            backup.add_directory(('home', 'me', 'important'))
-            backup.add_file(
-                ('home', 'me', 'important', 'stuff.txt'),
-                cid, 111, datetime.datetime(2014, 9, 12, 11, 9, 15), 0)
-            cid = db.add_content_item(
-                datetime.datetime(2015, 4, 14, 21, 36, 38), b'02' + b'0' * 30)
-            cids.append(cid)
-            backup.add_file(
-                ('home', 'me', 'important', 'other.txt'),
-                cid, 2323, datetime.datetime(2014, 5, 5, 19, 23, 2), 0)
-            cid = db.add_content_item(
-                datetime.datetime(2015, 4, 14, 21, 36, 39), b'03' + b'0' * 30)
-            cids.append(cid)
-            backup.add_file(
-                ('toplevel',),
-                cid, 2323, datetime.datetime(2015, 4, 13, 13, 0, 0), 397261917)
-            tree._disallow_modification(('path', 'to', 'db', 'content'))
-            backup.commit(datetime.datetime(2015, 4, 14, 21, 36, 41))
-        self.disallow_create_dbfile(
-            tree, ('path', 'to', 'db', '2015', '04-14T21:36'))
+        backup, cids = self.create_simple_backup_1(db)
 
         db = database.Database(tree, ('path', 'to', 'db'))
         self.assertCountEqual(cids, [x for x in db.iterate_contentids()])
