@@ -523,7 +523,7 @@ class TestSimpleDatabase(unittest.TestCase):
             db.get_most_recent_backup_before(
                 datetime.datetime(2005, 4, 3, 10, 46, 6)))
 
-class TestWriteDatabase(unittest.TestCase):
+class TestDatabase(unittest.TestCase):
 
     def patch_one(self, name, double, create=False):
         patcher = patch(name, double, create=create)
