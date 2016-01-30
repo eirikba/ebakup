@@ -15,7 +15,7 @@ class ContentInfoFile(object):
         self._read_file()
 
     def _read_file(self):
-        self.contentdata = ContentInfoDict()
+        self._contentdata = ContentInfoDict()
         f = self._dbfile
         f.open_and_lock_readonly()
         with f:
@@ -42,24 +42,32 @@ class ContentInfoFile(object):
             self._logger.warn('deprecated', 'item.updates')
         if hasattr(item, 'last'):
             self._logger.warn('deprecated', 'item.last')
-        self.contentdata[item.cid] = ContentData(
+        self._contentdata[item.cid] = ContentData(
             item.cid,
             item.checksum,
             datetime.datetime.utcfromtimestamp(item.first))
+
+    def get_info_for_cid(self, cid):
+        '''Return the ContentInfo object for 'cid'.
+        '''
+        data = self._contentdata.get(cid)
+        if data is None:
+            return None
+        return ContentInfo(self._db, data)
 
     def get_all_content_infos_with_checksum(self, checksum):
         '''Return a sequence of ContentInfo objects for all the content items
         that have the "good" checksum 'checksum'.
         '''
         infos = []
-        for cid in self.contentdata.get_contentids_for_checksum(checksum):
-            infos.append(ContentInfo(self._db, self.contentdata[cid]))
+        for cid in self._contentdata.get_contentids_for_checksum(checksum):
+            infos.append(ContentInfo(self._db, self._contentdata[cid]))
         return infos
 
     def iterate_contentids(self):
         '''Iterates over all content ids in this database.
         '''
-        for key in self.contentdata.keys():
+        for key in self._contentdata.keys():
             yield key
 
     def add_content_item(self, when, checksum):
@@ -87,7 +95,7 @@ class ContentInfoFile(object):
         self._dbfile.open_and_lock_readwrite()
         with self._dbfile:
             self._dbfile.append_item(item)
-        self.contentdata[contentid] = ContentData(
+        self._contentdata[contentid] = ContentData(
             contentid, checksum, when)
         return contentid
 
@@ -122,6 +130,7 @@ class ContentInfoDict(object):
 
     def values(self):
         return self._infos.values()
+
 
 class ContentInfo(object):
     def __init__(self, db, data):

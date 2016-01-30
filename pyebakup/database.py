@@ -8,7 +8,7 @@ import datafile
 
 from dbinternals.backupinfo import BackupInfo
 from dbinternals.backupinfobuilder import BackupInfoBuilder
-from dbinternals.contentdb import ContentInfoFile, ContentInfo
+from dbinternals.contentdb import ContentInfoFile
 
 class DataCorruptError(Exception): pass
 
@@ -240,13 +240,15 @@ class Database(object):
         '''
         yield from self._content.iterate_contentids()
 
-    def get_content_info(self, contentid):
-        '''Return a ContentInfo for the content with 'contentid' as id.
+    def get_content_info(self, cid):
+        '''Return the information about the content with the content id 'cid'.
+
+        The returned object supports at least:
+          - get_contentid()
+          - get_good_checksum()
+          - get_first_seen_time()
         '''
-        data = self._content.contentdata.get(contentid)
-        if data is None:
-            return None
-        return ContentInfo(self, data)
+        return self._content.get_info_for_cid(cid)
 
     def get_all_content_infos_with_checksum(self, checksum):
         '''Return a sequence of ContentInfo objects for all the content items
