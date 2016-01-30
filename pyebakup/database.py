@@ -71,30 +71,13 @@ class Database(object):
         '''
         if order_by not in (None, 'starttime'):
             raise AssertionError('Unexpected order_by: ' + str(order_by))
-        years = []
-        dirs, files = self._tree.get_directory_listing(self._path)
-        for name in dirs:
-            try:
-                num = int(name)
-                if 1900 < num < 9999:
-                    years.append(name)
-            except ValueError:
-                pass
-        if order_by == 'starttime':
-            years.sort()
-        backups = []
+        years = self._get_backup_year_list()
+        names = []
         for year in years:
-            dirs, files = self._tree.get_directory_listing(
-                self._path + (year,))
-            for name in files:
-                if self._re_backup_file.match(name):
-                    backups.append(year + '-' + name)
-                else:
-                    self._logger.log_warning(
-                        'unexpected file', (year, name))
+            names += self._get_backup_names_for_year(year)
         if order_by == 'starttime':
-            backups.sort()
-        return backups
+            names.sort()
+        return names
 
     _re_backup_name = re.compile(r'^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)')
     def get_backup_file_reader_for_name(self, name):
