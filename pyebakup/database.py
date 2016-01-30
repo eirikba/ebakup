@@ -61,7 +61,7 @@ class Database(object):
     def _get_checksum_algorithm_from_name(self, name):
         if name == 'sha256':
             return hashlib.sha256
-        raise AssertionError('Unknown checksum algorithm: ' + str(check_name))
+        raise AssertionError('Unknown checksum algorithm: ' + str(name))
 
     _re_backup_file = re.compile(r'^\d\d-\d\dT\d\d:\d\d$')
     def get_all_backup_names(self, order_by=None):
