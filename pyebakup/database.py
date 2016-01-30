@@ -161,24 +161,15 @@ class Database(object):
         when_name = '{:04}-{:02}-{:02}T{:02}:{:02}'.format(
             when.year, when.month, when.day, when.hour, when.minute)
         candidates = [x for x in yearly if x <= when_name]
-        backup = None
-        if candidates:
-            backup_name = candidates[-1]
-            backup = self._dbfileopener.open_backup(self, backup_name)
-            if backup.get_start_time() >= when:
-                if len(candidates) > 1:
-                    backup_name = candidates[-2]
-                    backup = self._dbfileopener.open_backup(self, backup_name)
-                else:
-                    backup = None
-        if not backup:
-            years = self._get_backup_year_list()
-            years = [x for x in years if x < when.year]
-            if not years:
-                return None
-            backup_name = self._get_backup_names_for_year(years[-1])[-1]
-            backup = self._dbfileopener.open_backup(self, backup_name)
-        return backup
+        while candidates:
+            backup = self._dbfileopener.open_backup(self, candidates.pop())
+            if backup.get_start_time() < when:
+                return backup
+        years = [x for x in self._get_backup_year_list() if x < when.year]
+        if not years:
+            return None
+        name = self._get_backup_names_for_year(years[-1])[-1]
+        return self._dbfileopener.open_backup(self, name)
 
     def get_oldest_backup_after(self, when):
         '''Obtain the data for the oldest backup after 'when' according to the
@@ -188,24 +179,16 @@ class Database(object):
         when_name = '{:04}-{:02}-{:02}T{:02}:{:02}'.format(
             when.year, when.month, when.day, when.hour, when.minute)
         candidates = [x for x in yearly if x >= when_name]
-        backup = None
-        if candidates:
-            backup_name = candidates[0]
-            backup = self._dbfileopener.open_backup(self, backup_name)
-            if backup.get_start_time() <= when:
-                if len(candidates) > 1:
-                    backup_name = candidates[1]
-                    backup = self._dbfileopener.open_backup(self, backup_name)
-                else:
-                    backup = None
-        if not backup:
-            years = self._get_backup_year_list()
-            years = [x for x in years if x > when.year]
-            if not years:
-                return None
-            backup_name = self._get_backup_names_for_year(years[0])[0]
-            backup = self._dbfileopener.open_backup(self, backup_name)
-        return backup
+        candidates.reverse()
+        while candidates:
+            backup = self._dbfileopener.open_backup(self, candidates.pop())
+            if backup.get_start_time() > when:
+                return backup
+        years = [x for x in self._get_backup_year_list() if x > when.year]
+        if not years:
+            return None
+        name = self._get_backup_names_for_year(years[0])[0]
+        return self._dbfileopener.open_backup(self, name)
 
     def start_backup(self, when):
         '''Adds a new backup object to the database.
