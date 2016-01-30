@@ -31,22 +31,9 @@ class Database(object):
     def __init__(self, tree, path):
         self._tree = tree
         self._path = path
-        self._content = None
         self._fileopener = None
-        self._read_main(tree, path)
-
-    def _read_main(self, tree, path):
-        with self._dbfileopener.open_main(tree, path) as main:
-            item = next(main)
-            if item.kind != 'magic':
-                raise AssertionError('First item in main is not magic')
-            if item.value != b'ebakup database v1':
-                raise AssertionError('Wrong file type in database')
-            for item in main:
-                if item.kind != 'setting':
-                    raise AssertionError('Non-setting in database main file')
-                if item.key == b'checksum':
-                    self._content_checksum_name = item.value.decode('utf-8')
+        self._content = None
+        self._content_checksum_name_value = None
 
     _re_backup_file = re.compile(r'^\d\d-\d\dT\d\d:\d\d$')
 
@@ -266,6 +253,12 @@ class Database(object):
             self._fileopener = DBFileOpener()
         return self._fileopener
 
+    @property
+    def _content_checksum_name(self):
+        if self._content_checksum_name_value is None:
+            self._read_main()
+        return self._content_checksum_name_value
+
     def _get_checksum_algorithm_from_name(self, name):
         if name == 'sha256':
             return hashlib.sha256
@@ -275,3 +268,17 @@ class Database(object):
         if self._content is not None:
             return
         self._content = self._dbfileopener.open_content_file(self)
+
+    def _read_main(self):
+        with self._dbfileopener.open_main(self._tree, self._path) as main:
+            item = next(main)
+            if item.kind != 'magic':
+                raise AssertionError('First item in main is not magic')
+            if item.value != b'ebakup database v1':
+                raise AssertionError('Wrong file type in database')
+            for item in main:
+                if item.kind != 'setting':
+                    raise AssertionError('Non-setting in database main file')
+                if item.key == b'checksum':
+                    self._content_checksum_name_value = item.value.decode(
+                        'utf-8')
