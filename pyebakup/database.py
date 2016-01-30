@@ -30,7 +30,7 @@ class Database(object):
         self._tree = tree
         self._path = path
         self._read_main(tree, path)
-        self._content = ContentInfoFile(self)
+        self._content = None
 
     def _read_main(self, tree, path):
         with datafile.open_main(tree, path) as main:
@@ -238,6 +238,7 @@ class Database(object):
     def iterate_contentids(self):
         '''Iterates over all content ids in this database.
         '''
+        self._load_content_file()
         yield from self._content.iterate_contentids()
 
     def get_content_info(self, cid):
@@ -248,12 +249,14 @@ class Database(object):
           - get_good_checksum()
           - get_first_seen_time()
         '''
+        self._load_content_file()
         return self._content.get_info_for_cid(cid)
 
     def get_all_content_infos_with_checksum(self, checksum):
         '''Return a sequence of ContentInfo objects for all the content items
         that have the "good" checksum 'checksum'.
         '''
+        self._load_content_file()
         return self._content.get_all_content_infos_with_checksum(checksum)
 
     def add_content_item(self, when, checksum):
@@ -262,4 +265,10 @@ class Database(object):
 
         Return the content id of the newly added item.
         '''
+        self._load_content_file()
         return self._content.add_content_item(when, checksum)
+
+    def _load_content_file(self):
+        if self._content is not None:
+            return
+        self._content = ContentInfoFile(self)
