@@ -8,7 +8,10 @@ import datafile
 
 from dbinternals.dbfileopener import DBFileOpener
 
-class DataCorruptError(Exception): pass
+
+class DataCorruptError(Exception):
+    pass
+
 
 def create_database(tree, path):
     '''Create a new, empty database at 'path' in 'tree'.
@@ -23,6 +26,7 @@ def create_database(tree, path):
     datafile.create_content_in_replacement_mode(tree, path).commit_and_close()
     return Database(tree, path)
 
+
 class Database(object):
     def __init__(self, tree, path):
         self._tree = tree
@@ -30,20 +34,6 @@ class Database(object):
         self._content = None
         self._fileopener = None
         self._read_main(tree, path)
-
-    def _set_dbfileopener(self, opener):
-        '''Override the code that opens and parses the raw files.
-
-        This is primarily intended for testing.
-        '''
-        assert self._fileopener is None
-        self._fileopener = opener
-
-    @property
-    def _dbfileopener(self):
-        if self._fileopener is None:
-            self._fileopener = DBFileOpener()
-        return self._fileopener
 
     def _read_main(self, tree, path):
         with self._dbfileopener.open_main(tree, path) as main:
@@ -58,12 +48,8 @@ class Database(object):
                 if item.key == b'checksum':
                     self._content_checksum_name = item.value.decode('utf-8')
 
-    def _get_checksum_algorithm_from_name(self, name):
-        if name == 'sha256':
-            return hashlib.sha256
-        raise AssertionError('Unknown checksum algorithm: ' + str(name))
-
     _re_backup_file = re.compile(r'^\d\d-\d\dT\d\d:\d\d$')
+
     def get_all_backup_names(self, order_by=None):
         '''Obtain a list of the names of all backups.
 
@@ -93,6 +79,7 @@ class Database(object):
         return names
 
     _re_backup_name = re.compile(r'^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)')
+
     def get_backup_file_reader_for_name(self, name):
         '''Obtain a DataFile opened read-only for the backup named 'name'.
 
@@ -150,7 +137,7 @@ class Database(object):
         dirs, files = self._tree.get_directory_listing(
             self._path + (year_name,))
         assert not dirs
-        names = [ year_name + '-' + x for x in files ]
+        names = [year_name + '-' + x for x in files]
         names.sort()
         return names
 
@@ -186,7 +173,7 @@ class Database(object):
                     backup = None
         if not backup:
             years = self._get_backup_year_list()
-            years = [ x for x in years if x < when.year ]
+            years = [x for x in years if x < when.year]
             if not years:
                 return None
             backup_name = self._get_backup_names_for_year(years[-1])[-1]
@@ -213,7 +200,7 @@ class Database(object):
                     backup = None
         if not backup:
             years = self._get_backup_year_list()
-            years = [ x for x in years if x > when.year ]
+            years = [x for x in years if x > when.year]
             if not years:
                 return None
             backup_name = self._get_backup_names_for_year(years[0])[0]
@@ -281,6 +268,25 @@ class Database(object):
         '''
         self._load_content_file()
         return self._content.add_content_item(when, checksum)
+
+    def _set_dbfileopener(self, opener):
+        '''Override the code that opens and parses the raw files.
+
+        This is primarily intended for testing.
+        '''
+        assert self._fileopener is None
+        self._fileopener = opener
+
+    @property
+    def _dbfileopener(self):
+        if self._fileopener is None:
+            self._fileopener = DBFileOpener()
+        return self._fileopener
+
+    def _get_checksum_algorithm_from_name(self, name):
+        if name == 'sha256':
+            return hashlib.sha256
+        raise AssertionError('Unknown checksum algorithm: ' + str(name))
 
     def _load_content_file(self):
         if self._content is not None:
