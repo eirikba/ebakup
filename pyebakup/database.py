@@ -6,9 +6,7 @@ import re
 
 import datafile
 
-from dbinternals.backupinfo import BackupInfo
-from dbinternals.backupinfobuilder import BackupInfoBuilder
-from dbinternals.contentdb import ContentInfoFile
+from dbinternals.dbfileopener import DBFileOpener
 
 class DataCorruptError(Exception): pass
 
@@ -29,11 +27,26 @@ class Database(object):
     def __init__(self, tree, path):
         self._tree = tree
         self._path = path
-        self._read_main(tree, path)
         self._content = None
+        self._fileopener = None
+        self._read_main(tree, path)
+
+    def _set_dbfileopener(self, opener):
+        '''Override the code that opens and parses the raw files.
+
+        This is primarily intended for testing.
+        '''
+        assert self._fileopener is None
+        self._fileopener = opener
+
+    @property
+    def _dbfileopener(self):
+        if self._fileopener is None:
+            self._fileopener = DBFileOpener()
+        return self._fileopener
 
     def _read_main(self, tree, path):
-        with datafile.open_main(tree, path) as main:
+        with self._dbfileopener.open_main(tree, path) as main:
             item = next(main)
             if item.kind != 'magic':
                 raise AssertionError('First item in main is not magic')
@@ -93,7 +106,8 @@ class Database(object):
         start = datetime.datetime(
             int(match.group(1)), int(match.group(2)), int(match.group(3)),
             int(match.group(4)), int(match.group(5)))
-        return datafile.open_backup(self._tree, self._path, start)
+        return self._dbfileopener.open_raw_backup(
+            self._tree, self._path, start)
 
     def create_backup_file_in_replacement_mode(self, starttime):
         '''Create a backup file for a backup starting at 'starttime'.
@@ -105,7 +119,7 @@ class Database(object):
         See DataFile.create_backup_in_replacement_mode() for details
         on the returned object.
         '''
-        return datafile.create_backup_in_replacement_mode(
+        return self._dbfileopener.create_backup_in_replacement_mode(
             self._tree, self._path, starttime)
 
     def get_most_recent_backup(self):
@@ -117,7 +131,7 @@ class Database(object):
             return None
         backup_names = self._get_backup_names_for_year(years[-1])
         backup_name = backup_names[-1]
-        return BackupInfo(self, backup_name)
+        return self._dbfileopener.open_backup(self, backup_name)
 
     def _get_backup_year_list(self):
         years = []
@@ -149,7 +163,7 @@ class Database(object):
             return None
         backup_names = self._get_backup_names_for_year(years[0])
         backup_name = backup_names[0]
-        backup = BackupInfo(self, backup_name)
+        backup = self._dbfileopener.open_backup(self, backup_name)
         return backup
 
     def get_most_recent_backup_before(self, when):
@@ -163,11 +177,11 @@ class Database(object):
         backup = None
         if candidates:
             backup_name = candidates[-1]
-            backup = BackupInfo(self, backup_name)
+            backup = self._dbfileopener.open_backup(self, backup_name)
             if backup.get_start_time() >= when:
                 if len(candidates) > 1:
                     backup_name = candidates[-2]
-                    backup = BackupInfo(self, backup_name)
+                    backup = self._dbfileopener.open_backup(self, backup_name)
                 else:
                     backup = None
         if not backup:
@@ -176,7 +190,7 @@ class Database(object):
             if not years:
                 return None
             backup_name = self._get_backup_names_for_year(years[-1])[-1]
-            backup = BackupInfo(self, backup_name)
+            backup = self._dbfileopener.open_backup(self, backup_name)
         return backup
 
     def get_oldest_backup_after(self, when):
@@ -190,11 +204,11 @@ class Database(object):
         backup = None
         if candidates:
             backup_name = candidates[0]
-            backup = BackupInfo(self, backup_name)
+            backup = self._dbfileopener.open_backup(self, backup_name)
             if backup.get_start_time() <= when:
                 if len(candidates) > 1:
                     backup_name = candidates[1]
-                    backup = BackupInfo(self, backup_name)
+                    backup = self._dbfileopener.open_backup(self, backup_name)
                 else:
                     backup = None
         if not backup:
@@ -203,7 +217,7 @@ class Database(object):
             if not years:
                 return None
             backup_name = self._get_backup_names_for_year(years[0])[0]
-            backup = BackupInfo(self, backup_name)
+            backup = self._dbfileopener.open_backup(self, backup_name)
         return backup
 
     def start_backup(self, when):
@@ -217,7 +231,7 @@ class Database(object):
         database until commit() is called on the returned object.
 
         '''
-        return BackupInfoBuilder(self, when)
+        return self._dbfileopener.create_backup(self, when)
 
     def get_checksum_algorithm_name(self):
         '''Return the name of the checksum algorithm used to identify file
@@ -271,4 +285,4 @@ class Database(object):
     def _load_content_file(self):
         if self._content is not None:
             return
-        self._content = ContentInfoFile(self)
+        self._content = self._dbfileopener.open_content_file(self)
