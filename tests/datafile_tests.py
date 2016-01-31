@@ -822,8 +822,8 @@ class TestDataFile(unittest.TestCase):
             ('path', 'to', 'db', '2015', '04-03T10:46'),
             testdata.dbfiledata('backup-1'))
 
-        backup = datafile.open_backup(
-            tree, ('path', 'to', 'db'), datetime.datetime(2015, 4, 3, 10, 46))
+        backup = datafile.open_backup_by_name(
+            tree, ('path', 'to', 'db'), '2015-04-03T10:46')
         self.assertItemSequence(expect.items, backup)
         self.assertRaises(StopIteration, next, backup)
         backup.close()
@@ -837,8 +837,8 @@ class TestDataFile(unittest.TestCase):
 
         self.assertRaisesRegex(
             datafile.InvalidDataError, 'non-matching start time.*10:46.*10:45',
-            datafile.open_backup,
-            tree, ('path', 'to', 'db'), datetime.datetime(2015, 4, 3, 10, 45))
+            datafile.open_backup_by_name,
+            tree, ('path', 'to', 'db'), '2015-04-03T10:45')
 
     def test_create_simple_backup(self):
         # This one is not using StandardItemData in order to preserve
@@ -893,7 +893,8 @@ class TestDataFile(unittest.TestCase):
         tree._files_modified = []
         self.assertNotIn(
             ('path', 'to', 'db', '2015', '09-05T21:22.new'), tree._files)
-        backup = datafile.open_backup(tree, ('path', 'to', 'db'), starttime)
+        backup = datafile.open_backup_by_name(
+            tree, ('path', 'to', 'db'), '2015-09-05T21:22')
         self.assertItemSequence(items, backup)
         self.assertRaises(StopIteration, next, backup)
         backup.close()
@@ -968,7 +969,8 @@ class TestDataFile(unittest.TestCase):
         tree._files_modified = []
         self.assertNotIn(
             ('path', 'to', 'db', '2015', '04-03T10:46.new'), tree._files)
-        backup = datafile.open_backup(tree, ('path', 'to', 'db'), starttime)
+        backup = datafile.open_backup_by_name(
+            tree, ('path', 'to', 'db'), '2015-04-03T10:46')
         self.assertItemSequence(items.items, backup)
         self.assertRaises(StopIteration, next, backup)
         backup.close()
@@ -1027,7 +1029,8 @@ class TestDataFile(unittest.TestCase):
         tree._files_modified = []
         self.assertNotIn(
             ('path', 'to', 'db', '2015', '04-03T10:46.new'), tree._files)
-        backup = datafile.open_backup(tree, ('path', 'to', 'db'), starttime)
+        backup = datafile.open_backup_by_name(
+            tree, ('path', 'to', 'db'), '2015-04-03T10:46')
         kvids = {}
         xids = { 0: tuple() }
         self.assertItemSequenceWithExtras(items.items, backup, kvids, xids)
@@ -1057,7 +1060,8 @@ class TestDataFile(unittest.TestCase):
         backup.insert_item(
             0, -1, datafile.ItemSetting(b'end', b'2015-04-03T10:47:59'))
         backup.commit_and_close()
-        backup = datafile.open_backup(tree, ('path', 'to', 'db'), starttime)
+        backup = datafile.open_backup_by_name(
+            tree, ('path', 'to', 'db'), '2015-04-03T10:46')
         self.assertEqual(2, backup.get_last_block_index())
         self.assertItemSequence(items.items[:5], backup)
         item = next(backup)

@@ -20,9 +20,6 @@ class BackupInfo(object):
     def __init__(self, db, name):
         self._db = db
         self._name = name
-        start = _datetime_from_backup_name(name)
-        self._dbfile = datafile.open_backup(
-            self._db._tree, self._db._path, start)
         self._read_whole_file()
         start = self.get_start_time()
         assert name == (
@@ -30,8 +27,8 @@ class BackupInfo(object):
                 start.year, start.month, start.day, start.hour, start.minute))
 
     def _read_whole_file(self):
-        start = _datetime_from_backup_name(self._name)
-        with datafile.open_backup(self._db._tree, self._db._path, start) as f:
+        with datafile.open_backup_by_name(
+                self._db._tree, self._db._path, self._name) as f:
             self.settings = {}
             self.extra_kvids = {}
             self.extra_xids = {}

@@ -135,39 +135,6 @@ def open_content(tree, dbpath, writable=False):
         f.open_and_lock_readonly()
     return f
 
-def open_backup(tree, dbpath, starttime, writable=False):
-    '''Open the backup file for the backup started at 'starttime' in the
-    ebakup database at tree:dbpath.
-
-    If 'writable' is True, the file is opened and locked for both
-    reading and writing. Otherwise, the file is only opened and locked
-    for reading.
-
-    Remember that if you want to hold more than one file from the same
-    ebakup database open at the same time, you need to hold a lock on
-    "main" as long as you have locked any of the other files.
-    '''
-    fname = '{:02}-{:02}T{:02}:{:02}'.format(
-        starttime.month, starttime.day, starttime.hour, starttime.minute)
-    f = DataFile(tree, dbpath + (str(starttime.year), fname))
-    if writable:
-        raise AssertionError('backup files are immutable!')
-    else:
-        f.open_and_lock_readonly()
-    for item in f:
-        if item.kind == 'setting' and item.key == b'start':
-            value = item.value
-            break
-        if item.kind not in ('setting', 'magic'):
-            raise InvalidDataError(
-                'Failed to find "start" setting in backup file')
-    f.seek(0, 0)
-    if str(starttime.year) + '-' + fname != value[:-3].decode('utf-8'):
-        raise InvalidDataError(
-            'Backup file has non-matching start time: ' +
-            str(value) + ' vs ' + str(starttime.year) + '-' + fname)
-    return f
-
 _re_bk_name = re.compile(r'^(\d{4})-(\d\d-\d\dT\d\d:\d\d)$')
 def open_backup_by_name(tree, dbpath, name, writable=False):
     '''Open the backup file for the backup with the name 'name' in the
