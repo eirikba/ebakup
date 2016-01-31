@@ -26,8 +26,8 @@ class DBFileOpener(object):
             tree, path, start)
 
     @staticmethod
-    def open_raw_backup(tree, path, start):
-        return datafile.open_backup(tree, path, start)
+    def open_raw_backup(tree, path, name):
+        return datafile.open_backup_by_name(tree, path, name)
 
     @staticmethod
     def open_backup(db, name):

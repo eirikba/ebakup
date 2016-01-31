@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import datetime
 import hashlib
 import re
 
@@ -77,11 +76,10 @@ class Database(object):
         See DataFile.open_backup() for details on the returned object.
         '''
         match = self._re_backup_name.match(name)
-        start = datetime.datetime(
-            int(match.group(1)), int(match.group(2)), int(match.group(3)),
-            int(match.group(4)), int(match.group(5)))
+        if not match:
+            return None
         return self._dbfileopener.open_raw_backup(
-            self._tree, self._path, start)
+            self._tree, self._path, name)
 
     def create_backup_file_in_replacement_mode(self, starttime):
         '''Create a backup file for a backup starting at 'starttime'.
@@ -121,12 +119,19 @@ class Database(object):
 
     def _get_backup_names_for_year(self, year):
         year_name = str(year)
-        dirs, files = self._tree.get_directory_listing(
-            self._path + (year_name,))
+        dirs, files = self._get_directory_listing_ignore_noexist((year_name,))
         assert not dirs
         names = [year_name + '-' + x for x in files]
         names.sort()
         return names
+
+    def _get_directory_listing_ignore_noexist(self, relpath):
+        try:
+            dirs, files = self._tree.get_directory_listing(
+                self._path + relpath)
+        except FileNotFoundError:
+            return (), ()
+        return dirs, files
 
     def get_oldest_backup(self):
         '''Obtain the data for the oldest backup according to the starting
