@@ -279,6 +279,9 @@ class DirectoryData(object):
         self.files = {}
 
 class FileData(object):
+    # The information stored in a FileData object is encoded as a
+    # string in the _data member. This saves a lot of memory over
+    # storing each item in a dict. Though at some cost to performance.
     __slots__ = ('_data', 'name')
 
     def __init__(
