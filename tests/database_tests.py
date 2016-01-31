@@ -4,7 +4,7 @@ import datetime
 import unittest
 
 import database
-import datafile
+import dataitems
 
 
 class FakeTree(object):
@@ -83,8 +83,8 @@ class FakeMain(object):
         return next(self._iter)
 
     def _start_iter(self):
-        yield datafile.ItemMagic(b'ebakup database v1')
-        yield datafile.ItemSetting(b'checksum', b'sha256')
+        yield dataitems.ItemMagic(b'ebakup database v1')
+        yield dataitems.ItemSetting(b'checksum', b'sha256')
 
 
 class FakeContentInfo(object):
