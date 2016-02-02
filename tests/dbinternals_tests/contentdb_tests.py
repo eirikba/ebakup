@@ -141,3 +141,10 @@ class TestContentDB(unittest.TestCase):
         self.assertEqual(checksum, info.get_good_checksum())
         self.assertEqual(firstseen, info.get_first_seen_time())
         self.assertEqual(cid, info.get_contentid())
+
+    def test_add_two_items_with_same_checksum(self):
+        firstseen = datetime.datetime(2015, 5, 12, 6, 22, 57)
+        checksum = b'new content checksum'
+        cid = self.contentfile.add_content_item(firstseen, checksum)
+        cid2 = self.contentfile.add_content_item(firstseen, checksum)
+        self.assertNotEqual(cid, cid2)

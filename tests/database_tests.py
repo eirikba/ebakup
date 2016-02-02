@@ -9,7 +9,9 @@ import dataitems
 
 class FakeTree(object):
     def __init__(self):
+        self._path_exists = {}
         self._dir_listings = {}
+        self._actions = []
 
     def _set_dir_listing(self, dirname, dirs, files):
         self._dir_listings[dirname] = (dirs, files)
@@ -22,6 +24,23 @@ class FakeTree(object):
         if listing is None:
             raise FileNotFoundError('No such file or directory: ' + str(path))
         return listing
+
+    def does_path_exist(self, path):
+        return self._path_exists[path]
+
+    def create_regular_file(self, path):
+        f = FakeNewFile(path)
+        self._actions.append(('create', f))
+        return f
+
+    def is_open_file_same_as_path(self, f, path):
+        return True
+
+    def is_same_file_system_as(self, tree):
+        return self == tree
+
+    def rename_and_overwrite(self, source, target):
+        self._actions.append(('rename/overwrite', source, target))
 
 
 class FakeDbOpener(object):
@@ -64,6 +83,34 @@ class FakeDbOpener(object):
 
     def open_content_file(self, db):
         return self._content_file
+
+
+class FakeNewFile(object):
+    def __init__(self, path):
+        self._path = path
+        self._locked = False
+        self._content = b''
+        self._open = True
+
+    def drop_all_cached_data(self):
+        pass
+
+    def lock_for_writing(self):
+        assert self._locked is False
+        self._locked = True
+
+    def get_size(self):
+        return len(self._content)
+
+    def write_data_slice(self, start, data):
+        assert self._locked is True
+        assert 0 <= start <= len(self._content)
+        old = self._content
+        self._content = old[:start] + data + old[start+len(data):]
+
+    def close(self):
+        self._open = False
+        self._locked = False
 
 
 class FakeMain(object):
@@ -436,3 +483,50 @@ class TestDatabaseWithManyBackups(unittest.TestCase):
             None,
             self.db.get_oldest_backup_after(
                 self.bks[-1].get_start_time()))
+
+
+class TestCreateDatabase(unittest.TestCase):
+    def setUp(self):
+        self.tree = FakeTree()
+        self.tree._path_exists[('new', 'db')] = False
+
+        self.db = database.create_database(self.tree, ('new', 'db'))
+        self.dbopener = FakeDbOpener()
+        self.db._set_dbfileopener(self.dbopener)
+
+    def test_create_empty_database(self):
+        actions = self.tree._actions
+        self.assertEqual('create', actions[0][0])
+        self.assertEqual(('new', 'db', 'main.new'), actions[0][1]._path)
+        self.assertEqual(
+            ('rename/overwrite',
+             ('new', 'db', 'main.new'), ('new', 'db', 'main')),
+            actions[1])
+        self.assertEqual('create', actions[2][0])
+        self.assertEqual(('new', 'db', 'content.new'), actions[2][1]._path)
+        self.assertEqual(
+            ('rename/overwrite',
+             ('new', 'db', 'content.new'), ('new', 'db', 'content')),
+            actions[3])
+        self.assertEqual(4, len(actions))
+
+    def test_create_database_and_backup(self):
+        starttime = datetime.datetime(2015, 1, 9, 22, 9, 48)
+        bk = self.db.start_backup(starttime)
+        self.assertEqual(1, len(self.dbopener._added_backups))
+        added = self.dbopener._added_backups[0]
+        self.assertEqual(added, bk)
+        self.assertTrue(isinstance(bk, FakeBackupCreator))
+        self.assertEqual(self.db, bk._db)
+        self.assertEqual(starttime, bk._start)
+
+
+class TestCreateDatabaseFails(unittest.TestCase):
+    def test_create_database_in_existing_directory_fails(self):
+        tree = FakeTree()
+        tree._path_exists[('new', 'db')] = True
+
+        self.assertRaisesRegex(
+            FileExistsError, 'already exists.*new.*db',
+            database.create_database, tree, ('new', 'db'))
+

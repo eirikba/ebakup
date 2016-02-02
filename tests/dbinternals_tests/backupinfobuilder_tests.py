@@ -6,6 +6,9 @@ import unittest
 import datafile
 
 import dbinternals.backupinfobuilder as backupbuilder
+# test_various_timestamps_for_mtime uses backupinfo to test round-trip
+# conversion.
+import dbinternals.backupinfo as backupinfo
 
 
 class FakeDatabase(object):
@@ -132,6 +135,7 @@ class TestBackupInfoBuilder(unittest.TestCase):
         self.db = FakeDatabase(self.tree, ('db',))
         self.start = datetime.datetime(2014, 12, 29, 14, 19, 43)
         self.builder = backupbuilder.BackupInfoBuilder(self.db, self.start)
+        self.bkname = '2014-12-29T14:19'
 
     def test_build_a_simple_backup(self):
         self.builder.add_file(
@@ -145,7 +149,7 @@ class TestBackupInfoBuilder(unittest.TestCase):
         endtime = datetime.datetime(2014, 12, 29, 14, 51, 33)
         self.builder.commit(endtime)
 
-        bk = DecodedBackup(self.tree, ('db',), '2014-12-29T14:19')
+        bk = DecodedBackup(self.tree, ('db',), self.bkname)
         self.assertEqual(b'2014-12-29T14:19:43', bk.get_start_time())
         self.assertEqual(b'2014-12-29T14:51:33', bk.get_end_time())
         self.assertCountEqual(
@@ -172,7 +176,7 @@ class TestBackupInfoBuilder(unittest.TestCase):
         endtime = datetime.datetime(2014, 12, 29, 14, 51, 33)
         self.builder.commit(endtime)
 
-        bk = DecodedBackup(self.tree, ('db',), '2014-12-29T14:19')
+        bk = DecodedBackup(self.tree, ('db',), self.bkname)
         self.assertCountEqual(
             ((b'a file',), (b'path', b'to', b'file')), bk.list_files())
         f = bk.get_file((b'path', b'to', b'file'))
@@ -182,3 +186,88 @@ class TestBackupInfoBuilder(unittest.TestCase):
         d = bk.get_dir((b'path', b'to'))
         self.assertCountEqual(
             ((b'group', b'yes'),), bk.get_extra(d.extra_data))
+
+    def test_build_small_backup_should_create_small_file(self):
+        dirs = (('path',), ('path', 'to'), ('subdir',))
+        for d in dirs:
+            self.builder.add_directory(d)
+        size = 17
+        mtime = datetime.datetime(2014, 4, 25, 21, 42, 15)
+        mtime_inc = datetime.timedelta(seconds=22)
+        nsecs = 134407806
+        fnames = ('file', 'other file', 'stuff')
+        for d in dirs:
+            for name in fnames:
+                self.builder.add_file(
+                    d + (name,),
+                    (name + str(mtime)).encode('utf-8'), # cid
+                    size, mtime, nsecs)
+                size += 13
+                mtime += mtime_inc
+                nsecs += 142476838
+                if nsecs > 999999999:
+                    nsecs -= 999999999
+        endtime = datetime.datetime(2014, 12, 29, 14, 51, 33)
+        self.builder.commit(endtime)
+        bkfile = self.tree._files[('db', '2014', self.bkname[5:])]
+        self.assertEqual(4096 * 2, len(bkfile._content))
+
+    def test_invalid_utf8_in_file_names(self):
+        cid = b'a cid'
+        size = 17
+        mtime = datetime.datetime(2014, 4, 25, 21, 42, 15)
+        nsecs = 134407806
+        # This is how python decodes file names to strings
+        test_filename = b'INVUTF8:ab\xddcd'
+        test_filename_str = test_filename.decode(
+            'utf-8', errors='surrogateescape')
+        test_dirname = b'INVUTF8:vx\xeeyz'
+        test_dirname_str = test_dirname.decode(
+            'utf-8', errors='surrogateescape')
+        self.builder.add_directory((test_dirname_str,))
+        self.builder.add_file((test_filename_str,), cid, size, mtime, nsecs)
+        endtime = datetime.datetime(2014, 12, 29, 14, 51, 33)
+        self.builder.commit(endtime)
+        bkfile = self.tree._files[('db', '2014', self.bkname[5:])]
+        self.assertIn(b'\x0d' + test_filename + b'\x05a cid', bkfile._content)
+        self.assertIn(b'\x0d' + test_dirname, bkfile._content)
+
+    def test_multioctet_utf8_characters_in_file_names(self):
+        cid = b'a cid'
+        size = 17
+        mtime = datetime.datetime(2014, 4, 25, 21, 42, 15)
+        nsecs = 134407806
+        test_filename = b'Seigmen-Dr\xc3\xa5ben.txt'
+        test_dirname = b'MULTI\xe5\x83\xa1UTF8'
+        self.builder.add_directory((test_dirname.decode('utf-8'),))
+        self.builder.add_file(
+            (test_filename.decode('utf-8'),), cid, size, mtime, nsecs)
+        endtime = datetime.datetime(2014, 12, 29, 14, 51, 33)
+        self.builder.commit(endtime)
+        bkfile = self.tree._files[('db', '2014', self.bkname[5:])]
+        self.assertIn(b'\x13' + test_filename + b'\x05a cid', bkfile._content)
+        self.assertIn(b'\x0c' + test_dirname, bkfile._content)
+
+    def test_various_timestamps_for_mtime(self):
+        tests = (
+            (('file1',), datetime.datetime(2014, 9, 12, 11, 9, 15), 0),
+            (('file2',),
+             datetime.datetime(2014, 1, 12, 11, 9, 15, 682246), 682246552),
+            (('file3',), datetime.datetime(2014, 2, 28, 11, 9, 15), 0),
+            (('file4',), datetime.datetime(2014, 3, 1, 11, 9, 15), 0),
+            (('file5',), datetime.datetime(2012, 2, 28, 11, 9, 15), 0),
+            (('file6',), datetime.datetime(2012, 2, 29, 11, 9, 15), 0),
+            (('file7',), datetime.datetime(2012, 3, 1, 11, 9, 15), 0),
+        )
+        size = 17
+        for test in tests:
+            mtime = test[1].replace(microsecond=0)
+            self.builder.add_file(
+                test[0], test[0][0].encode('utf-8'), size, mtime, test[2])
+        endtime = datetime.datetime(2014, 12, 29, 14, 51, 33)
+        self.builder.commit(endtime)
+        bk = backupinfo.BackupInfo(self.db, self.bkname)
+        for test in tests:
+            info = bk.get_file_info(test[0])
+            self.assertEqual(test[1], info.mtime)
+            self.assertEqual(test[2], info.mtime_nsec)
