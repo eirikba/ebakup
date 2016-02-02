@@ -137,6 +137,8 @@ expected_tests = set((
     'dbinternals_tests.backupinfo_tests.TestBackupInfo.test_is_directory_for_file_should_be_false',
     'dbinternals_tests.backupinfo_tests.TestBackupInfo.test_is_file_for_directory_should_be_false',
     'dbinternals_tests.backupinfo_tests.TestBackupInfo.test_is_file_for_file_should_be_true',
+    'dbinternals_tests.backupinfobuilder_tests.TestBackupInfoBuilder.test_build_a_simple_backup',
+    'dbinternals_tests.backupinfobuilder_tests.TestBackupInfoBuilder.test_build_a_simple_backup_with_extra_data',
     'dbinternals_tests.contentdb_tests.TestContentDB.test_add_item',
     'dbinternals_tests.contentdb_tests.TestContentDB.test_get_infos_for_checksum',
     'dbinternals_tests.contentdb_tests.TestContentDB.test_info_for_cid',
