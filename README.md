@@ -4,9 +4,9 @@ Ebakup - a backup maintenance system
 The official site for ebakup is on
 [eirikba.org](http://eirikba.org/projects/ebakup).
 
-ebakup is a simple backup system based on my personal wishes for what
-the backup system I want to use should provide. And that means it
-isn't really a "backup" system at all.
+ebakup was intended as a simple backup system based on my personal
+wishes for what the backup system I want to use should provide. It
+turns out that this makes it not really a "backup" system at all.
 
 What I want is a system where I can find copies of all the data I have
 at any time designated as "precious". This system must store both the
@@ -42,15 +42,15 @@ implement support for it):
 Status
 ------
 
-(As of 2015-10-01)
+(As of 2016-02-03)
 
 The backup system makes backups successfully. I'm using it myself for
 that purpose (though that's not a very strong endorsement, given that
 the alternative is no backup at all).
 
-I may still make some more backwards-incompatible changes to the
-backup storage. Since I am relying on this stuff now, I will have to
-make tools to upgrade (and verify correctness of upgrade) in that
+I will most likely make some more backwards-incompatible changes to
+the backup storage. Since I am relying on this stuff now, I will have
+to make tools to upgrade (and verify correctness of upgrade) in that
 case.
 
 The main missing piece now is verification (make sure all data has
@@ -58,17 +58,27 @@ been checked for corruption "recently"). And the support for
 retrieving files out of the backup again is somewhat rudimentary. And
 it would be nice with a better UI.
 
-The current python code is painfully slow at decoding the database
-files. I need to do something about that.
+I have spent some effort on the verification. Which turned out to be
+much harder than I had anticipated. But I think I have something that
+makes sense now, so hopefully I can make that work soonish.
 
-I will most likely do a large-scale clean-up once I have basic
-verification in place. I think the code is showing signs that some of
-the early design decisions were less than perfect. This will almost
-certainly lead to some changes in the underlying model, and will quite
-possibly lead to changes in how things are stored on disk. I'm pretty
-sure the current disk format will still be readable by the new code.
-But it is possible I will decide to just make an "upgrade" tool
-instead.
+The current python code is painfully slow at decoding the database
+files. I need to do something about that. I'm considering rewriting it
+in C++. It is also using a lot of memory, which I also think a rewrite
+to C++ could help with.
+
+It has been more than half a year since I started this project, and in
+that time I have learned a few things.
+
+I have learned a lot about what ebakup is, or should be. Which means I
+now want to make a lot of changes to the system. Particularly to the
+various terms I have used, which just aren't right.
+
+I have learned a lot about doing a complete software project properly.
+Unfortunately, in many cases by getting things wrong. I think this is
+the first private project I have ever done that has gone past the
+"half-finished hack" stage. So there's a need for a lot of cleanup in
+the codebase. Particularly to the test code.
 
 
 Requirements background
@@ -96,7 +106,8 @@ It does, however, lead to a really useful feature: Files that *only*
 exist in the backup. Once a file is added to the backup, it remains
 available indefinitely (at least unless it is explicitly purged). Thus
 it is reasonable to delete files from the "real" system and rely on
-being able to recover it from the backups. Even years in the future.
+being able to recover it from the backups. Even years or decades in
+the future.
 
 (As an aside: Now that I have actually constructed a working backup
 system, I should really have a look at the existing ones again. Just
@@ -113,10 +124,12 @@ other information (the files' paths and any metadata) are stored in
 the "database". Each snapshot has this information (for robustness
 reasons) stored in its own, standalone, immutable file.
 
-In addition, the backup system will by default create a "shadow tree"
-that recreates the backup's tree structure using hard links into the
-content storage. The shadow tree is only for convenience and can be
-trivially reconstructed from the database (and the content storage).
+In addition, the backup system can create a "shadow tree" that
+recreates the backup's tree structure using hard links into the
+content storage. This tree is currently constructed automatically
+whenever a new snapshot is made. But I think that was a bad UI choice,
+so I believe I will soon remove that feature. Instead I should add a
+command to ebakup to create the shadow tree on demand.
 
 
 Robustness
@@ -136,3 +149,9 @@ errors that can't be detected. And when such an error is found, the
 Similarly, every item added to the content store has its checksum
 (also currently sha-256) stored. Thus undetectable corruptions to the
 content of files are also extremely unlikely.
+
+So what happens when things do get corrupt? If ebakup's support for
+multiple copies of backups have been used, hopefully there should be
+at least one copy somewhere that is not corrupt. Which can then be
+used to replace the corrupt copies. (Though currently there's no UI
+for doing that. I need to add that too.)
