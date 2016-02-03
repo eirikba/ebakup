@@ -143,21 +143,12 @@ class TestBackup(unittest.TestCase):
         self.assertCountEqual(
             ('3d259f55c04ecd816b1e7efbd84f56d3e1e47a69154978b1d48e573af958',),
             os.listdir(os.path.join(contentpath, '01', 'bd')))
-        shadowpath = os.path.join(root_path, 'backup', '2014', '12-01T00:02')
         checksum = hashlib.sha256(b'This is a file').hexdigest()
         path = os.path.join(
             contentpath, checksum[:2], checksum[2:4], checksum[4:])
         with open(path, 'rb') as f:
             data = f.read()
         self.assertEqual(b'This is a file', data)
-        self.assertTrue(
-            os.path.samefile(
-                path, os.path.join(shadowpath, 'home', 'toplevel')))
-        self.assertTrue(
-            os.path.samefile(
-                path, os.path.join(shadowpath, 'home', 'subdir', 'copy')))
-        self.assertFalse(
-            os.path.exists(os.path.join(shadowpath, 'home', 'tmp')))
 
     def _check_first_backup_info(self):
         out = io.StringIO()

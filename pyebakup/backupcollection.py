@@ -92,11 +92,6 @@ class BackupCollection(object):
         builder = BackupBuilder(self, start)
         return builder
 
-    def _make_shadow_copy(self, path, contentid):
-        contentpath = self._make_path_from_contentid(contentid)
-        shadowpath = self._path + path
-        self._tree.make_cheap_copy(contentpath, shadowpath)
-
     def get_all_backup_names(self, order_by=None):
         '''Obtain a list of the names of all backups.
 
@@ -386,14 +381,6 @@ class BackupBuilder(object):
         '''
         self._backup.add_file(
             path, contentid, size, mtime, mtime_nsec, filetype, extra)
-        if contentid != b'':
-            # TODO: Figure out what to do with special files. This
-            # code will avoid making shadow copies of special files
-            # that have no file-specific description. Special files
-            # with file-specific descriptions will be created as
-            # regular files having the description as content.
-            self._collection._make_shadow_copy(
-                self._shadow_root + path, contentid)
 
     def add_directory(self, path, extra={}):
         '''Add the directory at 'path' to the backup, with the given attributes.

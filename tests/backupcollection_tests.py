@@ -570,22 +570,6 @@ class TestBasicBackup(unittest.TestCase):
         self.assertEqual(datetime.datetime(2015, 3, 16, 9, 52, 14), cs.first)
         self.assertEqual(datetime.datetime(2015, 3, 16, 9, 52, 14), cs.last)
 
-    def test_shadow_tree_created(self):
-        store = self.storetree
-        contentroot = ('path', 'to', 'store', 'content')
-        shadowroot = ('path', 'to', 'store', '2015', '02-14T19:55')
-        self.assertEqual(
-            store._files[contentroot + ('ba', '0f', 'e9fe63690ce68315439e5a089'
-                '86170b39937594c75fc4bbc32039db5ff0713be')],
-            store._files[shadowroot + ('homedir', 'file.txt')])
-        self.assertEqual(
-            store._files[contentroot + ('d1', '87', 'bda8636907240be66b50338fa'
-                'f862a4c3df3d7c4d30cef45a03f2ae5aa91365e')],
-            store._files[shadowroot + ('outside', 'store', 'deep', 'data')])
-        self.assertEqual(
-            store._files[shadowroot + ('homedir', 'file.txt')],
-            store._files[shadowroot + ('homedir', 'copy')])
-
 class TestTwoBackups(unittest.TestCase):
     def setUp(self):
         storetree = FakeDirectory()

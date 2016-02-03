@@ -167,27 +167,3 @@ class TestSimpleBackup(unittest.TestCase):
             self.assertEqual(
                 checksum, bkfile.good_checksum,
                 msg='checksum is wrong: ' + str(path))
-
-    def test_shadow_tree_is_linked_correctly(self):
-        backup = self.collection2.get_most_recent_backup()
-        start = backup.get_start_time()
-        shadowroot = (
-            'path', 'to', 'backup',
-            str(start.year),
-            '{:02}-{:02}T{:02}:{:02}'.format(
-                start.month, start.day, start.hour, start.minute))
-        contentroot = ('path', 'to', 'backup', 'content')
-        tree = self.storetree
-        for path in (
-                ('.emacs',), ('notes.txt',), ('Documents', 'Letter.odt'),
-                ('Documents', 'Photo.jpg'), ('tmp', 'Q.pdf'),
-                ('Pictures', 'Christmas', 'DSC_1886.JPG'),
-                ('Pictures', 'Christmas', 'DSC_1887.JPG'),
-                ('Pictures', 'Christmas', 'DSC_1888.JPG'),
-                ('Pictures', 'Christmas', 'DSC_1889.JPG'),
-                ):
-            cid = backup.get_file_info(path).contentid
-            contentpath = self.collection2._make_path_from_contentid(cid)
-            self.assertTrue(
-                tree._is_cheap_copy(contentpath, shadowroot + path),
-                msg='Not a cheap copy: ' + str(path))

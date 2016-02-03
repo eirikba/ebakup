@@ -227,33 +227,6 @@ class TestFullSequence(unittest.TestCase):
         self.assertFalse(
             fs._paths[('backups', 'home', 'db', '1995', '01-01T00:00')]
             .is_directory)
-        self.assertIn(('backups', 'home', '1995'), fs._paths)
-        self.assertIn(('backups', 'home', '1995', '01-01T00:00'), fs._paths)
-        self.assertTrue(
-            fs._paths[('backups', 'home', '1995', '01-01T00:00')].is_directory)
-        self.assertIn(
-            ('backups', 'home', '1995', '01-01T00:00', 'My Pictures',
-             'DSC_1903.JPG'),
-            fs._paths)
-        self.assertNotIn(
-            ('backups', 'home', '1995', '01-01T00:00', 'tmp-data.txt'),
-            fs._paths)
-        self.assertNotIn(
-            ('backups', 'home', '1995', '01-01T00:00', 'tmp', 'info'),
-            fs._paths)
-        self.assertEqual(
-            fs._paths[('home', 'me', 'notes.txt')].data,
-            fs._paths[('backups', 'home', '1995', '01-01T00:00', 'notes.txt')]
-            .data)
-        self.assertNotEqual(
-            fs._paths[('home', 'me', 'notes.txt')],
-            fs._paths[('backups', 'home', '1995', '01-01T00:00', 'notes.txt')])
-        self.assertEqual(
-            fs._paths[('backups', 'home', '1995', '01-01T00:00', 'notes.txt')],
-            fs._paths[
-                ('backups', 'home', 'content',
-                 '3f', '32', '379fe4108e99279890faf4'
-                 '4a836c6ad836ad331ea276d0a4b7858437091a')])
         contentfiles = tuple(
             x[3:] for x in fs._paths if x[:3] == ('backups', 'home', 'content'))
         expected = set()

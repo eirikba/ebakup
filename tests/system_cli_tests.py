@@ -114,32 +114,9 @@ class TestFullSequenceOfOperations(unittest.TestCase):
             ('Documents','Letter.odt'), self.time_backup1_start)
         self.check_backed_file(
             ('Pictures','Christmas', 'DSC_1887.JPG'), self.time_backup1_start)
-        self.assertIn(
-            self.shadowroot(self.time_backup1_start) +
-            ('home', 'Documents', 'Photo.jpg'),
-            self.local_filesys._paths)
-        self.assertNotIn(
-            self.shadowroot(self.time_backup1_start) +
-            ('home', 'tmp', 'scratchpad.txt'),
-            self.local_filesys._paths)
-
-    def shadowroot(self, backuptime):
-        return (
-            'backup', 'mine',
-            str(backuptime.year),
-            '{:02}-{:02}T{:02}:{:02}'.format(
-                backuptime.month, backuptime.day,
-                backuptime.hour, backuptime.minute))
 
     def check_backed_file(self, path, backuptime):
-        shadowpath = self.shadowroot(backuptime) + ('home',) + path
         origpath = ('home', 'me') + path
-        self.assertNotEqual(
-            self.local_filesys._paths[origpath],
-            self.local_filesys._paths[shadowpath])
-        self.assertEqual(
-            self.local_filesys._paths[origpath].data,
-            self.local_filesys._paths[shadowpath].data)
         hexsha = hashlib.sha256(
             self.local_filesys._paths[origpath].data).hexdigest()
         contentpath = (
@@ -150,9 +127,6 @@ class TestFullSequenceOfOperations(unittest.TestCase):
         self.assertEqual(
             self.local_filesys._paths[origpath].data,
             self.local_filesys._paths[contentpath].data)
-        self.assertEqual(
-            self.local_filesys._paths[shadowpath],
-            self.local_filesys._paths[contentpath])
 
     def sync_backups(self):
         self.local_filesys._add_file(
@@ -198,7 +172,7 @@ class TestFullSequenceOfOperations(unittest.TestCase):
 
     def check_synced_backups(self):
         self.assertCountEqual(
-            ('db', 'content', '2014', 'tmp'),
+            ('db', 'content', 'tmp'),
             self._get_items_in_path(('backup', 'mine')))
         self.assertCountEqual(
             ('db', 'content', 'tmp'),
