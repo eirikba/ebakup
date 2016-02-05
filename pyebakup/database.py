@@ -94,6 +94,14 @@ class Database(object):
         return self._dbfileopener.create_backup_in_replacement_mode(
             self._tree, self._path, starttime)
 
+    def get_backup_by_name(self, name):
+        '''Obtain the data for the backup named 'name'.
+        '''
+        try:
+            return self._dbfileopener.open_backup(self, name)
+        except FileNotFoundError:
+            return None
+
     def get_most_recent_backup(self):
         '''Obtain the data for the most recent backup according to the
         starting time.

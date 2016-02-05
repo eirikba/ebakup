@@ -128,10 +128,8 @@ In addition, the backup system can create a "shadow tree" that
 recreates the backup's tree structure using hard links into the
 content storage. This tree used to be constructed automatically
 whenever a new snapshot was made. But I think that was a bad UI
-choice, so I removed that feature. Instead I should add a command to
-ebakup to create the shadow tree on demand. (And I probably should do
-that soon, given that there is no longer even a half-convenient way to
-restore files from a snapshot.)
+choice, so I removed that feature. There is now a "shadowcopy" command
+that will create this tree when needed instead.
 
 
 Robustness

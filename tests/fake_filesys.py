@@ -26,6 +26,9 @@ class FakeFileSystem(object):
         self._treeaccess[path] = (
             'mkdir', 'create', 'stat', 'read', 'write', 'listdir', 'delete')
 
+    def _drop_all_access_to_subtree(self, path):
+        del self._treeaccess[path]
+
     def _allow_listing_subtree(self, path):
         self._allow_access_for_subtree(path, 'listdir')
 

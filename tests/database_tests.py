@@ -69,6 +69,8 @@ class FakeDbOpener(object):
 
     def open_backup(self, db, name):
         assert not self._added_backups
+        if name not in self._backups:
+            raise FileNotFoundError('No such file: testdb/' + name)
         return self._backups[name]
 
     def open_raw_backup(self, tree, path, name):
@@ -445,6 +447,14 @@ class TestDatabaseWithManyBackups(unittest.TestCase):
              '2015-03-23T22:30', '2015-05-21T03:35',
              '2015-06-07T09:19', '2015-06-15T00:21'),
             self.db.get_all_backup_names())
+
+    def test_get_backup_by_name_returns_correct_backup(self):
+        bk = self.db.get_backup_by_name('2014-10-24T22:18')
+        self.assertEqual(self.bk3, bk)
+
+    def test_get_backup_by_name_for_missing_backup_returns_none(self):
+        bk = self.db.get_backup_by_name('2014-07-13T18:23')
+        self.assertEqual(None, bk)
 
     def test_get_most_recent_backup_is_correct(self):
         self.assertEqual(self.bk8, self.db.get_most_recent_backup())

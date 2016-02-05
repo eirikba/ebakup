@@ -118,6 +118,16 @@ class BackupCollection(object):
         '''
         return self._db.create_backup_file_in_replacement_mode(starttime)
 
+    def get_backup_by_name(self, name):
+        '''Return a BackupData object for the backup named 'name'.
+
+        If there is no suitable backup, None is returned.
+        '''
+        info = self._db.get_backup_by_name(name)
+        if info is None:
+            return None
+        return BackupData(self, info)
+
     def get_most_recent_backup(self):
         '''Return a BackupData object for the most recently created backup.
 
@@ -331,6 +341,16 @@ class BackupCollection(object):
         '''
         path = self._make_path_from_contentid(contentid)
         return ContentReader(self._tree.get_item_at_path(path))
+
+    def make_shadow_copy(self, info, tree, path):
+        '''Create a shadow copy (aka hard link) of the file described by
+        'info' at tree:path.
+        '''
+        # If the trees are not the same, some magic is needed to find
+        # the equivalent of the source path in the target tree.
+        assert self._tree == tree
+        source = self._make_path_from_contentid(info.contentid)
+        tree.make_cheap_copy(source, path)
 
 class ContentInfo(object):
     '''Provides information about a content item.

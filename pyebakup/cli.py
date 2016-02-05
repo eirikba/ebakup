@@ -17,6 +17,7 @@ import ui_state
 from config import Config
 from task_backup import BackupTask
 from task_info import InfoTask
+from task_makeshadowtree import MakeShadowTreeTask
 from task_sync import SyncTask
 from task_webui import WebUITask
 
@@ -68,6 +69,18 @@ def parse_commandline(commandline=None, msgfile=None):
         help='Create any missing backup collections')
     syncparser.add_argument(
         'backups', nargs='*', help='Which backups to sync (default:all)')
+    shadowcopyparser = subparsers.add_parser(
+        'shadowcopy', help='Makes a "shadow" copy of a snapshot.')
+    shadowcopyparser.add_argument(
+        '--target',
+        help='The directory to create as the shadow copy. If the target '
+        'already exists, the command will fail. If the target does not '
+        'support having hardlinks created to files in the backup storage, '
+        'the command will fail. This typically means it has to be on the '
+        'same physical disk. WARNING: Do not modify the files in the '
+        'shadow tree. That will also modify the originals in the backup!')
+    shadowcopyparser.add_argument(
+        'snapshotname', help='Name of snapshot to copy')
     webuiparser = subparsers.add_parser(
         'webui',
         help='Run the web ui. By default, the web ui is always started '
@@ -77,6 +90,7 @@ def parse_commandline(commandline=None, msgfile=None):
     if msgfile is not None:
         backupparser._overridden_output_file = msgfile
         infoparser._overridden_output_file = msgfile
+        shadowcopyparser._overridden_output_file = msgfile
         webuiparser._overridden_output_file = msgfile
         syncparser._overridden_output_file = msgfile
     if commandline is None:
@@ -150,6 +164,9 @@ def make_tasks_from_args(args):
         tasks.append(task)
     elif args.command == 'info':
         task = InfoTask(config, args)
+        tasks.append(task)
+    elif args.command == 'shadowcopy':
+        task = MakeShadowTreeTask(config, args)
         tasks.append(task)
     elif args.command == 'webui':
         pass

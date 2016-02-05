@@ -101,6 +101,13 @@ class TestFullSequence(unittest.TestCase):
         cli.main(('sync', '--create'), services=self.services, stdoutfile=out)
         # This should not have caused any changes, so just do the same check
         self._check_result_of_sync(stdout=out.getvalue())
+        out = io.StringIO()
+        fs._allow_full_access_to_subtree(('backup', 'shadow'))
+        cli.main(
+            ('shadowcopy', '--target', '/backup/shadow', '1995-01-01T00:00'),
+            services=self.services, stdoutfile=out)
+        fs._drop_all_access_to_subtree(('backup', 'shadow'))
+        self.assertRegex(out.getvalue(), r'^Web ui started on port \d+$')
 
     def make_initial_source_tree(self, fs):
         fs._make_files(

@@ -21,7 +21,7 @@ class FileData(object):
                 assert not hasattr(self, 'content_generator')
                 assert not hasattr(self, 'content')
             setattr(self, k, v)
-            self.generate_missing_data()
+        self.generate_missing_data()
 
     def generate_missing_data(self):
         if self.content_type == 'content':
@@ -194,6 +194,12 @@ class FakeDatabase(object):
         self._backups.append(bkup)
         self._backups.sort(key=lambda x: x._start_time)
 
+    def get_backup_by_name(self, name):
+        for bk in self._backups:
+            if bk._get_name() == name:
+                return bk
+        return None
+
     def get_most_recent_backup(self):
         if not self._backups:
             return None
@@ -273,6 +279,11 @@ class FakeBackup(object):
         self._end_time = None
         self._files = {}
         self._directories = set()
+
+    def _get_name(self):
+        start = self._start_time
+        return '{:04}-{:02}-{:02}T{:02}:{:02}'.format(
+            start.year, start.month, start.day, start.hour, start.minute)
 
     def get_start_time(self):
         return self._start_time
@@ -506,6 +517,18 @@ class TestBasicBackup(unittest.TestCase):
             now=datetime.datetime(2015, 2, 18, 5, 27, 43))
         self.assertEqual(self.cid1, contentid)
 
+    def test_make_shadow_copy(self):
+        bk = self.backupcollection.get_backup_by_name('2015-02-14T19:55')
+        info = bk.get_file_info(('homedir', 'other.txt'))
+        self.backupcollection.make_shadow_copy(
+            info, self.storetree, ('path', 'to', 'shadow', 'other.txt'))
+        contentpath = self.backupcollection._make_path_from_contentid(
+            info.contentid)
+        self.assertEqual(('path', 'to', 'store', 'content'), contentpath[:4])
+        citem = self.storetree._files[contentpath]
+        link = self.storetree._files[('path', 'to', 'shadow', 'other.txt')]
+        self.assertEqual(citem, link)
+
     @unittest.skip('look into reviving when verification data is in place')
     def test_checksum_timeline(self):
         bc = backupcollection.open_collection(
@@ -708,6 +731,20 @@ class TestTwoBackups(unittest.TestCase):
             None,
             self.backupcollection.get_oldest_backup_after(
                 old2.get_start_time()))
+
+    def test_get_backup_by_name(self):
+        backup = self.backupcollection.get_backup_by_name('2015-04-20T17:00')
+        self.assertEqual(
+            datetime.datetime(2015, 4, 20, 17, 0, 22, 737955),
+            backup.get_start_time())
+        backup = self.backupcollection.get_backup_by_name('2015-06-18T12:33')
+        self.assertEqual(None, backup)
+        backup = self.backupcollection.get_backup_by_name('2015-02-14T19:55')
+        self.assertEqual(
+            datetime.datetime(2015, 2, 14, 19, 55, 32, 328629),
+            backup.get_start_time())
+        backup = self.backupcollection.get_backup_by_name('2012-06-18T12:33')
+        self.assertEqual(None, backup)
 
 class TestSingleStuff(unittest.TestCase):
     def test_default_start_and_end_time(self):
