@@ -3,6 +3,7 @@
 import argparse
 import datetime
 import os
+import re
 import sys
 import time
 
@@ -20,6 +21,8 @@ from task_info import InfoTask
 from task_makeshadowtree import MakeShadowTreeTask
 from task_sync import SyncTask
 from task_webui import WebUITask
+
+_start_time = datetime.datetime.utcnow()
 
 class UnknownCommandError(Exception): pass
 
@@ -53,6 +56,9 @@ def parse_commandline(commandline=None, msgfile=None):
         '--no-exit', action='store_true',
         help='Do not exit when tasks are complete '
         '(e.g. to keep the web ui running)')
+    parser.add_argument('--fake-start-time',
+        help='Act as if this is the time when ebakup started '
+            '(intended for testing)')
     subparsers = parser.add_subparsers(dest='command')
     backupparser = subparsers.add_parser(
         'backup', help='Perform one or more backup operations')
@@ -124,6 +130,9 @@ def create_services(args, overrides):
         'uistate': ui,
         'logger': True,
     }
+    if args is not None and args.fake_start_time:
+        _set_fake_start_time(args.fake_start_time)
+        services['utcnow'] = _fake_utcnow
     if overrides is None:
         overrides={'*':None}
     filtered = {}
@@ -180,3 +189,36 @@ def make_tasks_from_args(args):
 def perform_tasks(tasks):
     for task in tasks:
         task.execute()
+
+def _set_fake_start_time(start):
+    global _fake_time_diff
+    start_dt = _parse_datetime(start)
+    _fake_time_diff = start_dt - _start_time
+
+def _parse_datetime(timestr):
+    match = re.match(
+        r'^(\d{4})-(\d\d)-(\d\d)[T ](\d\d):(\d\d)(?::(\d\d)(?:\.(\d+)))$',
+        timestr)
+    if match is None:
+        raise AssertionError('Failed parse datetime string: ' + str(timestr))
+    year = int(match.group(1))
+    month = int(match.group(2))
+    day = int(match.group(3))
+    hour = int(match.group(4))
+    minute = int(match.group(5))
+    secondstr = match.group(6)
+    if secondstr:
+        second = int(secondstr)
+    else:
+        second = 0
+    subsecstr = match.group(7)
+    if not subsecstr:
+        micro = 0
+    elif len(subsecstr) >= 6:
+        micro = int(subsecstr[:6])
+    else:
+        micro = int(subsecstr) * 10 ** (6 - len(subsecstr))
+    return datetime.datetime(year, month, day, hour, minute, second, micro)
+
+def _fake_utcnow():
+    return datetime.datetime.utcnow() + _fake_time_diff
