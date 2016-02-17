@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Unlike all other tests, these tests will touch the actual file
+# Unlike most other tests, these tests will touch the actual file
 # system.
 
 import datetime
