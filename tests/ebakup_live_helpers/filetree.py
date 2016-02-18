@@ -8,6 +8,8 @@ class FileTree(object):
 
     def add_file(self, path, content):
         assert isinstance(content, bytes)
+        if isinstance(path, bytes):
+            path = path.decode('utf-8', errors='surrogateescape')
         assert path not in self._files
         self._files[path] = content
 
@@ -16,6 +18,8 @@ class FileTree(object):
             yield path
 
     def get_file_content(self, path):
+        if isinstance(path, bytes):
+            path = path.decode('utf-8', errors='surrogateescape')
         return self._files[path]
 
     def load_from_path(self, path):

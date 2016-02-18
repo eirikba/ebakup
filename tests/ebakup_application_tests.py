@@ -77,6 +77,27 @@ class TestFileTree(unittest.TestCase):
         self.assertCountEqual(
             ('a file', 'path/here'), [x for x in tree.iterate_files()])
 
+    def test_file_content_found_also_by_name_as_bytes(self):
+        tree = FileTree()
+        self._add_3_files(tree)
+        self.assertEqual(b'nothing', tree.get_file_content(b'a file'))
+
+    def test_broken_utf8_file_name_string(self):
+        tree = FileTree()
+        name = b'This\xa0is broken'
+        strname = name.decode('utf-8', errors='surrogateescape')
+        tree.add_file(strname, b'This is fine')
+        self.assertEqual(b'This is fine', tree.get_file_content(strname))
+        self.assertEqual(b'This is fine', tree.get_file_content(name))
+
+    def test_broken_utf8_file_name_bytes(self):
+        tree = FileTree()
+        name = b'This\xa0is broken'
+        strname = name.decode('utf-8', errors='surrogateescape')
+        tree.add_file(name, b'This is fine')
+        self.assertEqual(b'This is fine', tree.get_file_content(strname))
+        self.assertEqual(b'This is fine', tree.get_file_content(name))
+
     @unittest.skipUnless(
         tests.settings.run_live_tests, 'Live tests are disabled')
     def test_tree_loaded_from_disk_has_expected_files(self):
@@ -103,6 +124,51 @@ class TestFileTree(unittest.TestCase):
             os.makedirs(subdir, exist_ok=True)
             with open(fullpath, 'wb') as f:
                 f.write(content)
+
+
+class BackupChecker(object):
+    def __init__(self, testcase, dbpath, bkname):
+        self.tc = testcase
+        self.dbpath = dbpath
+        self.bk = BackupReader(dbpath, bkname)
+        self.content = ContentReader(dbpath)
+
+    def set_reference_tree(self, tree):
+        self.tree = tree
+
+    def assertSameFilesPresent(self):
+        treepaths = set(x for x in self.tree.iterate_files())
+        bkpaths = set(x.decode('utf-8', errors='surrogateescape')
+            for x in self.bk.iterate_files())
+        self.tc.assertEqual(treepaths, bkpaths)
+
+    def assertFilesHaveCorrectContentAndChecksums(self):
+        for path in self.bk.iterate_files():
+            self.assertFileHaveCorrectContent(path)
+            self.assertFileHaveCorrectChecksum(path)
+
+    def assertFileHaveCorrectContent(self, path):
+        data = self.tree.get_file_content(path)
+        bkdata = self._get_bk_data_for_path(path)
+        self.tc.assertEqual(data, bkdata)
+
+    def _get_bk_data_for_path(self, path):
+        finfo = self.bk.get_file_info(path)
+        cpath = makepath('backup', self.content.get_path(finfo.cid))
+        with open(cpath, 'rb') as f:
+            data = f.read()
+        return data
+
+    def assertFileHaveCorrectChecksum(self, path):
+        data = self.tree.get_file_content(path)
+        checksum = hashlib.sha256(data).digest()
+        bkchecksum = self._get_bk_checksum_for_path(path)
+        self.tc.assertEqual(checksum, bkchecksum)
+
+    def _get_bk_checksum_for_path(self, path):
+        finfo = self.bk.get_file_info(path)
+        cinfo = self.content.get_content_info(finfo.cid)
+        return cinfo.checksum
 
 
 @unittest.skipUnless(tests.settings.run_live_tests, 'Live tests are disabled')
@@ -132,24 +198,18 @@ class TestEbakupLive(unittest.TestCase):
             self._write_file(os.path.join('source', path), content)
 
     def assertInitialBackupIsCorrect(self):
-        bk = BackupReader(makepath('backup'), '2014-03-29T20:20')
-        content = ContentReader(makepath('backup'))
+        checker = BackupChecker(self, makepath('backup'), '2014-03-29T20:20')
+        tree = self._make_tree_from_path(makepath('source'), ignore_path='tmp')
+        checker.set_reference_tree(tree)
+        checker.assertSameFilesPresent()
+        checker.assertFilesHaveCorrectContentAndChecksums()
+
+    def _make_tree_from_path(self, path, ignore_path=None):
         tree = FileTree()
-        tree.load_from_path(makepath('source'))
-        tree.drop_subtree('tmp')
-        for path in tree.iterate_files():
-            finfo = bk.get_file_info(path)
-            cinfo = content.get_content_info(finfo.cid)
-            contentpath = makepath('backup', content.get_path(finfo.cid))
-            with open(contentpath, 'rb') as cf, \
-                    open(makepath('source', path), 'rb') as f:
-                cdata = cf.read()
-                fdata = f.read()
-                self.assertEqual(fdata, cdata)
-                self.assertEqual(
-                    hashlib.sha256(fdata).digest(), cinfo.checksum)
-        dirs, files = bk.list_directory('')
-        self.assertCountEqual((b'photos', b'music', b'other'), dirs)
+        tree.load_from_path(path)
+        if ignore_path is not None:
+            tree.drop_subtree(ignore_path)
+        return tree
 
     def _write_file(self, innerpath, content):
         if isinstance(content, str):

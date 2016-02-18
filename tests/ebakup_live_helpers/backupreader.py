@@ -34,6 +34,10 @@ class BackupReader(object):
                 files.append(f.name)
         return dirs, files
 
+    def iterate_files(self):
+        for path in self._files:
+            yield path
+
     def _read_file(self, bkpath, bkname):
         fs = filesys.get_file_system('local')
         dbpath = fs.path_from_string(os.path.join(bkpath, 'db'))
