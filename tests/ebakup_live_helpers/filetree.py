@@ -13,6 +13,10 @@ class FileTree(object):
         assert path not in self._files
         self._files[path] = content
 
+    def add_files_from_tree(self, tree):
+        for path, content in tree._files.items():
+            self.add_file(path, content=content)
+
     def iterate_files(self):
         for path in self._files:
             yield path
@@ -31,6 +35,14 @@ class FileTree(object):
                 subpath = os.path.relpath(fullpath, path)
                 self.add_file(subpath, content=content)
 
+    def change_file(self, path, content):
+        assert path in self._files
+        self._files[path] = content
+
+    def drop_file(self, path):
+        assert path in self._files
+        del self._files[path]
+
     def drop_subtree(self, path):
         todrop = []
         for cand in self._files:
@@ -38,6 +50,14 @@ class FileTree(object):
                 todrop.append(cand)
         for name in todrop:
             del self._files[name]
+
+    def write_to_disk(self, basepath):
+        for fpath, content in self._files.items():
+            path = os.path.join(basepath, fpath)
+            assert not os.path.exists(path)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'xb') as f:
+                f.write(content)
 
     def _is_sub_path(self, path, ancestor):
         return os.path.commonpath((path, ancestor)) == ancestor

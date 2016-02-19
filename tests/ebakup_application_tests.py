@@ -52,6 +52,11 @@ class TestFileTree(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(root_path)
 
+    def assertFileContentEqual(self, content, path):
+        with open(path, 'rb') as f:
+            actual = f.read()
+        self.assertEqual(content, actual)
+
     def test_empty_tree_has_no_files(self):
         tree = FileTree()
         self.assertCountEqual((), [x for x in tree.iterate_files()])
@@ -77,6 +82,31 @@ class TestFileTree(unittest.TestCase):
         self.assertCountEqual(
             ('a file', 'path/here'), [x for x in tree.iterate_files()])
 
+    def test_dropped_files_are_gone(self):
+        tree = FileTree()
+        self._add_3_files(tree)
+        tree.drop_file('path/here')
+        self.assertCountEqual(
+            ('a file', 'path/to/something.txt'),
+            [x for x in tree.iterate_files()])
+
+    def test_copied_tree_has_the_same_files(self):
+        tree = FileTree()
+        self._add_3_files(tree)
+        tree2 = FileTree()
+        tree2.add_files_from_tree(tree)
+        self.assertCountEqual(
+            ('a file', 'path/to/something.txt', 'path/here'),
+            [x for x in tree2.iterate_files()])
+
+    def test_change_file_changes_file_content(self):
+        tree = FileTree()
+        self._add_3_files(tree)
+        tree.change_file('a file', content=b'changed')
+        self.assertEqual(b'changed', tree.get_file_content('a file'))
+        self.assertEqual(b'', tree.get_file_content('path/to/something.txt'))
+        self.assertEqual(b'empty', tree.get_file_content('path/here'))
+
     def test_file_content_found_also_by_name_as_bytes(self):
         tree = FileTree()
         self._add_3_files(tree)
@@ -97,6 +127,23 @@ class TestFileTree(unittest.TestCase):
         tree.add_file(name, b'This is fine')
         self.assertEqual(b'This is fine', tree.get_file_content(strname))
         self.assertEqual(b'This is fine', tree.get_file_content(name))
+
+    @unittest.skipUnless(
+        tests.settings.run_live_tests, 'Live tests are disabled')
+    def test_write_to_disk(self):
+        tree = FileTree()
+        self._add_3_files(tree)
+        tree.write_to_disk(makepath('tree'))
+        self.assertCountEqual(('a file', 'path'), os.listdir(makepath('tree')))
+        self.assertCountEqual(
+            ('to', 'here'), os.listdir(makepath('tree', 'path')))
+        self.assertCountEqual(
+            ('something.txt',), os.listdir(makepath('tree', 'path', 'to')))
+        self.assertFileContentEqual(b'nothing', makepath('tree', 'a file'))
+        self.assertFileContentEqual(
+            b'', makepath('tree', 'path', 'to', 'something.txt'))
+        self.assertFileContentEqual(
+            b'empty', makepath('tree', 'path', 'here'))
 
     @unittest.skipUnless(
         tests.settings.run_live_tests, 'Live tests are disabled')
@@ -190,15 +237,37 @@ class TestEbakupLive(unittest.TestCase):
         result.assertOutputEmpty()
         self.assertInitialBackupIsCorrect()
 
+    def test_second_backup(self):
+        self._make_initial_config()
+        self._make_initial_source()
+        self.fake_start_time = '2014-03-29T20:20:40.369238'
+        result = self._run_ebakup('backup', '--create', 'main')
+        self._update_source_for_second_backup()
+        self.fake_start_time = '2014-04-17T01:01:43.623171'
+        result = self._run_ebakup('backup', 'main')
+        result.assertSuccess()
+        result.assertOutputEmpty()
+        self.assertSecondBackupIsCorrect()
+
     def _make_initial_config(self):
         self._write_file('config', _data.config_1)
 
     def _make_initial_source(self):
-        for path, content in _data.source_1_files:
-            self._write_file(os.path.join('source', path), content)
+        _data.source_tree_1.write_to_disk(makepath('source'))
+
+    def _update_source_for_second_backup(self):
+        shutil.rmtree(makepath('source'))
+        _data.source_tree_2.write_to_disk(makepath('source'))
 
     def assertInitialBackupIsCorrect(self):
         checker = BackupChecker(self, makepath('backup'), '2014-03-29T20:20')
+        tree = self._make_tree_from_path(makepath('source'), ignore_path='tmp')
+        checker.set_reference_tree(tree)
+        checker.assertSameFilesPresent()
+        checker.assertFilesHaveCorrectContentAndChecksums()
+
+    def assertSecondBackupIsCorrect(self):
+        checker = BackupChecker(self, makepath('backup'), '2014-04-17T01:01')
         tree = self._make_tree_from_path(makepath('source'), ignore_path='tmp')
         checker.set_reference_tree(tree)
         checker.assertSameFilesPresent()
@@ -267,7 +336,8 @@ _data.config_1 = (
     '      static' )
 
 _data.set_seed(b'initial source files')
-_data.source_1_files = (
+_data.source_tree_1 = FileTree()
+for path, content in (
     ('photos/DSC_2473.JPG', _data.make_data(size=102856)),
     ('photos/DSC_2474.JPG', _data.make_data(size=95172)),
     ('photos/DSC_2475.JPG', _data.make_data(size=26669)),
@@ -275,8 +345,19 @@ _data.source_1_files = (
     ('tmp/stuff.dat', _data.make_data(size=147674)),
     ('music/Seigmen-Slaver_av_solen_I-2-Dr\u00e5ben.mp3',
      _data.make_data(size=93158)),
-    ('music/Garnet_crow-The_twilight_valley-07-\u5411\u65e5\u8475\u306e\u8272',
+    ('music/Garnet_crow-The_twilight_valley-'
+     '07-\u5411\u65e5\u8475\u306e\u8272.ogg',
      _data.make_data(size=59709)),
     (b'other/broken\xa4utf8'.decode('utf-8', errors='surrogateescape'),
      _data.make_data(size=37)),
-    ('other/plain', _data.make_data(size=809)))
+    ('other/plain', _data.make_data(size=809))):
+    _data.source_tree_1.add_file(path, content=content)
+
+_data.set_seed(b'second set of source files')
+_data.source_tree_2 = FileTree()
+_data.source_tree_2.add_files_from_tree(_data.source_tree_1)
+_data.source_tree_2.drop_file('tmp/notes.txt')
+_data.source_tree_2.add_file('tmp/more notes.txt', _data.make_data(size=2157))
+_data.source_tree_2.change_file(
+    'other/plain', content=_data.make_data(size=809))
+_data.source_tree_2.add_file('new dir/new file', _data.make_data(size=6618))
