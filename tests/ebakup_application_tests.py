@@ -90,10 +90,17 @@ class BackupChecker(object):
         return cinfo.checksum
 
 
+tree_after_second_backup = None
+
 @unittest.skipUnless(tests.settings.run_live_tests, 'Live tests are disabled')
 class TestEbakupLive(unittest.TestCase):
 
     def setUp(self):
+        if tree_after_second_backup is None:
+            os.makedirs(root_path)
+            self._setup_after_second_backup()
+            self.assertNotEqual(None, tree_after_second_backup)
+            shutil.rmtree(root_path)
         os.makedirs(root_path)
 
     def tearDown(self):
@@ -114,6 +121,33 @@ class TestEbakupLive(unittest.TestCase):
         result.assertOutputEmpty()
         self.assertSecondBackupIsCorrect()
 
+    def test_setup_after_second_backup(self):
+        self.assertNotEqual(None, tree_after_second_backup)
+        self._setup_after_second_backup()
+        self.assertSecondBackupIsCorrect()
+
+    def test_shadowcopy_matches_tree(self):
+        self._setup_after_second_backup()
+        self.fake_start_time = '2014-04-30T08:24:40.640211'
+        result = self._run_ebakup(
+            'shadowcopy',
+            '--target', makepath('shadowtest'),
+            '2014-04-17T01:01')
+        result.assertSuccess()
+        result.assertOutputEmpty()
+        self.assertDirMatchesTree(
+            makepath('shadowtest'),
+            _data.source_tree_2.clone(ignore_subtree='tmp'))
+        # And plain files should be hardlinks
+        self.assertTrue(os.path.samefile(
+            makepath('shadowtest', 'other/plain'),
+            makepath('backup', self._get_content_path_for_data(
+                _data.source_tree_2.get_file_content('other/plain')))))
+
+    def _get_content_path_for_data(self, data):
+        digest = hashlib.sha256(data).digest()
+        return ContentReader.get_path(digest)
+
     def _prepare_initial_backup(self):
         self._make_initial_config()
         self._make_initial_source()
@@ -124,6 +158,17 @@ class TestEbakupLive(unittest.TestCase):
         self._run_ebakup('backup', '--create', 'main')
         self._make_source_for_second_backup()
         self.fake_start_time = '2014-04-17T01:01:43.623171'
+
+    def _setup_after_second_backup(self):
+        global tree_after_second_backup
+        if tree_after_second_backup is not None:
+            tree_after_second_backup.write_to_disk(makepath(''))
+            return
+        self._prepare_second_backup()
+        self._run_ebakup('backup', 'main')
+        tree = FileTree()
+        tree.load_from_path(makepath(''))
+        tree_after_second_backup = tree
 
     def _make_initial_config(self):
         self._write_file('config', _data.config_1)
@@ -152,6 +197,15 @@ class TestEbakupLive(unittest.TestCase):
         checker.assertSameFilesPresent()
         checker.assertFilesHaveCorrectContentAndChecksums()
 
+    def assertDirMatchesTree(self, path, tree):
+        for name in tree.iterate_files():
+            fdata = self._get_file_content(os.path.join(path, name))
+            self.assertEqual(tree.get_file_content(name), fdata)
+        for base, dirs, files in os.walk(path):
+            for name in files:
+                fpath = os.path.relpath(os.path.join(base, name), path)
+                self.assertTrue(tree.has_file(fpath), msg=fpath)
+
     def _write_file(self, innerpath, content):
         if isinstance(content, str):
             content = content.encode('utf-8')
@@ -160,6 +214,11 @@ class TestEbakupLive(unittest.TestCase):
         with open(path, 'xb') as f:
             wrote = f.write(content)
             self.assertEqual(len(content), wrote)
+
+    def _get_file_content(self, innerpath):
+        path = makepath(innerpath)
+        with open(path, 'rb') as f:
+            return f.read()
 
     def _run_ebakup(self, *args):
         runner = EbakupInvocation(

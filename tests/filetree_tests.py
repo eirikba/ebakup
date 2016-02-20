@@ -41,6 +41,11 @@ class TestFileTree(unittest.TestCase):
         self.assertEqual(b'', tree.get_file_content('path/to/something.txt'))
         self.assertEqual(b'empty', tree.get_file_content('path/here'))
 
+    def test_has_file(self):
+        tree = self._get_tree_with_3_files()
+        self.assertTrue(tree.has_file('a file'))
+        self.assertFalse(tree.has_file('other file'))
+
     def test_files_in_dropped_subtree_are_gone(self):
         tree = self._get_tree_with_3_files()
         tree.drop_subtree('path/to')

@@ -24,6 +24,9 @@ class FileTree(object):
         for path, content in tree._files.items():
             self.add_file(path, content=content)
 
+    def has_file(self, path):
+        return path in self._files
+
     def iterate_files(self):
         for path in self._files:
             yield path

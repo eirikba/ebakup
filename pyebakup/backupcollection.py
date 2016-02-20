@@ -348,7 +348,7 @@ class BackupCollection(object):
         '''
         # If the trees are not the same, some magic is needed to find
         # the equivalent of the source path in the target tree.
-        assert self._tree == tree
+        assert self._tree.is_same_file_system_as(tree)
         source = self._make_path_from_contentid(info.contentid)
         tree.make_cheap_copy(source, path)
 

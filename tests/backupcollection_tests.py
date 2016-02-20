@@ -42,6 +42,9 @@ class FakeDirectory(object):
     def _get_checksum(self, path):
         return self._files[path].checksum
 
+    def is_same_file_system_as(self, other):
+        return True
+
     def does_path_exist(self, path):
         if path in self._files:
             return True

@@ -16,7 +16,8 @@ class ContentReader(object):
     def get_content_info(self, cid):
         return self._cids[cid]
 
-    def get_path(self, cid):
+    @staticmethod
+    def get_path(cid):
         hexcid = hexify(cid)
         return os.path.join('content', hexcid[:2], hexcid[2:4], hexcid[4:])
 
