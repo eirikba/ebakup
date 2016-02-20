@@ -143,6 +143,10 @@ class TestFileTree(unittest.TestCase):
         self.assertCountEqual(
             ('other file', 'some/file/in/subdir.txt', 'some/other file'),
             [x for x in tree.iterate_files()])
+        self.assertEqual(b'content', tree.get_file_content('other file'))
+        self.assertEqual(
+            b'subcontent', tree.get_file_content('some/file/in/subdir.txt'))
+        self.assertEqual(b'empty', tree.get_file_content('some/other file'))
 
     def _get_tree_with_3_files(self):
         tree = FileTree()
