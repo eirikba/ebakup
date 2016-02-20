@@ -6,6 +6,13 @@ class FileTree(object):
     def __init__(self):
         self._files = {}
 
+    def clone(self, ignore_subtree=None):
+        tree = FileTree()
+        tree.add_files_from_tree(self)
+        if ignore_subtree is not None:
+            tree.drop_subtree(ignore_subtree)
+        return tree
+
     def add_file(self, path, content):
         assert isinstance(content, bytes)
         if isinstance(path, bytes):
