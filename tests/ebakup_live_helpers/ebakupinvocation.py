@@ -48,6 +48,10 @@ class EbakupInvocation(object):
             self.printResult()
         self.testcase.assertEqual(0, self.result.returncode)
 
+    def assertSuccessAndNoOutput(self):
+        self.assertSuccess()
+        self.assertOutputEmpty()
+
     def assertFailed(self):
         self.testcase.assertNotEqual(0, self.result.returncode)
 

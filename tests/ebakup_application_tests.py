@@ -90,6 +90,11 @@ class BackupChecker(object):
         return cinfo.checksum
 
 
+time_1 = '2014-03-29T20:20:40.369238'
+time_2 = '2014-04-17T01:01:43.623171'
+time_3 = '2014-04-30T08:24:40.640211'
+
+
 @unittest.skipUnless(tests.settings.run_live_tests, 'Live tests are disabled')
 class TestEbakupLive(unittest.TestCase):
 
@@ -103,8 +108,7 @@ class TestEbakupLive(unittest.TestCase):
         def _create_tree_after_second_backup(self):
             testcase = TestEbakupLive()
             os.makedirs(root_path)
-            testcase._prepare_second_backup()
-            testcase._run_ebakup('backup', 'main')
+            testcase._setup_second_backup_completed()
             tree = FileTree()
             tree.load_from_path(makepath(''))
             shutil.rmtree(root_path)
@@ -121,32 +125,35 @@ class TestEbakupLive(unittest.TestCase):
         if True:
             shutil.rmtree(root_path)
 
-    def test_initial_backup(self):
-        self._prepare_initial_backup()
+    def test_making_first_backup(self):
+        self._given_basic_config()
+        self._given_source_tree_1()
+        self._given_current_time_is(time_1)
         result = self._run_ebakup('backup', '--create', 'main')
-        result.assertSuccess()
-        result.assertOutputEmpty()
-        self.assertInitialBackupIsCorrect()
+        result.assertSuccessAndNoOutput()
+        self.assertBackupMatchesSourceTree1()
 
-    def test_second_backup(self):
-        self._prepare_second_backup()
+    def test_making_second_backup(self):
+        self._given_first_backup_completed()
+        self._given_source_tree_2()
+        self._given_current_time_is(time_2)
         result = self._run_ebakup('backup', 'main')
-        result.assertSuccess()
-        result.assertOutputEmpty()
+        result.assertSuccessAndNoOutput()
         self.assertSecondBackupIsCorrect()
 
-    def test_setup_after_second_backup(self):
-        self._setup_after_second_backup()
+    def test_cached_state_after_second_backup(self):
+        self._given_second_backup_completed()
+        self._given_current_time_is(time_3)
         self.assertSecondBackupIsCorrect()
 
     def test_shadowcopy_matches_tree(self):
-        self._setup_after_second_backup()
+        self._given_second_backup_completed()
+        self._given_current_time_is(time_3)
         result = self._run_ebakup(
             'shadowcopy',
             '--target', makepath('shadowtest'),
             '2014-04-17T01:01')
-        result.assertSuccess()
-        result.assertOutputEmpty()
+        result.assertSuccessAndNoOutput()
         tree = _data.source_tree_2.clone(ignore_subtree='tmp')
         self.assertDirMatchesTree(makepath('shadowtest'), tree)
         content_path = self._get_content_path_for_data(
@@ -155,40 +162,7 @@ class TestEbakupLive(unittest.TestCase):
             makepath('shadowtest', 'other/plain'),
             makepath('backup', content_path)))
 
-    def _get_content_path_for_data(self, data):
-        digest = hashlib.sha256(data).digest()
-        return ContentReader.get_path(digest)
-
-    def _prepare_initial_backup(self):
-        self._make_initial_config()
-        self._make_initial_source()
-        self.fake_start_time = '2014-03-29T20:20:40.369238'
-
-    def _prepare_second_backup(self):
-        self._prepare_initial_backup()
-        self._run_ebakup('backup', '--create', 'main')
-        self._make_source_for_second_backup()
-        self.fake_start_time = '2014-04-17T01:01:43.623171'
-
-    def _setup_after_second_backup(self):
-        self.shared_context.tree_after_second_backup.write_to_disk(
-            makepath(''))
-        self.fake_start_time = '2014-04-30T08:24:40.640211'
-
-    def _make_initial_config(self):
-        self._write_file('config', _data.config_1)
-
-    def _make_initial_source(self):
-        if os.path.exists(makepath('source')):
-            shutil.rmtree(makepath('source'))
-        _data.source_tree_1.write_to_disk(makepath('source'))
-
-    def _make_source_for_second_backup(self):
-        if os.path.exists(makepath('source')):
-            shutil.rmtree(makepath('source'))
-        _data.source_tree_2.write_to_disk(makepath('source'))
-
-    def assertInitialBackupIsCorrect(self):
+    def assertBackupMatchesSourceTree1(self):
         checker = BackupChecker(self, makepath('backup'), '2014-03-29T20:20')
         tree = _data.source_tree_1.clone(ignore_subtree='tmp')
         checker.set_reference_tree(tree)
@@ -211,6 +185,51 @@ class TestEbakupLive(unittest.TestCase):
                 fpath = os.path.relpath(os.path.join(base, name), path)
                 self.assertTrue(tree.has_file(fpath), msg=fpath)
 
+    def _given_basic_config(self):
+        self._write_file('config', _data.config_1)
+
+    def _given_source_tree_1(self):
+        if os.path.exists(makepath('source')):
+            shutil.rmtree(makepath('source'))
+        _data.source_tree_1.write_to_disk(makepath('source'))
+
+    def _given_current_time_is(self, time):
+        self.fake_start_time = time
+
+    def _given_first_backup_completed(self):
+        self._given_basic_config()
+        self._given_source_tree_1()
+        self._given_current_time_is(time_1)
+        self._run_ebakup('backup', '--create', 'main')
+
+    def _given_source_tree_2(self):
+        if os.path.exists(makepath('source')):
+            shutil.rmtree(makepath('source'))
+        _data.source_tree_2.write_to_disk(makepath('source'))
+
+    def _setup_second_backup_completed(self):
+        self._given_first_backup_completed()
+        self._given_source_tree_2()
+        self._given_current_time_is(time_2)
+        self._run_ebakup('backup', 'main')
+
+    def _given_second_backup_completed(self):
+        self.shared_context.tree_after_second_backup.write_to_disk(
+            makepath(''))
+
+    def _run_ebakup(self, *args):
+        runner = EbakupInvocation(
+            '--config', makepath('config'),
+            '--fake-start-time', self.fake_start_time,
+            *args)
+        runner.set_testcase(self)
+        runner.run()
+        return runner
+
+    def _get_content_path_for_data(self, data):
+        digest = hashlib.sha256(data).digest()
+        return ContentReader.get_path(digest)
+
     def _write_file(self, innerpath, content):
         if isinstance(content, str):
             content = content.encode('utf-8')
@@ -224,15 +243,6 @@ class TestEbakupLive(unittest.TestCase):
         path = makepath(innerpath)
         with open(path, 'rb') as f:
             return f.read()
-
-    def _run_ebakup(self, *args):
-        runner = EbakupInvocation(
-            '--config', makepath('config'),
-            '--fake-start-time', self.fake_start_time,
-            *args)
-        runner.set_testcase(self)
-        runner.run()
-        return runner
 
 
 class _data(object):
