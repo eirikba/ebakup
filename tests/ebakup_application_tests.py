@@ -154,13 +154,9 @@ class TestEbakupLive(unittest.TestCase):
             '--target', makepath('shadowtest'),
             '2014-04-17T01:01')
         result.assertSuccessAndNoOutput()
-        tree = _data.source_tree_2.clone(ignore_subtree='tmp')
-        self.assertDirMatchesTree(makepath('shadowtest'), tree)
-        content_path = self._get_content_path_for_data(
-            tree.get_file_content('other/plain'))
-        self.assertTrue(os.path.samefile(
-            makepath('shadowtest', 'other/plain'),
-            makepath('backup', content_path)))
+        self.assertDirMatchesSourceTree2(makepath('shadowtest'))
+        self.assertFileIsHardLinkToContent(
+            makepath('shadowtest', 'other/plain'))
 
     def assertBackupMatchesSourceTree1(self):
         checker = BackupChecker(self, makepath('backup'), '2014-03-29T20:20')
@@ -175,6 +171,16 @@ class TestEbakupLive(unittest.TestCase):
         checker.set_reference_tree(tree)
         checker.assertSameFilesPresent()
         checker.assertFilesHaveCorrectContentAndChecksums()
+
+    def assertDirMatchesSourceTree2(self, path):
+        tree = _data.source_tree_2.clone(ignore_subtree='tmp')
+        self.assertDirMatchesTree(path, tree)
+
+    def assertFileIsHardLinkToContent(self, path):
+        data = self._get_file_content_for_full_path(path)
+        content_path = self._get_content_path_for_data(data)
+        self.assertTrue(
+            os.path.samefile(path, makepath('backup', content_path)))
 
     def assertDirMatchesTree(self, path, tree):
         for name in tree.iterate_files():
@@ -239,10 +245,12 @@ class TestEbakupLive(unittest.TestCase):
             wrote = f.write(content)
             self.assertEqual(len(content), wrote)
 
-    def _get_file_content(self, innerpath):
-        path = makepath(innerpath)
+    def _get_file_content_for_full_path(self, path):
         with open(path, 'rb') as f:
             return f.read()
+
+    def _get_file_content(self, innerpath):
+            return self._get_file_content_for_full_path(makepath(innerpath))
 
 
 class _data(object):
