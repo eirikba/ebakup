@@ -292,19 +292,19 @@ _data.config_1 = (
 _data.set_seed(b'initial source files')
 _data.source_tree_1 = FileTree()
 for path, content in (
-    ('photos/DSC_2473.JPG', _data.make_data(size=102856)),
-    ('photos/DSC_2474.JPG', _data.make_data(size=95172)),
-    ('photos/DSC_2475.JPG', _data.make_data(size=26669)),
-    ('tmp/notes.txt', _data.make_data(size=96962)),
-    ('tmp/stuff.dat', _data.make_data(size=147674)),
-    ('music/Seigmen-Slaver_av_solen_I-2-Dr\u00e5ben.mp3',
-     _data.make_data(size=93158)),
-    ('music/Garnet_crow-The_twilight_valley-'
-     '07-\u5411\u65e5\u8475\u306e\u8272.ogg',
-     _data.make_data(size=59709)),
-    (b'other/broken\xa4utf8'.decode('utf-8', errors='surrogateescape'),
-     _data.make_data(size=37)),
-    ('other/plain', _data.make_data(size=809))):
+        ('photos/DSC_2473.JPG', _data.make_data(size=102856)),
+        ('photos/DSC_2474.JPG', _data.make_data(size=95172)),
+        ('photos/DSC_2475.JPG', _data.make_data(size=26669)),
+        ('tmp/notes.txt', _data.make_data(size=96962)),
+        ('tmp/stuff.dat', _data.make_data(size=147674)),
+        ('music/Seigmen-Slaver_av_solen_I-2-Dr\u00e5ben.mp3',
+         _data.make_data(size=93158)),
+        ('music/Garnet_crow-The_twilight_valley-'
+         '07-\u5411\u65e5\u8475\u306e\u8272.ogg',
+         _data.make_data(size=59709)),
+        (b'other/broken\xa4utf8'.decode('utf-8', errors='surrogateescape'),
+         _data.make_data(size=37)),
+        ('other/plain', _data.make_data(size=809))):
     _data.source_tree_1.add_file(path, content=content)
 
 _data.set_seed(b'second set of source files')
