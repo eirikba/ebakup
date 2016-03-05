@@ -127,24 +127,24 @@ class TestEbakupLive(unittest.TestCase):
 
     def test_making_first_backup(self):
         self._given_basic_config()
-        self._given_source_tree_1()
+        self._given_source_tree(_data.source_tree_1)
         self._given_current_time_is(time_1)
         result = self._run_ebakup('backup', '--create', 'main')
         result.assertSuccessAndNoOutput()
-        self.assertBackupMatchesSourceTree1()
+        self.assertBackupMatchesTree(time_1, _data.backup_tree_1)
 
     def test_making_second_backup(self):
         self._given_first_backup_completed()
-        self._given_source_tree_2()
+        self._given_source_tree(_data.source_tree_2)
         self._given_current_time_is(time_2)
         result = self._run_ebakup('backup', 'main')
         result.assertSuccessAndNoOutput()
-        self.assertSecondBackupIsCorrect()
+        self.assertBackupMatchesTree(time_2, _data.backup_tree_2)
 
     def test_cached_state_after_second_backup(self):
         self._given_second_backup_completed()
         self._given_current_time_is(time_3)
-        self.assertSecondBackupIsCorrect()
+        self.assertBackupMatchesTree(time_2, _data.backup_tree_2)
 
     def test_shadowcopy_matches_tree(self):
         self._given_second_backup_completed()
@@ -154,27 +154,17 @@ class TestEbakupLive(unittest.TestCase):
             '--target', makepath('shadowtest'),
             '2014-04-17T01:01')
         result.assertSuccessAndNoOutput()
-        self.assertDirMatchesSourceTree2(makepath('shadowtest'))
+        self.assertDirMatchesTree(makepath('shadowtest'), _data.backup_tree_2)
         self.assertFileIsHardLinkToContent(
             makepath('shadowtest', 'other/plain'))
 
-    def assertBackupMatchesSourceTree1(self):
-        checker = BackupChecker(self, makepath('backup'), '2014-03-29T20:20')
-        tree = _data.source_tree_1.clone(ignore_subtree='tmp')
+    def assertBackupMatchesTree(self, bkname, tree, dbpath=None):
+        if dbpath is None:
+            dbpath = makepath('backup')
+        checker = BackupChecker(self, dbpath, bkname[:16])
         checker.set_reference_tree(tree)
         checker.assertSameFilesPresent()
         checker.assertFilesHaveCorrectContentAndChecksums()
-
-    def assertSecondBackupIsCorrect(self):
-        checker = BackupChecker(self, makepath('backup'), '2014-04-17T01:01')
-        tree = _data.source_tree_2.clone(ignore_subtree='tmp')
-        checker.set_reference_tree(tree)
-        checker.assertSameFilesPresent()
-        checker.assertFilesHaveCorrectContentAndChecksums()
-
-    def assertDirMatchesSourceTree2(self, path):
-        tree = _data.source_tree_2.clone(ignore_subtree='tmp')
-        self.assertDirMatchesTree(path, tree)
 
     def assertFileIsHardLinkToContent(self, path):
         data = self._get_file_content_for_full_path(path)
@@ -194,28 +184,23 @@ class TestEbakupLive(unittest.TestCase):
     def _given_basic_config(self):
         self._write_file('config', _data.config_1)
 
-    def _given_source_tree_1(self):
+    def _given_source_tree(self, tree):
         if os.path.exists(makepath('source')):
             shutil.rmtree(makepath('source'))
-        _data.source_tree_1.write_to_disk(makepath('source'))
+        tree.write_to_disk(makepath('source'))
 
     def _given_current_time_is(self, time):
         self.fake_start_time = time
 
     def _given_first_backup_completed(self):
         self._given_basic_config()
-        self._given_source_tree_1()
+        self._given_source_tree(_data.source_tree_1)
         self._given_current_time_is(time_1)
         self._run_ebakup('backup', '--create', 'main')
 
-    def _given_source_tree_2(self):
-        if os.path.exists(makepath('source')):
-            shutil.rmtree(makepath('source'))
-        _data.source_tree_2.write_to_disk(makepath('source'))
-
     def _setup_second_backup_completed(self):
         self._given_first_backup_completed()
-        self._given_source_tree_2()
+        self._given_source_tree(_data.source_tree_2)
         self._given_current_time_is(time_2)
         self._run_ebakup('backup', 'main')
 
@@ -310,6 +295,8 @@ class _data(object):
                 ('other/plain', cls.make_data(size=809))):
             cls.source_tree_1.add_file(path, content=content)
 
+        cls.backup_tree_1 = cls.source_tree_1.clone(ignore_subtree='tmp')
+
         cls.set_seed(b'second set of source files')
         cls.source_tree_2 = FileTree()
         cls.source_tree_2.add_files_from_tree(cls.source_tree_1)
@@ -319,6 +306,8 @@ class _data(object):
         cls.source_tree_2.change_file(
             'other/plain', content=cls.make_data(size=809))
         cls.source_tree_2.add_file('new dir/new file', cls.make_data(size=6618))
+
+        cls.backup_tree_2 = cls.source_tree_2.clone(ignore_subtree='tmp')
 
 
 _data._create_data()
