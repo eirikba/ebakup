@@ -280,38 +280,45 @@ class _data(object):
         cls._entropy += hashlib.md5(cls._seed).digest()
 
 
-_data.config_1 = (
-    'backup main\n'
-    '  collection local:' + root_path + '/backup\n'
-    '  source local:' + root_path + '/source\n'
-    '    paths tmp transient\n'
-    '      ignore\n'
-    '    path photos\n'
-    '      static' )
+    @classmethod
+    def _create_data(cls):
+        cls.config_1 = (
+            'backup main\n'
+            '  collection local:' + root_path + '/backup\n'
+            '  source local:' + root_path + '/source\n'
+            '    paths tmp transient\n'
+            '      ignore\n'
+            '    path photos\n'
+            '      static' )
 
-_data.set_seed(b'initial source files')
-_data.source_tree_1 = FileTree()
-for path, content in (
-        ('photos/DSC_2473.JPG', _data.make_data(size=102856)),
-        ('photos/DSC_2474.JPG', _data.make_data(size=95172)),
-        ('photos/DSC_2475.JPG', _data.make_data(size=26669)),
-        ('tmp/notes.txt', _data.make_data(size=96962)),
-        ('tmp/stuff.dat', _data.make_data(size=147674)),
-        ('music/Seigmen-Slaver_av_solen_I-2-Dr\u00e5ben.mp3',
-         _data.make_data(size=93158)),
-        ('music/Garnet_crow-The_twilight_valley-'
-         '07-\u5411\u65e5\u8475\u306e\u8272.ogg',
-         _data.make_data(size=59709)),
-        (b'other/broken\xa4utf8'.decode('utf-8', errors='surrogateescape'),
-         _data.make_data(size=37)),
-        ('other/plain', _data.make_data(size=809))):
-    _data.source_tree_1.add_file(path, content=content)
+        cls.set_seed(b'initial source files')
+        cls.source_tree_1 = FileTree()
+        for path, content in (
+                ('photos/DSC_2473.JPG', cls.make_data(size=102856)),
+                ('photos/DSC_2474.JPG', cls.make_data(size=95172)),
+                ('photos/DSC_2475.JPG', cls.make_data(size=26669)),
+                ('tmp/notes.txt', cls.make_data(size=96962)),
+                ('tmp/stuff.dat', cls.make_data(size=147674)),
+                ('music/Seigmen-Slaver_av_solen_I-2-Dr\u00e5ben.mp3',
+                 cls.make_data(size=93158)),
+                ('music/Garnet_crow-The_twilight_valley-'
+                 '07-\u5411\u65e5\u8475\u306e\u8272.ogg',
+                 cls.make_data(size=59709)),
+                (b'other/broken\xa4utf8'.decode(
+                    'utf-8', errors='surrogateescape'),
+                 cls.make_data(size=37)),
+                ('other/plain', cls.make_data(size=809))):
+            cls.source_tree_1.add_file(path, content=content)
 
-_data.set_seed(b'second set of source files')
-_data.source_tree_2 = FileTree()
-_data.source_tree_2.add_files_from_tree(_data.source_tree_1)
-_data.source_tree_2.drop_file('tmp/notes.txt')
-_data.source_tree_2.add_file('tmp/more notes.txt', _data.make_data(size=2157))
-_data.source_tree_2.change_file(
-    'other/plain', content=_data.make_data(size=809))
-_data.source_tree_2.add_file('new dir/new file', _data.make_data(size=6618))
+        cls.set_seed(b'second set of source files')
+        cls.source_tree_2 = FileTree()
+        cls.source_tree_2.add_files_from_tree(cls.source_tree_1)
+        cls.source_tree_2.drop_file('tmp/notes.txt')
+        cls.source_tree_2.add_file(
+            'tmp/more notes.txt', cls.make_data(size=2157))
+        cls.source_tree_2.change_file(
+            'other/plain', content=cls.make_data(size=809))
+        cls.source_tree_2.add_file('new dir/new file', cls.make_data(size=6618))
+
+
+_data._create_data()
