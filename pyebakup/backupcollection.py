@@ -42,8 +42,9 @@ class BackupCollection(object):
     '''
 
     def __init__(self, tree, path, services=None):
-        '''Return a BackupCollection object for the backup collection
-        described by 'params'.
+        '''Do not create BackupCollection objects by hand. Use the
+        create_collection() and open_collection() helper functions
+        instead.
         '''
         if services is None:
             services = {}
