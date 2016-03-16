@@ -10,234 +10,6 @@ import logger
 
 from config_subtree import CfgSubtree
 
-class FakeBackupCollection(object):
-    def __init__(self):
-        self._backups = []
-        self._content = {} # { content: contentid }
-        self._content_add_count = {} # { content: count }
-
-    def start_backup(self):
-        return FakeBackupBuilder(self)
-
-    def get_most_recent_backup(self):
-        if not self._backups:
-            return None
-        return self._backups[-1]
-
-    def add_content(self, sourcefile):
-        data = sourcefile._get_content()
-        return self.add_content_data(data)
-
-    def add_content_data(self, data):
-        self._content_add_count[data] = self._content_add_count.get(data, 0) + 1
-        if data not in self._content:
-            self._content[data] = b'content' + data
-        return self._content[data]
-
-class FakeBackupBuilder(object):
-    def __init__(self, collection):
-        self._collection = collection
-        self._done = False
-        self._backup = FakeBackup()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, a, b, c):
-        self._done = True
-
-    def commit(self):
-        assert self._done is False
-        self._done = True
-        self._collection._backups.append(self._backup)
-
-    def add_file(self, path, contentid, size, mtime, mtime_ns, filetype, extra):
-        assert path not in self._backup._files
-        self._backup._files[path] = FakeBackupFileInfo(
-            contentid, size, mtime, mtime_ns, filetype, extra)
-
-    def add_directory(self, path, extra={}):
-        assert path not in self._backup._files
-        parent = path[:-1]
-        if parent and parent not in self._backup._files:
-            self.add_directory(parent)
-        self._backup._files[path] = FakeBackupFileInfo(
-            None, None, None, None, 'directory', extra)
-
-FakeBackupFileInfo = collections.namedtuple(
-    'FakeBackupFileInfo',
-    ('contentid', 'size', 'mtime', 'mtime_nsec', 'filetype', 'extra_data'))
-class FakeBackup(object):
-    def __init__(self):
-        self._files = {} # { path: FakeBackupFileInfo }
-
-    def get_file_info(self, path):
-        return self._files.get(path)
-
-    def list_directory(self, path):
-        dirs = set()
-        files = set()
-        pathlen = len(path)
-        for cand in self._files:
-            if cand[:-1] == path:
-                if self._files[cand].filetype == 'directory':
-                    dirs.add(cand[-1])
-                else:
-                    files.add(cand[-1])
-        return tuple(dirs), tuple(files)
-
-filenum = 0
-class FakeTree(object):
-    def __init__(self):
-        self._files = {}
-        self._listed_directories = set()
-
-    def _copy_tree(self, other):
-        self._files.update(other._files)
-
-    def _copy_tree_with_new_objects(self, other):
-        for path, item in other._files.items():
-            if hasattr(item, '_fileid'):
-                fileid = item._fileid
-            else:
-                fileid = None
-            self._files[path] = FakeFile(fileid, item._filetype)
-
-    def _add_directory(self, path):
-        if not path:
-            return
-        self._add_directory(path[:-1])
-        self._files[path] = FakeFile(None, filetype='directory')
-
-    def _add_files(self, folder, files):
-        global filenum
-        self._add_directory(folder)
-        for name in files:
-            self._files[folder + (name,)] = FakeFile(filenum)
-            filenum += 1
-
-    def _add_symlink(self, path, content):
-        global filenum
-        self._add_directory(path[:-1])
-        filenum += 1
-        f = FakeFile(filenum, 'symlink')
-        f._override(content=content)
-        self._files[path] = f
-
-    def _add_special_file(self, path, filetype):
-        global filenum
-        self._add_directory(path[:-1])
-        filenum += 1
-        self._files[path] = FakeFile(filenum, filetype)
-
-    def path_to_full_string(self, path):
-        return 'faketree:' + str(path)
-
-    def get_directory_listing(self, path):
-        self._listed_directories.add(path)
-        pathlen = len(path)
-        dirs = set()
-        files = set()
-        for cand in self._files:
-            if len(cand) > pathlen and cand[:pathlen] == path:
-                if len(cand) == pathlen + 1:
-                    if self._files[cand]._filetype == 'directory':
-                        dirs.add(cand[-1])
-                    else:
-                        files.add(cand[-1])
-                else:
-                    dirs.add(cand[pathlen])
-        return tuple(dirs), tuple(files)
-
-    def get_item_at_path(self, path):
-        if path in self._files:
-            return self._files[path]
-
-
-class FakeFile(object):
-    def __init__(self, fileid, filetype='file'):
-        self._filetype = filetype
-        if fileid is not None:
-            self._fileid = fileid
-        self._overrides = {}
-        self._access = {}
-
-    def _register_access(self, what):
-        self._access[what] = self._access.get(what, 0) + 1
-
-    def _get_content(self):
-        '''Not really the actual content. Rather, a short bytes object that
-        uniquely identifies the actual content of this file.
-        '''
-        assert self._filetype == 'file'
-        self._register_access('content')
-        return self._get_raw_content()
-
-    def _get_raw_content(self):
-        override = self._overrides.get('content')
-        if override is not None:
-            return override
-        return str(self._fileid).encode('utf-8')
-
-    def _override(self, content=None, mtime_nsec=None):
-        if content is not None:
-            self._overrides['content'] = content
-        if mtime_nsec is not None:
-            self._overrides['mtime_nsec'] = mtime_nsec
-
-    def _change(self):
-        global filenum
-        self._overrides['content'] = None
-        self._fileid = filenum
-        filenum += 1
-
-    def get_size(self):
-        self._register_access('size')
-        assert self._filetype == 'file'
-        return self._fileid * 3 + 7
-
-    def get_mtime(self):
-        self._register_access('mtime')
-        assert self._filetype != 'symlink'
-        return self.get_link_mtime()
-
-    def get_link_mtime(self):
-        mtime = (datetime.datetime(2015, 2, 14) +
-                 datetime.timedelta(seconds=self._fileid))
-        nanosecond = self._overrides.get('mtime_nsec')
-        if nanosecond is None:
-            nanosecond = (999999960 + self._fileid * 7) % 1000000000
-        mtime = mtime.replace(microsecond=nanosecond//1000)
-        return mtime, nanosecond
-
-    def get_filetype(self):
-        self._register_access('filetype')
-        return self._filetype
-
-    def readsymlink(self):
-        self._register_access('readsymlink')
-        assert self._filetype == 'symlink'
-        return self._get_raw_content()
-
-    def get_backup_extra_data(self):
-        return {}
-
-
-def add_backup_handlers(tree, ignore=None, dynamic=None, static=None):
-    root = tree.subtrees
-    for paths, handler in ( (ignore, 0), (dynamic, 1), (static, 2) ):
-        if paths is None:
-            continue
-        for path in paths:
-            tree = root
-            for comp in path:
-                tree = tree.make_subtree(comp)
-            if handler == 0:
-                tree.set_ignored()
-            elif handler == 1:
-                tree.set_backed_up()
-            elif handler == 2:
-                tree.set_backed_up_static()
 
 def add_backup_handlers(tree, ignore=None, dynamic=None, static=None):
     root = CfgSubtree(None, None)
@@ -249,49 +21,294 @@ def add_backup_handlers(tree, ignore=None, dynamic=None, static=None):
             root._add_child_path('plain', path, handler=handler)
     tree.set_backup_handlers(root)
 
+
+class Empty(object):
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
+class File(object):
+    def __init__(self, fdata, path):
+        assert fdata[0] in ('directory', 'file', 'socket', 'symlink')
+        self._ftype = fdata[0]
+        self._realfid = fdata[1]
+        self._fid = fdata[1]
+        if self._fid == b'1~c':
+            # Everything should be the same as b'1', except the content.
+            # But currently, nothing ever reads the content of a File.
+            # So this will only change the cid
+            self._fid = b'1'
+        self._path = path
+        self._seed = None
+        if self._fid is not None:
+            self._seed = sum(self._fid)
+
+    def get_filetype(self):
+        return self._ftype
+
+    def get_size(self):
+        assert self._ftype == 'file'
+        return self._get_size()
+
+    def _get_size(self):
+        if self._ftype == 'socket':
+            return 0
+        if self._ftype == 'symlink':
+            return len(self.readsymlink())
+        assert self._ftype == 'file'
+        return self._seed * 3 + 7
+
+    def get_mtime(self):
+        assert self._ftype != 'symlink'
+        return self._get_mtime()
+
+    def get_link_mtime(self):
+        assert self._ftype == 'symlink'
+        return self._get_mtime()
+
+    def _get_mtime(self):
+        mtime_ns = (999999960 + self._seed * 7) % 1000000000
+        mtime = (datetime.datetime(2015, 2, 14) +
+            datetime.timedelta(
+                seconds=self._seed, milliseconds=mtime_ns//1000))
+        return mtime, mtime_ns
+
+    def readsymlink(self):
+        assert self._ftype == 'symlink'
+        assert self._path == ('home', 'me', 'myfiles', 'sl')
+        return b'/home/missing'
+
+    def get_backup_extra_data(self):
+        return {}
+
+    def _get_cid(self):
+        if self._realfid == b's':
+            return b'cid:/home/missing'
+        if self._realfid == b'':
+            return b''
+        return b'cid:' + self._realfid
+
+class BasicTree(object):
+    _basic_tree_data = {
+        ('home', 'me', 'myfiles', 'file.txt'): ('file', b'1'),
+        ('home', 'me', 'myfiles', 'goodstuff'): ('file', b'2'),
+        ('home', 'me', 'myfiles', 'more data'): ('file', b'3'),
+        ('home', 'me', 'myfiles', 'static', 'one'): ('file', b'4'),
+        ('home', 'me', 'myfiles', 'static', 'two'): ('file', b'5'),
+        ('home', 'me', 'myfiles', 'static', 'more', 'three'): ('file', b'6'),
+        ('home', 'me', 'myfiles', 'static', 'more', 'four'): ('file', b'7'),
+        ('home', 'other', 'more'): ('file', b'8'),
+        ('home', 'other', 'notmine'): ('file', b'9'),
+        ('home', 'me', 'tmp', 'boring'): ('file', b'a'),
+        ('home', 'me', 'tmp', 'forgetme'): ('file', b'b'),
+        ('home', 'me', 'tmp', 'stuff'): ('file', b'c'),
+        ('home', 'me', 'tmp', 'subdir', 'neither'): ('file', b'd'),
+        ('home', 'me', 'tmp', 'subdir', 'nor'): ('file', b'e'),
+        ('home', 'me', 'toplevel'): ('file', b'f'),
+        ('home', 'outside'): ('file', b'g'),
+        ('home', 'and more'): ('file', b'h'),
+        ('home', 'me', 'myfiles', 'sl'): ('symlink', b's'),
+        ('home', 'me', 'myfiles', 'sock'): ('socket', b''),
+    }
+
+    @classmethod
+    def get_file_data(cls, path, overrides=None):
+        if overrides is None:
+            overrides = {}
+        if path in overrides:
+            return overrides[path]
+        pathlen = len(path)
+        for p in overrides:
+            if (len(p) > pathlen and
+                    p[:pathlen] == path and
+                    overrides[p] is not None):
+                return ('directory', None)
+        if path in cls._basic_tree_data:
+            return cls._basic_tree_data[path]
+        for p in cls._basic_tree_data:
+            if (len(p) > pathlen and
+                    p[:pathlen] == path and
+                    p not in overrides):
+                return ('directory', None)
+        return None
+
+    @classmethod
+    def get_directory_listing(cls, path, overrides=None):
+        if overrides is None:
+            overrides = {}
+        dirs = set()
+        files = set()
+        pathlen = len(path)
+        for p in overrides:
+            if len(p) > pathlen and p[:pathlen] == path:
+                if overrides[p] is None:
+                    pass
+                elif len(p) == pathlen + 1:
+                    files.add(p[-1])
+                else:
+                    dirs.add(p[pathlen])
+        for p in cls._basic_tree_data:
+            if len(p) > pathlen and p[:pathlen] == path:
+                if p in overrides:
+                    pass
+                elif len(p) == pathlen + 1:
+                    files.add(p[-1])
+                else:
+                    dirs.add(p[pathlen])
+        return tuple(dirs), tuple(files)
+
+
+class BasicTreeSpy(object):
+    def __init__(self):
+        self._overrides = {}
+        self._directories_listed = []
+
+    def _get_file_data(self, path):
+        return BasicTree.get_file_data(path, self._overrides)
+
+    def path_to_full_string(self, path):
+        return 'basictree:' + '/'.join(path)
+
+    def get_directory_listing(self, path):
+        self._directories_listed.append(path)
+        return BasicTree.get_directory_listing(path, self._overrides)
+
+    def get_item_at_path(self, path):
+        fdata = self._get_file_data(path)
+        if fdata is None:
+            return None
+        return File(fdata, path)
+
+
+class NewBackupSpy(object):
+    def __init__(self):
+        self._committed = False
+        self._added_files = []
+        self._added_directories = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, a, b, c):
+        pass
+
+    def add_directory(self, path, extra=None):
+        assert not self._committed
+        self._added_directories.append((path, extra))
+
+    def add_file(self, path, cid, size, mtime, mtime_ns, filetype, extra):
+        assert not self._committed
+        self._added_files.append(
+            (path, cid, size, mtime, mtime_ns, filetype, extra))
+
+    def commit(self):
+        assert not self._committed
+        self._committed = True
+
+    def _get_data_for_added_file(self, path):
+        return [x for x in self._added_files if x[0] == path]
+
+    def get_file_info(self, path):
+        ds = self._get_data_for_added_file(path)
+        assert len(ds) < 2
+        if len(ds) < 1:
+            return None
+        d = ds[0]
+        return Empty()
+
+
+class BackupFileInfo(object):
+    def __init__(self, fdata, path):
+        self._file = File(fdata, path)
+
+    @property
+    def filetype(self):
+        return self._file.get_filetype()
+
+    @property
+    def size(self):
+        return self._file.get_size()
+
+    @property
+    def mtime(self):
+        return self._file.get_mtime()[0]
+
+    @property
+    def mtime_nsec(self):
+        return self._file.get_mtime()[1]
+
+    @property
+    def contentid(self):
+        return self._file._get_cid()
+
+
+class SingleBackupStub(object):
+    def get_file_info(self, path):
+        assert path[0] == 'main'
+        fdata = BasicTree.get_file_data(('home', 'me') + path[1:])
+        if fdata is not None:
+            return BackupFileInfo(fdata, path)
+        return None
+
+    def list_directory(self, path):
+        if path == ():
+            return ('main',), ()
+        assert path[0] == 'main'
+        return BasicTree.get_directory_listing(('home', 'me') + path[1:])
+
+
+class BasicCollectionSpy(object):
+    def __init__(self):
+        self._added_backup = None
+        self._added_cids = []
+
+    def get_most_recent_backup(self):
+        return self._added_backup
+
+    def start_backup(self):
+        assert self._added_backup is None
+        self._added_backup = NewBackupSpy()
+        return self._added_backup
+
+    def add_content(self, f):
+        cid = f._get_cid()
+        self._added_cids.append(cid)
+        return cid
+
+    def add_content_data(self, d):
+        cid = b'cid:' + d[:16]
+        self._added_cids.append(cid)
+        return cid
+
+
+class SingleBackupCollectionSpy(BasicCollectionSpy):
+    def __init__(self):
+        BasicCollectionSpy.__init__(self)
+        self._old_backup = SingleBackupStub()
+
+    def get_most_recent_backup(self):
+        if self._added_backup is not None:
+            return self._added_backup
+        return self._old_backup
+
+
 class TestBasicBackup(unittest.TestCase):
     def setUp(self):
-        bc = FakeBackupCollection()
-        self.backupcollection = bc
-        self.services = {
-            'utcnow': lambda : datetime.datetime(2001, 8, 12, 9, 3, 15),
+        self.sourcetree = BasicTreeSpy()
+        self.collection = BasicCollectionSpy()
+        self.logger = logger.Logger()
+        services = {
+            'logger': self.logger,
             }
-        self.logger = logger.Logger(services=self.services)
-        self.stdout = io.StringIO()
-        self.logger.set_outfile(self.stdout)
-        self.services['logger'] = self.logger
-        bo = backupoperation.BackupOperation(bc, services=self.services)
-        self.backupoperation = bo
-        sourcetree = FakeTree()
-        self.sourcetree = sourcetree
-        sourcetree._add_files(
-            ('home', 'me', 'myfiles'), ('file.txt', 'goodstuff', 'more data'))
-        # Make sure the file used for the "unchanged" test has a non-0
-        # microsecond:
-        filetxt = sourcetree._files[('home', 'me', 'myfiles', 'file.txt')]
-        filetxt._override(mtime_nsec=375468925)
-        sourcetree._add_files(
-            ('home', 'me', 'myfiles', 'static'), ('one', 'two'))
-        sourcetree._add_files(
-            ('home', 'me', 'myfiles', 'static', 'more'), ('three', 'four'))
-        sourcetree._add_files(('home', 'other'), ('more', 'notmine'))
-        sourcetree._add_files(
-            ('home', 'me', 'tmp'), ('boring', 'forgetme', 'stuff'))
-        sourcetree._add_files(
-            ('home', 'me', 'tmp', 'subdir'), ('neither', 'nor'))
-        sourcetree._add_files(('home', 'me'), ('toplevel',))
-        sourcetree._add_files(('home',), ('outside', 'and more'))
-        sourcetree._add_symlink(
-            ('home', 'me', 'myfiles', 'sl'), b'/home/missing')
-        sourcetree._add_special_file(
-            ('home', 'me', 'myfiles', 'sock'), 'socket')
-        tree = bo.add_tree_to_backup(sourcetree, ('home', 'me'), ('main',))
+        bo = backupoperation.BackupOperation(self.collection, services=services)
+        tree = bo.add_tree_to_backup(
+            self.sourcetree, ('home', 'me'), ('main',))
         add_backup_handlers(
             tree,
             ignore=(('tmp',),),
             dynamic=(('tmp', 'stuff'),),
             static=(('myfiles', 'static'),))
-        self.backuptree = tree
         bo.execute_backup()
 
         self.expected_backed_up_files = [
@@ -318,6 +335,82 @@ class TestBasicBackup(unittest.TestCase):
             self.assertLessThan(
                 event.severity, logger.Logger.LOG_WARNING, msg=str(event))
 
+    def test_correct_files_are_backed_up(self):
+        backup = self.collection._added_backup
+        self.assertCountEqual(
+            self.expected_backed_up_files,
+            [x[0] for x in backup._added_files])
+        self.assertCountEqual(
+            self.expected_backed_up_dirs,
+            [x[0] for x in backup._added_directories])
+        self.assertNoLoggedProblems()
+
+    def test_files_are_backed_up_with_correct_content(self):
+        backup = self.collection._added_backup
+        expectedcids = []
+        for totest in self.expected_backed_up_files:
+            sourcepath = ('home', 'me') + totest[1:]
+            sourcefile = self.sourcetree.get_item_at_path(sourcepath)
+            expectedcid = sourcefile._get_cid()
+            if expectedcid != b'':
+                expectedcids.append(expectedcid)
+            bkfiles = backup._get_data_for_added_file(totest)
+            self.assertEqual(1, len(bkfiles))
+            self.assertEqual(expectedcid, bkfiles[0][1])
+        self.assertCountEqual(expectedcids, self.collection._added_cids)
+        self.assertCountEqual(
+            expectedcids + [b''], [x[1] for x in backup._added_files])
+        self.assertNoLoggedProblems()
+
+    def test_files_are_backed_up_with_correct_metadata(self):
+        backup = self.collection._added_backup
+        for totest in self.expected_backed_up_files:
+            sourcepath = ('home', 'me') + totest[1:]
+            sourcefile = self.sourcetree.get_item_at_path(sourcepath)
+            bkfiles = backup._get_data_for_added_file(totest)
+            self.assertEqual(1, len(bkfiles))
+            bkfile = bkfiles[0]
+            self.assertEqual(sourcefile._get_size(), bkfile[2],
+                msg='Size mismatch for ' + str(totest))
+            mtime, mtime_ns = sourcefile._get_mtime()
+            self.assertEqual(mtime, bkfile[3],
+                msg='mtime mismatch for ' + str(totest))
+            self.assertEqual(mtime_ns, bkfile[4],
+                msg='mtime_ns mismatch for ' + str(totest))
+        self.assertNoLoggedProblems()
+
+    def test_ignored_subtrees_are_not_traversed(self):
+        sourcetree = self.sourcetree
+        self.assertIn(('home', 'me', 'tmp'), sourcetree._directories_listed)
+        self.assertNotIn(
+            ('home', 'me', 'tmp', 'subdir'), sourcetree._directories_listed)
+
+
+class TestSecondBackup(unittest.TestCase):
+    def setUp(self):
+        self.logger = logger.Logger()
+        self.stdout = io.StringIO()
+        self.logger.set_outfile(self.stdout)
+        services = {
+            'logger': self.logger
+            }
+        self.collection = SingleBackupCollectionSpy()
+        self.sourcetree = BasicTreeSpy()
+        self.bo = backupoperation.BackupOperation(
+            self.collection, services=services)
+        tree = self.bo.add_tree_to_backup(
+            self.sourcetree, ('home', 'me'), ('main',))
+        add_backup_handlers(
+            tree,
+            ignore=(('tmp',),),
+            dynamic=(('tmp', 'stuff'),),
+            static=(('myfiles', 'static'),))
+
+    def assertNoLoggedProblems(self):
+        for event in self.logger.raw_log:
+            self.assertLessThan(
+                event.severity, logger.Logger.LOG_WARNING, msg=str(event))
+
     def assertLoggedError(self, item, what):
         for event in self.logger.raw_log:
             if (event.severity >= logger.Logger.LOG_ERROR and
@@ -326,585 +419,193 @@ class TestBasicBackup(unittest.TestCase):
                 return
         self.fail('Log has no error type "' + what + '" for ' + str(item))
 
-    def test_correct_files_are_backed_up(self):
-        self.assertEqual(1, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[-1]
-        self.assertCountEqual(
-            self.expected_backed_up_files + self.expected_backed_up_dirs,
-            backup._files)
-        self.assertNoLoggedProblems()
-
-    def test_files_are_backed_up_with_correct_content(self):
-        sourcetree = self.sourcetree
-        self.assertEqual(1, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[-1]
-        for totest in self.expected_backed_up_files:
-            fcid = backup._files[totest][0]
-            sourcename = ('home', 'me') + totest[1:]
-            content = sourcetree._files[sourcename]._get_raw_content()
-            if sourcename == ('home', 'me', 'myfiles', 'sock'):
-                self.assertNotIn(content, self.backupcollection._content)
-            else:
-                ccid = self.backupcollection._content[content]
-                self.assertEqual(
-                    fcid, ccid,
-                    msg='Content mismatch for ' + str(totest))
-        self.assertNoLoggedProblems()
-
-    def test_files_are_backed_up_with_correct_metadata(self):
-        sourcetree = self.sourcetree
-        self.assertEqual(1, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[-1]
-        for totest in self.expected_backed_up_files:
-            bkfile = backup._files[totest]
-            sourcename = ('home', 'me') + totest[1:]
-            srcfile = sourcetree._files[sourcename]
-            if srcfile.get_filetype() == 'file':
-                self.assertEqual(
-                    srcfile.get_size(), bkfile[1],
-                    msg='Size mismatch for ' + str(totest))
-            elif srcfile.get_filetype() == 'symlink':
-                self.assertEqual(
-                    len(srcfile.readsymlink()), bkfile[1],
-                    msg='Size mismatch for ' + str(totest))
-            else:
-                self.assertEqual(
-                    0, bkfile[1],
-                    msg='Size mismatch for ' + str(totest))
-            mtime, mtime_ns = srcfile.get_link_mtime()
-            self.assertEqual(
-                mtime, bkfile[2],
-                msg='mtime mismatch for ' + str(totest))
-            self.assertEqual(
-                mtime_ns, bkfile[3],
-                msg='mtime_ns mismatch for ' + str(totest))
-        self.assertNoLoggedProblems()
-
-    def test_ignored_subtrees_are_not_traversed(self):
-        sourcetree = self.sourcetree
-        self.assertIn(('home', 'me', 'tmp'), sourcetree._listed_directories)
-        self.assertNotIn(
-            ('home', 'me', 'tmp', 'subdir'), sourcetree._listed_directories)
-
     def test_changed_static_data_causes_error_to_be_reported(self):
-        bo = backupoperation.BackupOperation(
-            self.backupcollection, services=self.services)
-        sourcetree2 = FakeTree()
-        sourcetree2._copy_tree(self.sourcetree)
-        # Change one static file
-        changed = sourcetree2._files[
-            ('home', 'me', 'myfiles', 'static', 'more', 'three')]
-        oldcontent = changed._get_content()
-        changed._change()
-        self.assertNotEqual(oldcontent, changed._get_content())
-        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        add_backup_handlers(
-            tree2,
-            ignore=(('tmp',),),
-            dynamic=(('tmp', 'stuff'),),
-            static=(('myfiles', 'static'),))
         self.assertNoLoggedProblems()
-        bo.execute_backup()
+        # Change one static file
+        relpath = ('myfiles', 'static', 'more', 'three')
+        self.sourcetree._overrides[('home', 'me') + relpath] = ('file', b'n')
+        self.bo.execute_backup()
+
         self.assertRegex(
             self.stdout.getvalue(), 'static file changed.*more.*three')
-        self.assertLoggedError(
-            ('main', 'myfiles', 'static', 'more', 'three'),
-            'static file changed')
-        self.assertEqual(2, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[0]
-        self.assertEqual(
-            self.backupcollection._content[oldcontent],
-            backup._files[
-                ('main', 'myfiles', 'static', 'more', 'three')].contentid)
-        backup2 = self.backupcollection._backups[1]
-        self.assertEqual(
-            self.backupcollection._content[changed._get_content()],
-            backup2._files[
-                ('main', 'myfiles', 'static', 'more', 'three')].contentid)
+        self.assertLoggedError(('main',) + relpath, 'static file changed')
+
+    def test_changed_static_data_is_backed_up(self):
+        # Change one static file
+        relpath = ('myfiles', 'static', 'more', 'three')
+        self.sourcetree._overrides[('home', 'me') + relpath] = ('file', b'n')
+        self.bo.execute_backup()
+
+        backup = self.collection._added_backup
+        bkfiles = backup._get_data_for_added_file(('main',) + relpath)
+        expectedcid = File(('file', b'n'), None)._get_cid()
+        self.assertEqual(1, len(bkfiles))
+        self.assertEqual(expectedcid, bkfiles[0][1])
 
     def test_removed_static_data_causes_error_to_be_reported(self):
-        bo = backupoperation.BackupOperation(
-            self.backupcollection, services=self.services)
-        sourcetree2 = FakeTree()
-        sourcetree2._copy_tree(self.sourcetree)
         # Change one static file
-        oldcontent = sourcetree2._files[
-            ('home', 'me', 'myfiles', 'static', 'more', 'three')]._get_content()
-        del sourcetree2._files[
-            ('home', 'me', 'myfiles', 'static', 'more', 'three')]
-        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        add_backup_handlers(
-            tree2,
-            ignore=(('tmp',),),
-            dynamic=(('tmp', 'stuff'),),
-            static=(('myfiles', 'static'),))
+        relpath = ('myfiles', 'static', 'more', 'three')
+        self.sourcetree._overrides[('home', 'me') + relpath] = None
         self.assertNoLoggedProblems()
-        bo.execute_backup()
+        self.bo.execute_backup()
+
         self.assertRegex(
             self.stdout.getvalue(), 'static file removed.*more.*three')
         self.assertLoggedError(
             ('main', 'myfiles', 'static', 'more', 'three'),
             'static file removed')
-        self.assertEqual(2, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[0]
-        self.assertEqual(
-            self.backupcollection._content[oldcontent],
-            backup._files[
-                ('main', 'myfiles', 'static', 'more', 'three')].contentid)
-        backup2 = self.backupcollection._backups[1]
-        self.assertNotIn(
-            ('main', 'myfiles', 'static', 'more', 'three'), backup2._files)
+
+    def test_removed_static_data_is_removed_in_new_backup(self):
+        # Change one static file
+        relpath = ('myfiles', 'static', 'more', 'three')
+        self.sourcetree._overrides[('home', 'me') + relpath] = None
+        self.assertNoLoggedProblems()
+        self.bo.execute_backup()
+
+        backup = self.collection._added_backup
+        bkfiles = backup._get_data_for_added_file(('main',) + relpath)
+        self.assertEqual([], bkfiles)
 
     def test_moved_static_data_causes_no_error_to_be_reported(self):
-        bo = backupoperation.BackupOperation(
-            self.backupcollection, services=self.services)
-        sourcetree2 = FakeTree()
-        sourcetree2._copy_tree(self.sourcetree)
-        # Change one static file
-        oldcontent = sourcetree2._files[
-            ('home', 'me', 'myfiles', 'static', 'more', 'three')]._get_content()
-        sourcetree2._files[('home', 'me', 'myfiles', 'static', 'new')] = (
-            sourcetree2._files[
-                ('home', 'me', 'myfiles', 'static', 'more', 'three')])
-        del sourcetree2._files[
-            ('home', 'me', 'myfiles', 'static', 'more', 'three')]
-        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        add_backup_handlers(
-            tree2,
-            ignore=(('tmp',),),
-            dynamic=(('tmp', 'stuff'),),
-            static=(('myfiles', 'static'),))
+        # Move one static file
+        relpath1 = ('myfiles', 'static', 'more', 'three')
+        relpath2 = ('myfiles', 'static', 'new')
+        self.sourcetree._overrides[('home', 'me') + relpath1] = None
+        self.sourcetree._overrides[('home', 'me') + relpath2] = ('file', b'6')
         self.assertNoLoggedProblems()
-        bo.execute_backup()
+        self.bo.execute_backup()
+
         self.assertEqual('', self.stdout.getvalue())
         self.assertNoLoggedProblems()
-        self.assertEqual(2, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[0]
-        self.assertEqual(
-            self.backupcollection._content[oldcontent],
-            backup._files[
-                ('main', 'myfiles', 'static', 'more', 'three')].contentid)
-        backup2 = self.backupcollection._backups[1]
-        self.assertNotIn(
-            ('main', 'myfiles', 'static', 'more', 'three'), backup2._files)
-        self.assertEqual(
-            self.backupcollection._content[oldcontent],
-            backup2._files[('main', 'myfiles', 'static', 'new')].contentid)
+
+    def test_moved_static_data_is_backed_up(self):
+        # Move one static file
+        relpath1 = ('myfiles', 'static', 'more', 'three')
+        relpath2 = ('myfiles', 'static', 'new')
+        self.sourcetree._overrides[('home', 'me') + relpath1] = None
+        self.sourcetree._overrides[('home', 'me') + relpath2] = ('file', b'6')
         self.assertNoLoggedProblems()
+        self.bo.execute_backup()
+
+        backup = self.collection._added_backup
+        bkfiles = backup._get_data_for_added_file(('main',) + relpath1)
+        self.assertEqual([], bkfiles)
+        bkfiles = backup._get_data_for_added_file(('main',) + relpath2)
+        self.assertEqual(1, len(bkfiles))
+        bkfile = bkfiles[0]
+        self.assertEqual(bkfile[1], File(('file', b'6'), None)._get_cid())
 
     def test_move_static_data_to_nonstatic_causes_error_to_be_reported(self):
-        bo = backupoperation.BackupOperation(
-            self.backupcollection, services=self.services)
-        sourcetree2 = FakeTree()
-        sourcetree2._copy_tree(self.sourcetree)
-        # Change one static file
-        oldcontent = sourcetree2._files[
-            ('home', 'me', 'myfiles', 'static', 'more', 'three')]._get_content()
-        sourcetree2._files[('home', 'me', 'myfiles', 'new')] = (
-            sourcetree2._files[
-                ('home', 'me', 'myfiles', 'static', 'more', 'three')])
-        del sourcetree2._files[
-            ('home', 'me', 'myfiles', 'static', 'more', 'three')]
-        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        add_backup_handlers(
-            tree2,
-            ignore=(('tmp',),),
-            dynamic=(('tmp', 'stuff'),),
-            static=(('myfiles', 'static'),))
+        # Move one static file to non-static area
+        relpath1 = ('myfiles', 'static', 'more', 'three')
+        relpath2 = ('myfiles', 'new')
+        self.sourcetree._overrides[('home', 'me') + relpath1] = None
+        self.sourcetree._overrides[('home', 'me') + relpath2] = ('file', b'6')
         self.assertNoLoggedProblems()
-        bo.execute_backup()
+        self.bo.execute_backup()
+
         self.assertRegex(
             self.stdout.getvalue(), 'static file removed.*more.*three')
         self.assertLoggedError(
             ('main', 'myfiles', 'static', 'more', 'three'),
             'static file removed')
-        self.assertEqual(2, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[0]
-        self.assertEqual(
-            self.backupcollection._content[oldcontent],
-            backup._files[
-                ('main', 'myfiles', 'static', 'more', 'three')].contentid)
-        backup2 = self.backupcollection._backups[1]
-        self.assertNotIn(
-            ('main', 'myfiles', 'static', 'more', 'three'), backup2._files)
-        self.assertEqual(
-            self.backupcollection._content[oldcontent],
-            backup2._files[('main', 'myfiles', 'new')].contentid)
 
     def test_changed_file_is_updated(self):
-        # First, verify that each content has only been added once
-        # during the first back-up operation.
-        self.assertEqual(1, len(self.backupcollection._backups))
-        old_contents = []
-        for content, count in self.backupcollection._content_add_count.items():
-            old_contents.append(content)
-            self.assertEqual(1, count)
-        bo = backupoperation.BackupOperation(
-            self.backupcollection, services=self.services)
-        sourcetree2 = FakeTree()
-        sourcetree2._copy_tree(self.sourcetree)
         # Change one file
-        changed = sourcetree2._files[('home', 'me', 'myfiles', 'more data')]
-        oldcontent = changed._get_content()
-        changed._change()
-        self.assertNotEqual(oldcontent, changed._get_content())
-        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        add_backup_handlers(
-            tree2,
-            ignore=(('tmp',),),
-            dynamic=(('tmp', 'stuff'),),
-            static=(('myfiles', 'static'),))
+        relpath = ('myfiles', 'more data')
+        self.sourcetree._overrides[('home', 'me') + relpath] = ('file', b'n')
+        self.bo.execute_backup()
+
         self.assertNoLoggedProblems()
-        bo.execute_backup()
         self.assertEqual('', self.stdout.getvalue())
         self.assertNoLoggedProblems()
-        self.assertEqual(2, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[0]
-        self.assertEqual(
-            self.backupcollection._content[oldcontent],
-            backup._files[('main', 'myfiles', 'more data')].contentid)
-        backup2 = self.backupcollection._backups[1]
-        self.assertEqual(
-            self.backupcollection._content[changed._get_content()],
-            backup2._files[('main', 'myfiles', 'more data')].contentid)
-        self.assertNotIn(changed._get_content(), old_contents)
-        self.assertIn(changed._get_content(), self.backupcollection._content)
-        self.assertIn(
-            changed._get_content(), self.backupcollection._content_add_count)
-        for content, count in self.backupcollection._content_add_count.items():
-            if content == self.sourcetree._files[
-                    ('home', 'me', 'myfiles', 'sl')].readsymlink():
-                # For now, symlinks are added every time. I expect
-                # them to be few and small, so the performance impact
-                # is negligible.
-                self.assertEqual(2, count)
-            else:
-                self.assertEqual(1, count)
-            if content != changed._get_content():
-                self.assertIn(content, old_contents)
-        self.assertNoLoggedProblems()
+        backup = self.collection._added_backup
+        bkfiles = backup._get_data_for_added_file(('main',) + relpath)
+        self.assertEqual(1, len(bkfiles))
+        bkfile = bkfiles[0]
+        new_cid = File(('file', b'n'), None)._get_cid()
+        self.assertEqual(bkfile[1], new_cid)
+        self.assertIn(new_cid, self.collection._added_cids)
 
     def test_files_with_unchanged_mtime_and_size_are_assumed_same(self):
-        # First, verify that each content has only been added once
-        # during the first back-up operation.
-        self.assertEqual(1, len(self.backupcollection._backups))
-        old_contents = []
-        for content, count in self.backupcollection._content_add_count.items():
-            old_contents.append(content)
-            self.assertEqual(1, count)
-        bo = backupoperation.BackupOperation(
-            self.backupcollection, services=self.services)
-        sourcetree2 = FakeTree()
-        sourcetree2._copy_tree(self.sourcetree)
         # Intentionally break the assumption that unchanged mtime and
         # size implies unchanged content.
-        changed = sourcetree2._files[('home', 'me', 'myfiles', 'file.txt')]
-        oldcontent = changed._get_content()
-        changed._override(content=b'changed')
-        self.assertNotEqual(oldcontent, changed._get_content())
-        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        add_backup_handlers(
-            tree2,
-            ignore=(('tmp',),),
-            dynamic=(('tmp', 'stuff'),),
-            static=(('myfiles', 'static'),))
+        relpath = ('myfiles', 'file.txt')
+        self.sourcetree._overrides[('home', 'me') + relpath] = ('file', b'1~c')
         self.assertNoLoggedProblems()
-        bo.execute_backup()
-        self.assertNoLoggedProblems()
-        self.assertEqual(2, len(self.backupcollection._backups))
-        # And now, check that no contents have been added at all
-        # during the second back-up operation.
-        for content, count in self.backupcollection._content_add_count.items():
-            if content == self.sourcetree._files[
-                    ('home', 'me', 'myfiles', 'sl')].readsymlink():
-                # For now, symlinks are added every time. I expect
-                # them to be few and small, so the performance impact
-                # is negligible.
-                self.assertEqual(2, count)
-            else:
-                self.assertEqual(1, count)
-            self.assertIn(content, old_contents)
-        self.assertNoLoggedProblems()
+        self.bo.execute_backup()
 
-    def test_file_with_identical_content_gets_same_contentid(self):
-        # First, verify that each content has only been added once
-        # during the first back-up operation.
-        self.assertEqual(1, len(self.backupcollection._backups))
-        old_contents = []
-        for content, count in self.backupcollection._content_add_count.items():
-            old_contents.append(content)
-            self.assertEqual(1, count)
-        bo = backupoperation.BackupOperation(
-            self.backupcollection, services=self.services)
-        sourcetree2 = FakeTree()
-        sourcetree2._copy_tree(self.sourcetree)
-        # And change one file, and let its content be the same as another
-        original = sourcetree2._files[('home', 'me', 'myfiles', 'file.txt')]
-        changed = sourcetree2._files[('home', 'me', 'myfiles', 'more data')]
-        oldcontent = changed._get_content()
-        changed._change()
-        changed._override(content=original._get_content())
-        self.assertNotEqual(oldcontent, changed._get_content())
-        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        add_backup_handlers(
-            tree2,
-            ignore=(('tmp',),),
-            dynamic=(('tmp', 'stuff'),),
-            static=(('myfiles', 'static'),))
         self.assertNoLoggedProblems()
-        bo.execute_backup()
+        # symlinks are currently never "assumed unchanged", so it gets
+        # added each time. They should typically be small and
+        # relatively few, so it doesn't matter much.
+        self.assertEqual([b'cid:/home/missing'], self.collection._added_cids)
+        backup = self.collection._added_backup
+        bkfiles = backup._get_data_for_added_file(('main',) + relpath)
+        self.assertEqual(1, len(bkfiles))
+        bkfile = bkfiles[0]
+        # File not updated, even though content has changed (Yes,
+        # that's NOT good. But it should only happen if both the size
+        # and the mtime is unchanged for the same file. So I think it
+        # is a small price to pay for a huge performance advantage.)
+        old_cid = File(('file', b'1'), None)._get_cid()
+        self.assertEqual(bkfile[1], old_cid)
+        self.assertNotEqual(old_cid, File(('file', b'1~c'), None)._get_cid())
+
+    def test_second_backup_includes_the_correct_files_content_and_metadata(self):
+        # Remove one file, add one and change one
+        relpath1 = ('myfiles', 'more data')
+        relpath2 = ('myfiles', 'newdir', 'goodstuff')
+        relpath3 = ('tmp', 'stuff')
+        srcbase = ('home', 'me')
+        bkbase = ('main',)
+        self.sourcetree._overrides[srcbase + relpath1] = None
+        self.sourcetree._overrides[srcbase + relpath2] = ('file', b'r')
+        self.sourcetree._overrides[srcbase + relpath3] = ('file', b't')
+        self.bo.execute_backup()
+
         self.assertNoLoggedProblems()
-        self.assertEqual(2, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[0]
-        backup2 = self.backupcollection._backups[1]
-        self.assertEqual(
-            self.backupcollection._content[changed._get_content()],
-            backup2._files[('main', 'myfiles', 'more data')].contentid)
-        self.assertEqual(
-            backup2._files[('main', 'myfiles', 'file.txt')].contentid,
-            backup2._files[('main', 'myfiles', 'more data')].contentid)
-        self.assertEqual(
-            backup._files[('main', 'myfiles', 'file.txt')].contentid,
-            backup2._files[('main', 'myfiles', 'more data')].contentid)
-        for content, count in self.backupcollection._content_add_count.items():
-            if content == changed._get_content():
-                self.assertEqual(2, count)
-            elif content == self.sourcetree._files[
-                    ('home', 'me', 'myfiles', 'sl')].readsymlink():
-                # For now, symlinks are added every time. I expect
-                # them to be few and small, so the performance impact
-                # is negligible.
-                self.assertEqual(2, count)
-            else:
-                self.assertEqual(1, count)
-            self.assertIn(content, old_contents)
-        self.assertNoLoggedProblems()
-
-class TestTwoBackups(unittest.TestCase):
-    def setUp(self):
-        bc = FakeBackupCollection()
-        self.backupcollection = bc
-        self.logger = logger.Logger()
-        self.services = {
-            'logger': self.logger,
-            }
-        bo = backupoperation.BackupOperation(bc, services=self.services)
-        self.backupoperation = bo
-        sourcetree = FakeTree()
-        self.sourcetree = sourcetree
-        sourcetree._add_files(
-            ('home', 'me', 'myfiles'), ('file.txt', 'goodstuff', 'more data'))
-        sourcetree._add_files(
-            ('home', 'me', 'myfiles', 'static'), ('one', 'two'))
-        sourcetree._add_files(
-            ('home', 'me', 'myfiles', 'static', 'more'), ('three', 'four'))
-        sourcetree._add_files(('home', 'other'), ('more', 'notmine'))
-        sourcetree._add_files(
-            ('home', 'me', 'tmp'), ('boring', 'forgetme', 'stuff'))
-        sourcetree._add_files(('home', 'me'), ('toplevel',))
-        sourcetree._add_files(('home',), ('outside', 'and more'))
-        tree = bo.add_tree_to_backup(sourcetree, ('home', 'me'), ('main',))
-        add_backup_handlers(
-            tree,
-            ignore=(('tmp',),),
-            dynamic=(('tmp', 'stuff'),),
-            static=(('myfiles', 'static'),))
-        self.backuptree = tree
-        bo.execute_backup()
-
-        bo = backupoperation.BackupOperation(bc, services=self.services)
-        self.backupoperation2 = bo
-        sourcetree2 = FakeTree()
-        self.sourcetree2 = sourcetree2
-        sourcetree2._copy_tree_with_new_objects(sourcetree)
-        del sourcetree2._files[('home', 'me', 'myfiles', 'more data')]
-        sourcetree2._add_files(('home', 'me', 'myfiles'), ('new file',))
-        sourcetree2._add_files(('home', 'me', 'new dir'), ('new file',))
-        tree2 = bo.add_tree_to_backup(sourcetree2, ('home', 'me'), ('main',))
-        self.backuptree2 = tree2
-        add_backup_handlers(
-            tree2,
-            ignore=(('tmp',),),
-            dynamic=(('tmp', 'stuff'),),
-            static=(('myfiles', 'static'),))
-        bo.execute_backup()
-
-    def assertNoLoggedProblems(self):
-        for event in self.logger.raw_log:
-            self.assertLessThan(
-                event.severity, logger.Logger.LOG_WARNING, msg=str(event))
-
-    def test_correct_files_are_backed_up_1(self):
-        self.assertEqual(2, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[0]
-        expected_files = [
-            ('main', 'myfiles', 'file.txt'),
-            ('main', 'myfiles', 'goodstuff'),
-            ('main', 'myfiles', 'more data'),
-            ('main', 'myfiles', 'static', 'one'),
-            ('main', 'myfiles', 'static', 'two'),
-            ('main', 'myfiles', 'static', 'more', 'three'),
-            ('main', 'myfiles', 'static', 'more', 'four'),
-            ('main', 'tmp', 'stuff'),
-            ('main', 'toplevel')]
-        expected_dirs = [
+        expected_files = {
+            ('main', 'myfiles', 'file.txt'): b'1',
+            ('main', 'myfiles', 'goodstuff'): b'2',
+            ('main', 'myfiles', 'newdir' , 'goodstuff'): b'r',
+            ('main', 'myfiles', 'static', 'one'): b'4',
+            ('main', 'myfiles', 'static', 'two'): b'5',
+            ('main', 'myfiles', 'static', 'more', 'three'): b'6',
+            ('main', 'myfiles', 'static', 'more', 'four'): b'7',
+            ('main', 'myfiles', 'sl'): b's',
+            ('main', 'myfiles', 'sock'): b'',
+            ('main', 'tmp', 'stuff'): b't',
+            ('main', 'toplevel'): b'f'}
+        expected_dirs = (
             ('main',),
             ('main', 'myfiles'),
+            ('main', 'myfiles', 'newdir'),
             ('main', 'myfiles', 'static'),
             ('main', 'myfiles', 'static', 'more'),
-            ('main', 'tmp')]
-
-        self.assertCountEqual(expected_files + expected_dirs, backup._files)
-        self.assertNoLoggedProblems()
-
-    def test_correct_files_are_backed_up_2(self):
-        self.assertEqual(2, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[1]
-        expected_files = [
-            ('main', 'myfiles', 'file.txt'),
-            ('main', 'myfiles', 'goodstuff'),
-            ('main', 'myfiles', 'new file'),
-            ('main', 'new dir', 'new file'),
-            ('main', 'myfiles', 'static', 'one'),
-            ('main', 'myfiles', 'static', 'two'),
-            ('main', 'myfiles', 'static', 'more', 'three'),
-            ('main', 'myfiles', 'static', 'more', 'four'),
-            ('main', 'tmp', 'stuff'),
-            ('main', 'toplevel')]
-        expected_dirs = [
-            ('main',),
-            ('main', 'myfiles'),
-            ('main', 'myfiles', 'static'),
-            ('main', 'myfiles', 'static', 'more'),
-            ('main', 'new dir'),
-            ('main', 'tmp')]
-        self.assertCountEqual(expected_files + expected_dirs, backup._files)
-        self.assertNoLoggedProblems()
-
-    def test_files_are_backed_up_with_correct_content_1(self):
-        expected_files = [
-            ('main', 'myfiles', 'file.txt'),
-            ('main', 'myfiles', 'goodstuff'),
-            ('main', 'myfiles', 'more data'),
-            ('main', 'myfiles', 'static', 'one'),
-            ('main', 'myfiles', 'static', 'two'),
-            ('main', 'myfiles', 'static', 'more', 'three'),
-            ('main', 'myfiles', 'static', 'more', 'four'),
-            ('main', 'tmp', 'stuff'),
-            ('main', 'toplevel')]
-        sourcetree = self.sourcetree
-        self.assertEqual(2, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[0]
-        for totest in expected_files:
-            fcid = backup._files[totest][0]
-            sourcename = ('home', 'me') + totest[1:]
-            content = sourcetree._files[sourcename]._get_content()
-            ccid = self.backupcollection._content[content]
-            self.assertEqual(
-                fcid, ccid,
-                msg='Content mismatch for ' + str(totest))
-        self.assertNoLoggedProblems()
-
-    def test_files_are_backed_up_with_correct_content_2(self):
-        expected_files = [
-            ('main', 'myfiles', 'file.txt'),
-            ('main', 'myfiles', 'goodstuff'),
-            ('main', 'myfiles', 'new file'),
-            ('main', 'new dir', 'new file'),
-            ('main', 'myfiles', 'static', 'one'),
-            ('main', 'myfiles', 'static', 'two'),
-            ('main', 'myfiles', 'static', 'more', 'three'),
-            ('main', 'myfiles', 'static', 'more', 'four'),
-            ('main', 'tmp', 'stuff'),
-            ('main', 'toplevel')]
-        sourcetree = self.sourcetree2
-        self.assertEqual(2, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[1]
-        for totest in expected_files:
-            fcid = backup._files[totest][0]
-            sourcename = ('home', 'me') + totest[1:]
-            content = sourcetree._files[sourcename]._get_content()
-            ccid = self.backupcollection._content[content]
-            self.assertEqual(
-                fcid, ccid,
-                msg='Content mismatch for ' + str(totest))
-        self.assertNoLoggedProblems()
-
-    def test_files_are_backed_up_with_correct_metadata_1(self):
-        expected_files = [
-            ('main', 'myfiles', 'file.txt'),
-            ('main', 'myfiles', 'goodstuff'),
-            ('main', 'myfiles', 'more data'),
-            ('main', 'myfiles', 'static', 'one'),
-            ('main', 'myfiles', 'static', 'two'),
-            ('main', 'myfiles', 'static', 'more', 'three'),
-            ('main', 'myfiles', 'static', 'more', 'four'),
-            ('main', 'tmp', 'stuff'),
-            ('main', 'toplevel')]
-        sourcetree = self.sourcetree
-        self.assertEqual(2, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[0]
-        for totest in expected_files:
-            bkfile = backup._files[totest]
-            sourcename = ('home', 'me') + totest[1:]
-            srcfile = sourcetree._files[sourcename]
-            self.assertEqual(
-                srcfile.get_size(), bkfile[1],
-                msg='Size mismatch for ' + str(totest))
-            mtime, mtime_ns = srcfile.get_mtime()
-            self.assertEqual(
-                mtime, bkfile[2],
-                msg='mtime mismatch for ' + str(totest))
-            self.assertEqual(
-                mtime_ns, bkfile[3],
-                msg='mtime_ns mismatch for ' + str(totest))
-        self.assertNoLoggedProblems()
-
-    def test_files_are_backed_up_with_correct_metadata_2(self):
-        expected_files = [
-            ('main', 'myfiles', 'file.txt'),
-            ('main', 'myfiles', 'goodstuff'),
-            ('main', 'myfiles', 'new file'),
-            ('main', 'new dir', 'new file'),
-            ('main', 'myfiles', 'static', 'one'),
-            ('main', 'myfiles', 'static', 'two'),
-            ('main', 'myfiles', 'static', 'more', 'three'),
-            ('main', 'myfiles', 'static', 'more', 'four'),
-            ('main', 'tmp', 'stuff'),
-            ('main', 'toplevel')]
-        sourcetree = self.sourcetree2
-        self.assertEqual(2, len(self.backupcollection._backups))
-        backup = self.backupcollection._backups[1]
-        for totest in expected_files:
-            bkfile = backup._files[totest]
-            sourcename = ('home', 'me') + totest[1:]
-            srcfile = sourcetree._files[sourcename]
-            self.assertEqual(
-                srcfile.get_size(), bkfile[1],
-                msg='Size mismatch for ' + str(totest))
-            mtime, mtime_ns = srcfile.get_mtime()
-            self.assertEqual(
-                mtime, bkfile[2],
-                msg='mtime mismatch for ' + str(totest))
-            self.assertEqual(
-                mtime_ns, bkfile[3],
-                msg='mtime_ns mismatch for ' + str(totest))
-        self.assertNoLoggedProblems()
-
-    def test_second_backup_does_not_open_unchanged_files(self):
-        unchanged = (
-            ('home', 'me', 'myfiles', 'file.txt'),
-            ('home', 'me', 'myfiles', 'goodstuff'),
-            ('home', 'me', 'myfiles', 'static', 'one'),
-            ('home', 'me', 'myfiles', 'static', 'two'),
-            ('home', 'me', 'myfiles', 'static', 'more', 'three'),
-            ('home', 'me', 'myfiles', 'static', 'more', 'four'),
-            ('home', 'me', 'tmp', 'stuff'),
-            ('home', 'me', 'toplevel'),
-            )
-        changed = ('home', 'me', 'myfiles', 'new file')
-        f = self.sourcetree2.get_item_at_path(changed)
-        self.assertLess(0, f._access.get('content', 0))
-        for totest in unchanged:
-            f = self.sourcetree2.get_item_at_path(totest)
-            self.assertEqual(None, f._access.get('content'), msg=totest)
+            ('main', 'tmp'))
+        backup = self.collection._added_backup
+        self.assertCountEqual(
+            expected_files.keys(), [x[0] for x in backup._added_files])
+        self.assertCountEqual(
+            expected_dirs, [x[0] for x in backup._added_directories])
+        for p in expected_files:
+            bkfiles = backup._get_data_for_added_file(p)
+            self.assertEqual(1, len(bkfiles))
+            fid = expected_files[p]
+            bkf = bkfiles[0]
+            fdata = File(('file', fid), None)
+            self.assertEqual(bkf[1], fdata._get_cid())
+            srcsize = fdata.get_size()
+            if fid == b's':
+                srcsize = 13
+            elif fid == b'':
+                srcsize = 0
+            self.assertEqual(bkf[2], srcsize)
+            self.assertEqual(bkf[3], fdata._get_mtime()[0])
+            self.assertEqual(bkf[4], fdata._get_mtime()[1])
+        added_cids = self.collection._added_cids
+        for fid in (b'r', b't'):
+            self.assertIn(File(('file', fid), None)._get_cid(), added_cids)
+        for fid in (b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'f'):
+            self.assertNotIn(File(('file', fid), None)._get_cid(), added_cids)
