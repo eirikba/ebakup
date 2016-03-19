@@ -6,6 +6,7 @@
 import datetime
 import hashlib
 import os
+import re
 import shutil
 import unittest
 
@@ -16,6 +17,7 @@ from ebakup_live_helpers.common import root_path, makepath
 from ebakup_live_helpers.contentreader import ContentReader
 from ebakup_live_helpers.ebakupinvocation import EbakupInvocation
 from ebakup_live_helpers.filetree import FileTree
+
 
 class TestEbakupInvocation(unittest.TestCase):
     '''Tests the most trivial invocations of ebakup, and so doubles as
@@ -158,6 +160,22 @@ class TestEbakupLive(unittest.TestCase):
         self.assertFileIsHardLinkToContent(
             makepath('shadowtest', 'other/plain'))
 
+    def test_verify_finds_some_problems(self):
+        self._given_second_backup_completed()
+        self._given_current_time_is(time_3)
+        content1 = _data.backup_tree_2.get_file_content('photos/DSC_2474.JPG')
+        cid1 = self._get_cid_for_data(content1)
+        cpath1 = makepath('backup', self._get_content_path_for_data(content1))
+        content2 = _data.backup_tree_2.get_file_content('other/plain')
+        cid2 = self._get_cid_for_data(content2)
+        cpath2 = makepath('backup', self._get_content_path_for_data(content2))
+        os.unlink(cpath1)
+        with open(cpath2, "r+") as f:
+             f.write('changed')
+        result = self._run_ebakup('verify')
+        self.assertVerifyResult(
+            result, content_missing=(cid1,), content_changed=(cid2,))
+
     def assertBackupMatchesTree(self, bkname, tree, dbpath=None):
         if dbpath is None:
             dbpath = makepath('backup')
@@ -180,6 +198,34 @@ class TestEbakupLive(unittest.TestCase):
             for name in files:
                 fpath = os.path.relpath(os.path.join(base, name), path)
                 self.assertTrue(tree.has_file(fpath), msg=fpath)
+
+    def assertVerifyResult(
+            self, result, content_missing=(), content_changed=()):
+        out, err = result._get_interesting_output()
+        self.assertEqual(b'', err)
+        out_cmissing = []
+        out_cchanged = []
+        re_line = re.compile(rb'^\s*([^:]+):\s*(.*)$')
+        for line in out.split(b'\n'):
+            if (line == b'' or
+                    line.startswith(b'Results of verifying') or
+                    line.startswith(b'ERRORS: ') or
+                    line.startswith(b'Warnings: ')):
+                continue
+            match = re_line.match(line)
+            self.assertNotEqual(None, match, msg=line)
+            what = match.group(1)
+            which = match.group(2)
+            if what == b'Content missing':
+                out_cmissing.append(which.decode('utf-8'))
+            elif what == b'Content changed':
+                out_cchanged.append(which.decode('utf-8'))
+            else:
+                self.fail('Unknown output: ' + str(line))
+        self.assertCountEqual(
+            [str(x) for x in content_missing], out_cmissing)
+        self.assertCountEqual(
+            [str(x) for x in content_changed], out_cchanged)
 
     def _given_basic_config(self):
         self._write_file('config', _data.config_1)
@@ -220,6 +266,9 @@ class TestEbakupLive(unittest.TestCase):
     def _get_content_path_for_data(self, data):
         digest = hashlib.sha256(data).digest()
         return ContentReader.get_path(digest)
+
+    def _get_cid_for_data(self, data):
+        return hashlib.sha256(data).digest()
 
     def _write_file(self, innerpath, content):
         if isinstance(content, str):

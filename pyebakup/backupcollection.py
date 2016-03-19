@@ -78,6 +78,9 @@ class BackupCollection(object):
     def _open_database(self, dbopener):
         self._db = dbopener(self._tree, self._path + ('db',))
 
+    def get_checksum_algorithm(self):
+        return self._db.get_checksum_algorithm()
+
     def start_backup(self, start=None):
         '''Starts a backup operation.
 

@@ -20,6 +20,7 @@ from task_backup import BackupTask
 from task_info import InfoTask
 from task_makeshadowtree import MakeShadowTreeTask
 from task_sync import SyncTask
+from task_verify import VerifyTask
 from task_webui import WebUITask
 
 _start_time = datetime.datetime.utcnow()
@@ -75,6 +76,12 @@ def parse_commandline(commandline=None, msgfile=None):
         help='Create any missing backup collections')
     syncparser.add_argument(
         'backups', nargs='*', help='Which backups to sync (default:all)')
+    verifyparser = subparsers.add_parser(
+        'verify',
+        help='Check whether the backed up data is consistent. This should '
+        'detect most corruptions that may happen. '
+        'WARNING: This is currently "work in progress" and does NOT '
+        'fully check all that should be checked')
     shadowcopyparser = subparsers.add_parser(
         'shadowcopy', help='Makes a "shadow" copy of a snapshot.')
     shadowcopyparser.add_argument(
@@ -99,6 +106,7 @@ def parse_commandline(commandline=None, msgfile=None):
         shadowcopyparser._overridden_output_file = msgfile
         webuiparser._overridden_output_file = msgfile
         syncparser._overridden_output_file = msgfile
+        verifyparser._overridden_output_file = msgfile
     if commandline is None:
         args = parser.parse_args()
     else:
@@ -182,9 +190,20 @@ def make_tasks_from_args(args):
     elif args.command == 'sync':
         task = SyncTask(config, args)
         tasks.append(task)
+    elif args.command == 'verify':
+        task = _make_verify_task(config, args)
+        tasks.append(task)
     else:
         raise UnknownCommandError('Unknown command: ' + args.command)
     return tasks
+
+def _make_verify_task(config, args):
+    cfgcollection = config.backups[0].collections[0]
+    collection = args.services['backupcollection.open'](
+        cfgcollection.filesystem, cfgcollection.path)
+    task = VerifyTask(collection, services=args.services)
+    task.printSummaryAfterCompletion()
+    return task
 
 def perform_tasks(tasks):
     for task in tasks:
