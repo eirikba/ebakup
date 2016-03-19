@@ -318,16 +318,8 @@ class BackupCollection(object):
         '''Get the stored data about the content item with content id
         'contentid'.
 
-        The returned object has at least the attributes 'goodsum',
-        'lastsum' and 'timeline'.
-
-        The 'timeline' attribute is a sequence (probably a tuple) of
-        items with at least the attributes 'checksum', 'first',
-        'last', and 'restored'. 'restored' is True if the entry was
-        created when the content item was restored from a "believed
-        good" source and False otherwise. It is an error for
-        'restored' to be True and 'checksum' to be different from
-        'goodsum'.
+        The returned object has at least the attributes 'goodsum' and
+        'first_seen'.
         '''
         dbinfo = self._db.get_content_info(contentid)
         return ContentInfo(
