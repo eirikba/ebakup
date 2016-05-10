@@ -72,5 +72,5 @@ class ContentDataChecker(object):
         while data != b'':
             checksummer.update(data)
             done += len(data)
-            data = content.get_data_slice(done, readsize)
+            data = content.get_data_slice(done, done + readsize)
         return checksummer.digest()
