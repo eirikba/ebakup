@@ -104,7 +104,7 @@ class TestTaskVerify(unittest.TestCase):
         result = task.execute()
         self.assertEqual(1, len(result.errors))
         self.assertEqual(0, len(result.warnings))
-        self.assertEqual("Content missing: b'cid123'", result.errors[0])
+        self.assertEqual("Content missing: 636964313233", result.errors[0])
 
     def test_verify_single_backup_collection_with_corrupt_content(self):
         services = {
@@ -115,7 +115,8 @@ class TestTaskVerify(unittest.TestCase):
         result = task.execute()
         self.assertEqual(1, len(result.errors))
         self.assertEqual(0, len(result.warnings))
-        self.assertEqual("Content changed: b'cid123'", result.errors[0])
+        self.assertEqual(
+            "Content not matching checksum: 636964313233", result.errors[0])
 
 
 # Missing:

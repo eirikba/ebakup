@@ -19,6 +19,10 @@ from ebakup_live_helpers.ebakupinvocation import EbakupInvocation
 from ebakup_live_helpers.filetree import FileTree
 
 
+def hexstr(d):
+    return ''.join('{:02x}'.format(x) for x in d)
+
+
 class TestEbakupInvocation(unittest.TestCase):
     '''Tests the most trivial invocations of ebakup, and so doubles as
     tests for the EbakupInvocation helper class.
@@ -174,7 +178,9 @@ class TestEbakupLive(unittest.TestCase):
              f.write('changed')
         result = self._run_ebakup('verify')
         self.assertVerifyResult(
-            result, content_missing=(cid1,), content_changed=(cid2,))
+            result,
+            content_missing=(hexstr(cid1),),
+            content_changed=(hexstr(cid2),))
 
     def assertBackupMatchesTree(self, bkname, tree, dbpath=None):
         if dbpath is None:
@@ -218,7 +224,7 @@ class TestEbakupLive(unittest.TestCase):
             which = match.group(2)
             if what == b'Content missing':
                 out_cmissing.append(which.decode('utf-8'))
-            elif what == b'Content changed':
+            elif what == b'Content not matching checksum':
                 out_cchanged.append(which.decode('utf-8'))
             else:
                 self.fail('Unknown output: ' + str(line))

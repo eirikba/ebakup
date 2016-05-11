@@ -40,6 +40,10 @@ class VerifyTask(object):
             print('  ', warning)
 
 
+def hexstr(d):
+    return ''.join('{:02x}'.format(x) for x in d)
+
+
 class ContentDataChecker(object):
     def __init__(self, collection, result):
         self.collection = collection
@@ -48,9 +52,10 @@ class ContentDataChecker(object):
     def check_content_data(self, cid):
         content = self.get_content_reader(cid)
         if content is None:
-            self._result.errors.append('Content missing: ' + str(cid))
+            self._result.errors.append('Content missing: ' + hexstr(cid))
         elif not self.is_checksum_good(cid, content):
-            self._result.errors.append('Content changed: ' + str(cid))
+            self._result.errors.append(
+                'Content not matching checksum: ' + hexstr(cid))
 
     def get_content_reader(self, cid):
         try:
