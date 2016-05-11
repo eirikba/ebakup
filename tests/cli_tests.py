@@ -12,7 +12,7 @@ class TestSimpleStuff(unittest.TestCase):
     def test_empty_commandline(self):
         stdout = io.StringIO()
         self.assertRaisesRegex(
-            SystemExit, '1', cli.parse_commandline, '', msgfile=stdout)
+            SystemExit, '1', cli.main.parse_commandline, '', msgfile=stdout)
         self.assertRegex(stdout.getvalue(), '^usage:')
 
     def test_commandline_backup(self):
@@ -32,14 +32,14 @@ class TestSimpleStuff(unittest.TestCase):
     def _parse_commandline(self, cmdline):
         stdout = io.StringIO()
         try:
-            args = cli.parse_commandline(cmdline, msgfile=stdout)
+            args = cli.main.parse_commandline(cmdline, msgfile=stdout)
         except SystemExit:
             self.fail('Parse commandline failed: ' + stdout.getvalue())
         self.assertRegex(stdout.getvalue(), '^$')
         return args
 
     def test_create_default_services(self):
-        services = cli.create_services(None, None)
+        services = cli.main.create_services(None, None)
         expected_services = {
             'filesystem': callable,
             'backupoperation': callable,

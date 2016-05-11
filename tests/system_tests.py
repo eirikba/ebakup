@@ -74,7 +74,7 @@ class TestFullSequence(unittest.TestCase):
             self.fs.get_item_at_path, ('home', 'me', 'tmp', 'nosuchfile'))
         out = io.StringIO()
         self.advance_utcnow(seconds=20)
-        cli.main(
+        cli.cli_main(
             ('backup', '--create', 'home'),
             services=self.services,
             stdoutfile=out)
@@ -85,25 +85,27 @@ class TestFullSequence(unittest.TestCase):
         self.advance_utcnow(days=4, seconds=2000)
         self._update_sources_before_second_backup()
         self.advance_utcnow(seconds=600)
-        cli.main(('backup', 'home'), services=self.services, stdoutfile=out)
+        cli.cli_main(('backup', 'home'), services=self.services, stdoutfile=out)
         self.advance_utcnow(seconds=80)
         self._check_result_of_second_backup(stdout=out.getvalue())
         self.advance_utcnow(seconds=32)
         self.assertRaisesRegex(
             FileNotFoundError, 'Backup collection does not exist.*second',
-            cli.main, ('sync',), services=self.services, stdoutfile=out)
+            cli.cli_main, ('sync',), services=self.services, stdoutfile=out)
         self.advance_utcnow(seconds=17)
         out = io.StringIO()
-        cli.main(('sync', '--create'), services=self.services, stdoutfile=out)
+        cli.cli_main(
+            ('sync', '--create'), services=self.services, stdoutfile=out)
         self._check_result_of_sync(stdout=out.getvalue())
         self.advance_utcnow(seconds=27)
         out = io.StringIO()
-        cli.main(('sync', '--create'), services=self.services, stdoutfile=out)
+        cli.cli_main(
+            ('sync', '--create'), services=self.services, stdoutfile=out)
         # This should not have caused any changes, so just do the same check
         self._check_result_of_sync(stdout=out.getvalue())
         out = io.StringIO()
         fs._allow_full_access_to_subtree(('backup', 'shadow'))
-        cli.main(
+        cli.cli_main(
             ('shadowcopy', '--target', '/backup/shadow', '1995-01-01T00:00'),
             services=self.services, stdoutfile=out)
         fs._drop_all_access_to_subtree(('backup', 'shadow'))
@@ -206,7 +208,7 @@ class TestFullSequence(unittest.TestCase):
 
     def _check_info_before_first_backup(self):
         out = io.StringIO()
-        cli.main(('info',), services=self.services, stdoutfile=out)
+        cli.cli_main(('info',), services=self.services, stdoutfile=out)
         outstr = out.getvalue()
         if outstr.startswith('Web ui started'):
             firstline, outstr = outstr.split('\n', 1)
@@ -375,7 +377,7 @@ class TestFullSequence(unittest.TestCase):
 
     def _check_info_after_initial_backup(self):
         out = io.StringIO()
-        cli.main(('info',), services=self.services, stdoutfile=out)
+        cli.cli_main(('info',), services=self.services, stdoutfile=out)
         outstr = out.getvalue()
         if outstr.startswith('Web ui started'):
             firstline, outstr = outstr.split('\n', 1)

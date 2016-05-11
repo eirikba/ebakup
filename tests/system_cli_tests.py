@@ -82,7 +82,7 @@ class TestFullSequenceOfOperations(unittest.TestCase):
             access=0o644)
         self.advance_utcnow(seconds=1)
         self.time_backup1_start = self._utcnow
-        cli.main(
+        cli.cli_main(
             ('backup', '--create', 'home'),
             stdoutfile=self.stdout, services=self.services)
         self.advance_utcnow(seconds=1)
@@ -158,7 +158,7 @@ class TestFullSequenceOfOperations(unittest.TestCase):
         self.local_filesys._allow_reading_subtree(('etc', 'xdg', 'ebakup'))
         self.local_filesys._allow_full_access_to_subtree(('backup', 'second'))
         self.local_filesys._allow_reading_subtree(('backup', 'mine'))
-        cli.main(
+        cli.cli_main(
             ('sync', '--create'),
             stdoutfile=self.stdout, services=self.services)
         self.advance_utcnow(seconds=1)
