@@ -9,7 +9,7 @@ import backupcollection
 import backupoperation
 import fake_filesys
 
-from config_subtree import CfgSubtree
+from config.config_subtree import CfgSubtree
 
 def make_cfgsubtree(spec):
     root = CfgSubtree(None, None)

@@ -8,7 +8,7 @@ import unittest
 import backupoperation
 import logger
 
-from config_subtree import CfgSubtree
+from config.config_subtree import CfgSubtree
 
 
 def add_backup_handlers(tree, ignore=None, dynamic=None, static=None):

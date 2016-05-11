@@ -2,7 +2,7 @@
 
 import re
 
-from config_subtree import CfgSubtree
+from .config_subtree import CfgSubtree
 
 class InvalidDataError(Exception): pass
 

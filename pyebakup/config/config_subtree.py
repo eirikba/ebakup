@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import glob_utils
+from . import glob_utils
 
 class CfgSubtree(object):
     def __init__(self, matchtype, matchdata):

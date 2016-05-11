@@ -2,7 +2,7 @@
 
 import unittest
 
-import glob_utils as globs
+import config.glob_utils as globs
 
 class TestSimpleGlobs(unittest.TestCase):
 
