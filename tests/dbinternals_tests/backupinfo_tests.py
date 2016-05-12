@@ -5,7 +5,7 @@ import unittest
 
 import testdata
 
-import dbinternals.backupinfo as backupinfo
+import database.dbinternals.backupinfo as backupinfo
 
 
 class FakeDatabase(object):

@@ -4,7 +4,7 @@ import datetime
 import hashlib
 import unittest
 
-import datafile
+import database.datafile as datafile
 import testdata
 
 class FakeTree(object):

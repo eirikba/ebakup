@@ -3,12 +3,12 @@
 import datetime
 import unittest
 
-import datafile
+import database.datafile as datafile
 
-import dbinternals.backupinfobuilder as backupbuilder
+import database.dbinternals.backupinfobuilder as backupbuilder
 # test_various_timestamps_for_mtime uses backupinfo to test round-trip
 # conversion.
-import dbinternals.backupinfo as backupinfo
+import database.dbinternals.backupinfo as backupinfo
 
 
 class FakeDatabase(object):

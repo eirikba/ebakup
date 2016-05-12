@@ -3,9 +3,9 @@
 import hashlib
 import re
 
-import datafile
+from . import datafile
 
-from dbinternals.dbfileopener import DBFileOpener
+from .dbinternals.dbfileopener import DBFileOpener
 
 
 class DataCorruptError(Exception):

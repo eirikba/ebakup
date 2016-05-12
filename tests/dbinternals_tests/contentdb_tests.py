@@ -5,7 +5,7 @@ import unittest
 
 import testdata
 
-import dbinternals.contentdb as contentdb
+import database.dbinternals.contentdb as contentdb
 
 
 class FakeDatabase(object):

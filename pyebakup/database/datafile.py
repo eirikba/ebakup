@@ -3,9 +3,9 @@
 import hashlib
 import re
 
-import valuecodecs
+from . import valuecodecs
 
-from dataitems import (
+from .dataitems import (
     ItemMagic, ItemSetting, ItemKeyValue, ItemExtraDef,
     ItemDirectory, ItemFile, ItemSpecialFile,
     ItemContent)

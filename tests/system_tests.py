@@ -13,7 +13,7 @@ import unittest
 
 import backupcollection
 import cli
-import datafile
+import database.datafile as datafile
 import fake_filesys
 
 class TestFullSequence(unittest.TestCase):

@@ -3,7 +3,7 @@
 import collections
 import datetime
 
-import datafile
+import database.datafile as datafile
 
 ContentData = collections.namedtuple(
     'ContentData', ('contentid', 'checksum', 'first_seen'))

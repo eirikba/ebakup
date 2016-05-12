@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-import datafile
+import database.datafile as datafile
 
-from dbinternals.backupinfo import BackupInfo
-from dbinternals.backupinfobuilder import BackupInfoBuilder
-from dbinternals.contentdb import ContentInfoFile
+from .backupinfo import BackupInfo
+from .backupinfobuilder import BackupInfoBuilder
+from .contentdb import ContentInfoFile
 
 class DBFileOpener(object):
 

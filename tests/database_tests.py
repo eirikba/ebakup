@@ -4,7 +4,7 @@ import datetime
 import unittest
 
 import database
-import dataitems
+import database.dataitems as dataitems
 
 
 class FakeTree(object):

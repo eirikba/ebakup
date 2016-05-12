@@ -2,7 +2,7 @@
 
 import os
 
-import datafile
+import database.datafile as datafile
 import filesys
 
 def hexify(data):
