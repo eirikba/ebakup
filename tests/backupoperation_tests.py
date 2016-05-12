@@ -5,7 +5,7 @@ import datetime
 import io
 import unittest
 
-import backupoperation
+import backup.backupoperation as backupoperation
 import logger
 
 from config.config_subtree import CfgSubtree

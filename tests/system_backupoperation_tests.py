@@ -6,7 +6,7 @@ import hashlib
 import unittest
 
 import backupcollection
-import backupoperation
+import backup.backupoperation as backupoperation
 import fake_filesys
 
 from config.config_subtree import CfgSubtree
