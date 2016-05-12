@@ -4,7 +4,7 @@ import socket
 
 class FileSystemAccessLostError(Exception): pass
 
-from local_filesys import LocalFileSystem
+from .local_filesys import LocalFileSystem
 
 def get_file_system(kind):
     if kind == 'local':
