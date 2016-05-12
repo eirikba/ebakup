@@ -4,7 +4,7 @@ import io
 import socket
 import unittest
 
-import http_handler
+import webui.http_handler as http_handler
 import task_webui
 
 class FakeArgs(object): pass

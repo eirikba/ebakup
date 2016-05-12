@@ -7,14 +7,14 @@ except ImportError:
 import os.path
 import re
 
-import http_server
+from . import http_server
 
 class TemplateError(Exception): pass
 
 class HttpHandler(http_server.NullHandler):
     def __init__(self, state):
         self._state = state
-        maindir = os.path.dirname(os.path.dirname(__file__))
+        maindir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         self._datadir = os.path.join(maindir, 'datafiles').encode('utf-8')
 
     def handle_request_received(self, method, resource):

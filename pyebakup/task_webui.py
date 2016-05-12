@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import http_server
+import webui.http_server as http_server
 import threading
 import time
 
