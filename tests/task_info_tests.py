@@ -6,7 +6,7 @@ import re
 import textwrap
 import unittest
 
-import task_info
+import cli.task_info as task_info
 
 class FakeFilesys(object):
     def __init__(self, name):

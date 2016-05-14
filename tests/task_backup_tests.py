@@ -2,7 +2,7 @@
 
 import unittest
 
-import task_backup
+import cli.task_backup as task_backup
 
 class FakeConfig(object):
     def __init__(self):

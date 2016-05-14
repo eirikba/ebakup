@@ -16,12 +16,12 @@ import logger
 import webui.ui_state as ui_state
 
 from config import Config
-from task_backup import BackupTask
-from task_info import InfoTask
-from task_makeshadowtree import MakeShadowTreeTask
-from task_sync import SyncTask
-from task_verify import VerifyTask
-from task_webui import WebUITask
+from .task_backup import BackupTask
+from .task_info import InfoTask
+from .task_makeshadowtree import MakeShadowTreeTask
+from .task_sync import SyncTask
+from .task_verify import VerifyTask
+from .task_webui import WebUITask
 
 _start_time = datetime.datetime.utcnow()
 

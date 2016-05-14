@@ -3,7 +3,7 @@
 import errno
 import unittest
 
-import task_makeshadowtree
+import cli.task_makeshadowtree as task_makeshadowtree
 
 
 class FakeArgs(object):

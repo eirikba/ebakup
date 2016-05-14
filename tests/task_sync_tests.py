@@ -5,7 +5,7 @@ import hashlib
 import re
 import unittest
 
-import task_sync
+import cli.task_sync as task_sync
 import testdata
 
 hexits = '0123456789abcdef'

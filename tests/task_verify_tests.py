@@ -2,7 +2,7 @@
 
 import unittest
 
-import task_verify
+import cli.task_verify as task_verify
 
 
 def checksum(data):
