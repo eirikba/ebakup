@@ -5,7 +5,7 @@ import hashlib
 import io
 import unittest
 
-import backupcollection
+import backupstorage.backupcollection as backupcollection
 
 
 def raiseUnexpectedCallError():

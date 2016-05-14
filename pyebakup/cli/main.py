@@ -7,7 +7,7 @@ import re
 import sys
 import time
 
-import backupcollection
+import backupstorage.backupcollection as backupcollection
 import backup.backupoperation as backupoperation
 import database
 import filesys

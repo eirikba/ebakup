@@ -11,7 +11,7 @@ import io
 import textwrap
 import unittest
 
-import backupcollection
+import backupstorage.backupcollection as backupcollection
 import cli
 import database.datafile as datafile
 import fake_filesys

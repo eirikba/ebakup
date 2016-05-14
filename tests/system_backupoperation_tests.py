@@ -5,7 +5,7 @@ import datetime
 import hashlib
 import unittest
 
-import backupcollection
+import backupstorage.backupcollection as backupcollection
 import backup.backupoperation as backupoperation
 import fake_filesys
 
