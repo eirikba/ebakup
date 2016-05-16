@@ -3,12 +3,12 @@
 import datetime
 import unittest
 
-import database.datafile as datafile
+import pyebakup.database.datafile as datafile
 
-import database.dbinternals.backupinfobuilder as backupbuilder
+import pyebakup.database.backupinfobuilder as backupbuilder
 # test_various_timestamps_for_mtime uses backupinfo to test round-trip
 # conversion.
-import database.dbinternals.backupinfo as backupinfo
+import pyebakup.database.backupinfo as backupinfo
 
 
 class FakeDatabase(object):

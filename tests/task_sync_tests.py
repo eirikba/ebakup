@@ -5,7 +5,7 @@ import hashlib
 import re
 import unittest
 
-import cli.task_sync as task_sync
+import pyebakup.cli.task_sync as task_sync
 import testdata
 
 hexits = '0123456789abcdef'

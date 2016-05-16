@@ -5,7 +5,8 @@ import re
 
 from . import datafile
 
-from .dbinternals.dbfileopener import DBFileOpener
+from .dbfileopener import DBFileOpener
+
 
 
 class DataCorruptError(Exception):

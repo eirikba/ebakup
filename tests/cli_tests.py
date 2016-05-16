@@ -3,7 +3,7 @@
 import io
 import unittest
 
-import cli
+import pyebakup.cli as cli
 
 class FakeArgs(object): pass
 

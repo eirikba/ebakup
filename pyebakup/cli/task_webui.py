@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-import webui.http_server as http_server
 import threading
 import time
+
+import pyebakup.webui.http_server as http_server
 
 class WebUITask(object):
 

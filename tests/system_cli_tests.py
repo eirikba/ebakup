@@ -7,7 +7,7 @@ import re
 import textwrap
 import unittest
 
-import cli
+import pyebakup.cli as cli
 
 import fake_filesys
 

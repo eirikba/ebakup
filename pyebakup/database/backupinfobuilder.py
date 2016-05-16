@@ -2,8 +2,8 @@
 
 import datetime
 
-import database.datafile as datafile
-import database.valuecodecs as valuecodecs
+from . import datafile
+from . import valuecodecs
 
 class BackupInfoBuilder(object):
     def __init__(self, db, start):

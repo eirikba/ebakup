@@ -3,8 +3,8 @@
 import datetime
 import re
 
-import database.datafile as datafile
-import database.valuecodecs as valuecodecs
+from . import datafile
+from . import valuecodecs
 
 _re_backup_name = re.compile(r'^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)')
 def _datetime_from_backup_name(name):

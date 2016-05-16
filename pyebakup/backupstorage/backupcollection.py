@@ -2,8 +2,8 @@
 
 import datetime
 
-import database
-import logger
+import pyebakup.database as database
+import pyebakup.logger as logger
 
 def create_collection(tree, path, services=None):
     '''Create a new backup collection at tree:path and return a

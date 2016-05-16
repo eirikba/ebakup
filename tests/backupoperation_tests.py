@@ -5,10 +5,10 @@ import datetime
 import io
 import unittest
 
-import backup.backupoperation as backupoperation
-import logger
+import pyebakup.backup.backupoperation as backupoperation
+import pyebakup.logger as logger
 
-from config.config_subtree import CfgSubtree
+from pyebakup.config.config_subtree import CfgSubtree
 
 
 def add_backup_handlers(tree, ignore=None, dynamic=None, static=None):

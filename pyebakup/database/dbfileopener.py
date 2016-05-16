@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import database.datafile as datafile
+from . import datafile
 
 from .backupinfo import BackupInfo
 from .backupinfobuilder import BackupInfoBuilder

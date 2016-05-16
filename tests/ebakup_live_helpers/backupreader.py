@@ -2,8 +2,8 @@
 
 import os
 
-import database.datafile as datafile
-import filesys
+import pyebakup.database.datafile as datafile
+import pyebakup.filesys as filesys
 
 class BackupReader(object):
     def __init__(self, bkpath, bkname):

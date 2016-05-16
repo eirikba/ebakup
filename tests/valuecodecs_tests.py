@@ -3,7 +3,7 @@
 import datetime
 import unittest
 
-import database.valuecodecs as valuecodecs
+import pyebakup.database.valuecodecs as valuecodecs
 
 class TestCodecs(unittest.TestCase):
     def test_mtime_to_db_codec(self):

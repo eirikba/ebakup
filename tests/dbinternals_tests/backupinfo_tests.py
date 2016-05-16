@@ -5,7 +5,7 @@ import unittest
 
 import testdata
 
-import database.dbinternals.backupinfo as backupinfo
+import pyebakup.database.backupinfo as backupinfo
 
 
 class FakeDatabase(object):

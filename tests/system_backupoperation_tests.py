@@ -5,11 +5,11 @@ import datetime
 import hashlib
 import unittest
 
-import backupstorage.backupcollection as backupcollection
-import backup.backupoperation as backupoperation
+import pyebakup.backupstorage.backupcollection as backupcollection
+import pyebakup.backup.backupoperation as backupoperation
 import fake_filesys
 
-from config.config_subtree import CfgSubtree
+from pyebakup.config.config_subtree import CfgSubtree
 
 def make_cfgsubtree(spec):
     root = CfgSubtree(None, None)

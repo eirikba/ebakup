@@ -2,7 +2,7 @@
 
 import unittest
 
-import cli.task_verify as task_verify
+import pyebakup.cli.task_verify as task_verify
 
 
 def checksum(data):

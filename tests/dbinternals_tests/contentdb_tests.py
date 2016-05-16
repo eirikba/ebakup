@@ -5,7 +5,7 @@ import unittest
 
 import testdata
 
-import database.dbinternals.contentdb as contentdb
+import pyebakup.database.contentdb as contentdb
 
 
 class FakeDatabase(object):

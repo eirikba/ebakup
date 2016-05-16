@@ -5,7 +5,7 @@ import threading
 import time
 import unittest
 
-import webui.http_server as http_server
+import pyebakup.webui.http_server as http_server
 
 class Handler(object):
     def __init__(self):

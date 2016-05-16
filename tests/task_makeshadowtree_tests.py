@@ -3,7 +3,7 @@
 import errno
 import unittest
 
-import cli.task_makeshadowtree as task_makeshadowtree
+import pyebakup.cli.task_makeshadowtree as task_makeshadowtree
 
 
 class FakeArgs(object):

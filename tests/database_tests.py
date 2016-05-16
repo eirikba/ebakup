@@ -3,8 +3,8 @@
 import datetime
 import unittest
 
-import database
-import database.dataitems as dataitems
+import pyebakup.database as database
+import pyebakup.database.dataitems as dataitems
 
 
 class FakeTree(object):

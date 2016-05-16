@@ -2,7 +2,7 @@
 
 import unittest
 
-import config.glob_utils as globs
+import pyebakup.config.glob_utils as globs
 
 class TestSimpleGlobs(unittest.TestCase):
 

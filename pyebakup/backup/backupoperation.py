@@ -2,7 +2,7 @@
 
 import collections
 
-import logger
+import pyebakup.logger as logger
 
 class DevNullUIState(object):
     def set_status(self, key, value):

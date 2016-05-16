@@ -11,9 +11,9 @@ import io
 import textwrap
 import unittest
 
-import backupstorage.backupcollection as backupcollection
-import cli
-import database.datafile as datafile
+import pyebakup.backupstorage.backupcollection as backupcollection
+import pyebakup.cli as cli
+import pyebakup.database.datafile as datafile
 import fake_filesys
 
 class TestFullSequence(unittest.TestCase):

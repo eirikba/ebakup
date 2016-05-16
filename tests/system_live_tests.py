@@ -8,7 +8,7 @@ import shutil
 import socket
 import unittest
 
-import filesys
+import pyebakup.filesys as filesys
 import tests.settings
 
 root_path = os.path.abspath(os.path.join(os.getcwd(), 'DELETEME_testebakup'))

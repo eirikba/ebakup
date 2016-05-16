@@ -7,15 +7,15 @@ import re
 import sys
 import time
 
-import backupstorage.backupcollection as backupcollection
-import backup.backupoperation as backupoperation
-import database
-import filesys
-import webui.http_handler as http_handler
-import logger
-import webui.ui_state as ui_state
+import pyebakup.backupstorage.backupcollection as backupcollection
+import pyebakup.backup.backupoperation as backupoperation
+import pyebakup.database as database
+import pyebakup.filesys as filesys
+import pyebakup.webui.http_handler as http_handler
+import pyebakup.logger as logger
+import pyebakup.webui.ui_state as ui_state
 
-from config import Config
+from pyebakup.config import Config
 from .task_backup import BackupTask
 from .task_info import InfoTask
 from .task_makeshadowtree import MakeShadowTreeTask

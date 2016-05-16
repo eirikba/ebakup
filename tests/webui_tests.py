@@ -4,8 +4,8 @@ import io
 import socket
 import unittest
 
-import webui.http_handler as http_handler
-import cli.task_webui as task_webui
+import pyebakup.webui.http_handler as http_handler
+import pyebakup.cli.task_webui as task_webui
 
 class FakeArgs(object): pass
 

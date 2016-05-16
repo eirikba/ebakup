@@ -3,7 +3,7 @@
 import textwrap
 import unittest
 
-import config
+import pyebakup.config as config
 
 
 class FakeTree(object):

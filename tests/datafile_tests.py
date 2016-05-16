@@ -4,7 +4,7 @@ import datetime
 import hashlib
 import unittest
 
-import database.datafile as datafile
+import pyebakup.database.datafile as datafile
 import testdata
 
 class FakeTree(object):

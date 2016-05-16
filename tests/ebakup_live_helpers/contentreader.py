@@ -2,8 +2,8 @@
 
 import os
 
-import database.datafile as datafile
-import filesys
+import pyebakup.database.datafile as datafile
+import pyebakup.filesys as filesys
 
 def hexify(data):
     return ''.join('{:02x}'.format(x) for x in data)

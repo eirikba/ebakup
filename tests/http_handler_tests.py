@@ -3,7 +3,7 @@
 import datetime
 import unittest
 
-import webui.http_handler as http_handler
+import pyebakup.webui.http_handler as http_handler
 
 class FakeArgs(object): pass
 class FakeUIState(object): pass
