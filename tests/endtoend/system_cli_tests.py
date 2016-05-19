@@ -32,8 +32,8 @@ class TestFullSequenceOfOperations(unittest.TestCase):
         self.services = {
             'filesystem': self.get_local_filesys,
             'backupoperation': None,
-            'backupcollection.create': None,
-            'backupcollection.open': None,
+            'backupstorage.create': None,
+            'backupstorage.open': None,
             'database.create': None,
             'database.open': None,
             'logger': None,
@@ -65,7 +65,7 @@ class TestFullSequenceOfOperations(unittest.TestCase):
             ('home', 'me', '.config', 'ebakup', 'config'),
             content=textwrap.dedent('''\
                 backup home
-                   collection local:/backup/mine
+                   storage local:/backup/mine
                    source local:/home/me
                        targetpath home
                        path tmp
@@ -133,8 +133,8 @@ class TestFullSequenceOfOperations(unittest.TestCase):
             ('home', 'me', '.config', 'ebakup', 'config'),
             content=textwrap.dedent('''\
                 backup home
-                   collection local:/backup/mine
-                   collection local:/backup/second
+                   storage local:/backup/mine
+                   storage local:/backup/second
                    source local:/home/me
                        targetpath home
                        path tmp

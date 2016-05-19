@@ -324,7 +324,7 @@ class _data(object):
     def _create_data(cls):
         cls.config_1 = (
             'backup main\n'
-            '  collection local:' + root_path + '/backup\n'
+            '  storage local:' + root_path + '/backup\n'
             '  source local:' + root_path + '/source\n'
             '    paths tmp transient\n'
             '      ignore\n'

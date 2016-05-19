@@ -4,10 +4,10 @@ Backup database
 
 The backup database stores all the information about the backup except
 for the actual contents of the files themselves. The content of each
-file is stored in the "content storage" (see backup_collection.txt).
+file is stored in the "content storage" (see backup_storage.txt).
 
 The backup database is stored in the "db" top-level directory in the
-database collection. In this directory there are:
+backup storage. In this directory there are:
 
 - "main": This provides global information about the database. It must
   always be present.
@@ -16,7 +16,7 @@ database collection. In this directory there are:
   storage. Realistically, this should always be present.
 
 - <YYYY/MM-DDThh:mm>: These files provide information about each
-  backup in the backup collection.
+  backup in the backup storage.
 
 More files may be added in future revisions of this document.
 

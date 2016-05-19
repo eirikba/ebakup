@@ -12,7 +12,7 @@ def checksum(data):
 class ArgsStub(object):
     def __init__(self):
         self.services = {
-            'backupcollection.open': lambda x, y: x,
+            'backupstorage.open': lambda x, y: x,
         }
 
 
@@ -20,19 +20,19 @@ class ConfigStub(object):
     def __init__(self):
         self.backups = []
 
-    def _add_single_collection_backup(self, coll):
+    def _add_single_storage_backup(self, coll):
         self.backups.append(ConfigBackupStub())
-        self.backups[-1].collections.append(ConfigCollectionStub(coll))
+        self.backups[-1].storages.append(ConfigStorageStub(coll))
 
 
 class ConfigBackupStub(object):
     def __init__(self):
-        self.collections = []
+        self.storages = []
 
 
-class ConfigCollectionStub(object):
-    def __init__(self, collection):
-        self.filesystem = collection
+class ConfigStorageStub(object):
+    def __init__(self, storage):
+        self.filesystem = storage
         self.path = None
 
 
@@ -61,7 +61,7 @@ class ChecksummerFake(object):
         return checksum(self._data)
 
 
-class EmptyBackupCollectionStub(object):
+class EmptyBackupStorageStub(object):
     def iterate_contentids(self):
         for cid in ():
             yield cid
@@ -76,7 +76,7 @@ class Content(object):
         self.content = content
 
 
-class SingleBackupCollectionStub(object):
+class SingleBackupStorageStub(object):
     def __init__(self):
         self._contents = {
             b'cid123': Content(b'data for file 123')
@@ -100,7 +100,7 @@ class SingleBackupCollectionStub(object):
         c = self._contents.get(cid)
         if c.content is None:
             raise FileNotFoundError(
-                'no such file or directory: /testcollection/content/' +
+                'no such file or directory: /teststorage/content/' +
                 str(cid))
         return FileReaderStub(c.content)
 
@@ -110,34 +110,34 @@ class TestTaskVerify(unittest.TestCase):
         self.args = ArgsStub()
         self.config = ConfigStub()
 
-    def test_verify_empty_collection_is_ok(self):
-        self.config._add_single_collection_backup(EmptyBackupCollectionStub())
+    def test_verify_empty_storage_is_ok(self):
+        self.config._add_single_storage_backup(EmptyBackupStorageStub())
         task = task_verify.VerifyTask(self.config, self.args)
         result = task.execute()
         self.assertEqual(0, len(result.errors))
         self.assertEqual(0, len(result.warnings))
 
-    def test_verify_single_backup_collection_is_ok(self):
-        self.config._add_single_collection_backup(SingleBackupCollectionStub())
+    def test_verify_single_backup_storage_is_ok(self):
+        self.config._add_single_storage_backup(SingleBackupStorageStub())
         task = task_verify.VerifyTask(self.config, self.args)
         result = task.execute()
         self.assertEqual(0, len(result.errors))
         self.assertEqual(0, len(result.warnings))
 
-    def test_verify_single_backup_collection_with_missing_content(self):
-        coll = SingleBackupCollectionStub()
+    def test_verify_single_backup_storage_with_missing_content(self):
+        coll = SingleBackupStorageStub()
         coll._override_content(b'cid123', None)
-        self.config._add_single_collection_backup(coll)
+        self.config._add_single_storage_backup(coll)
         task = task_verify.VerifyTask(self.config, self.args)
         result = task.execute()
         self.assertEqual(1, len(result.errors))
         self.assertEqual(0, len(result.warnings))
         self.assertEqual("Content missing: 636964313233", result.errors[0])
 
-    def test_verify_single_backup_collection_with_corrupt_content(self):
-        coll = SingleBackupCollectionStub()
+    def test_verify_single_backup_storage_with_corrupt_content(self):
+        coll = SingleBackupStorageStub()
         coll._override_content(b'cid123', b'different data')
-        self.config._add_single_collection_backup(coll)
+        self.config._add_single_storage_backup(coll)
         task = task_verify.VerifyTask(self.config, self.args)
         result = task.execute()
         self.assertEqual(1, len(result.errors))
@@ -148,10 +148,10 @@ class TestTaskVerify(unittest.TestCase):
 
 # Missing:
 #
-# Checking other collections than the first
-# Checking multiple collections
-# Comparing collections to each other
-# Handling collections that are not currently accessible
+# Checking other storages than the first
+# Checking multiple storages
+# Comparing storages to each other
+# Handling storages that are not currently accessible
 # Missing cids
 #  - found in backups
 #  - found in content store (do we care?)

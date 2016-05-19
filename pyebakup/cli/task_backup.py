@@ -4,13 +4,13 @@ class BackupTask(object):
 
     def __init__(self, config, args):
         self._config = config
-        self._create_collection = args.create
+        self._create_storage = args.create
         self._services = args.services
         self._logger = self._services['logger']
         self._ui = self._services['uistate']
         self._backupoperationfactory = args.services['backupoperation']
-        self._collectionopener = args.services['backupcollection.open']
-        self._collectioncreator = args.services['backupcollection.create']
+        self._storageopener = args.services['backupstorage.open']
+        self._storagecreator = args.services['backupstorage.create']
         self._dbcreator = args.services['database.create']
         self._dbopener = args.services['database.open']
         self._utcnow = args.services['utcnow']
@@ -30,37 +30,37 @@ class BackupTask(object):
                 self._logger.LOG_ERROR, 'Requested backup unknown', name)
             raise NotTestedError('Requested backup not found')
             return
-        # TODO: Pick the available collection with the oldest "most
+        # TODO: Pick the available storage with the oldest "most
         # recent" backup.
         storetree = None
-        for collectiondata in backup_config.collections:
-            cand = collectiondata.filesystem
+        for storage in backup_config.storages:
+            cand = storage.filesystem
             if cand.is_accessible():
                 storetree = cand
-                storepath = collectiondata.path
+                storepath = storage.path
                 break
         if storetree is None:
             self._logger.log(
-                self._logger.LOG_ERROR, 'No backup collections available', name)
-            raise NotTestedError('No backup collections available')
+                self._logger.LOG_ERROR, 'No backup storages available', name)
+            raise NotTestedError('No backup storages available')
             return
-        if self._create_collection:
+        if self._create_storage:
             self._ui.set_status(
                 'task-backup',
-                'Creating collection ' +
+                'Creating storage ' +
                 storetree.path_to_full_string(storepath))
-            collection = self._services['backupcollection.create'](
+            storage = self._services['backupstorage.create'](
                 storetree, storepath, services=self._services)
         else:
             self._ui.set_status(
                 'task-backup',
-                'Opening collection ' +
+                'Opening storage ' +
                 storetree.path_to_full_string(storepath))
-            collection = self._services['backupcollection.open'](
+            storage = self._services['backupstorage.open'](
                 storetree, storepath, services=self._services)
-        self._ui.set_status('task-backup', 'Collection opened')
+        self._ui.set_status('task-backup', 'Storage opened')
         operation = self._backupoperationfactory(
-            collection, services=self._services)
+            storage, services=self._services)
         for sourcedata in backup_config.sources:
             self._ui.set_status(
                 'task-backup',

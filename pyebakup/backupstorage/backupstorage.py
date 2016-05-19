@@ -5,9 +5,9 @@ import datetime
 import pyebakup.database as database
 import pyebakup.logger as logger
 
-def create_collection(tree, path, services=None):
-    '''Create a new backup collection at tree:path and return a
-    BackupCollection for accessing it.
+def create_storage(tree, path, services=None):
+    '''Create a new backup storage at tree:path and return a
+    BackupStorage for accessing it.
     '''
     # Explicitly create the top-level directory to ensure failure
     # if it already exists.
@@ -18,13 +18,13 @@ def create_collection(tree, path, services=None):
     if services is None or dbcreator is None:
         dbcreator = database.create_database
     db = dbcreator(tree, path + ('db',))
-    return BackupCollection(tree, path, services=services)
+    return BackupStorage(tree, path, services=services)
 
-def open_collection(tree, path, services=None):
-    '''Return a BackupCollection object for the backup collection
+def open_storage(tree, path, services=None):
+    '''Return a BackupStorage object for the backup storage
     described by this object.
     '''
-    return BackupCollection(tree, path, services=services)
+    return BackupStorage(tree, path, services=services)
 
 
 hexits = '0123456789abcdef'
@@ -37,13 +37,13 @@ def hexify(data):
         out.append(hexits[c&15])
     return ''.join(out)
 
-class BackupCollection(object):
-    '''Provides access to a backup collection.
+class BackupStorage(object):
+    '''Provides access to a backup storage.
     '''
 
     def __init__(self, tree, path, services=None):
-        '''Do not create BackupCollection objects by hand. Use the
-        create_collection() and open_collection() helper functions
+        '''Do not create BackupStorage objects by hand. Use the
+        create_storage() and open_storage() helper functions
         instead.
         '''
         if services is None:
@@ -65,15 +65,15 @@ class BackupCollection(object):
     def _verify_sane_directory_structure(self):
         if not self._tree.does_path_exist(self._path):
             raise FileNotFoundError(
-                'Backup collection does not exist: ' + str(self._path))
+                'Backup storage does not exist: ' + str(self._path))
         if not self._tree.does_path_exist(self._path + ('db',)):
             raise NotTestedError('No "db"')
             raise FileNotFoundError(
-                'Backup collection has no "db": ' + str(self._path))
+                'Backup storage has no "db": ' + str(self._path))
         if not self._tree.does_path_exist(self._path + ('content',)):
             raise NotTestedError('No "content"')
             raise FileNotFoundError(
-                'Backup collection has no "content": ' + str(self._path))
+                'Backup storage has no "content": ' + str(self._path))
 
     def _open_database(self, dbopener):
         self._db = dbopener(self._tree, self._path + ('db',))
@@ -302,7 +302,7 @@ class BackupCollection(object):
         '''
 
     def iterate_contentids(self):
-        '''Iterates over all content ids in this collection.
+        '''Iterates over all content ids in this storage.
         '''
         yield from self._db.iterate_contentids()
 
@@ -371,9 +371,9 @@ class ContentReader(object):
 class BackupBuilder(object):
     '''Allows building up a new backup.
     '''
-    def __init__(self, collection, start_time):
-        self._collection = collection
-        self._db = collection._db
+    def __init__(self, storage, start_time):
+        self._storage = storage
+        self._db = storage._db
         self._start_time = start_time
         self._shadow_root = (
             str(start_time.year),
@@ -411,7 +411,7 @@ class BackupBuilder(object):
         time will be used.
         '''
         if end_time is None:
-            end_time = self._collection._utcnow()
+            end_time = self._storage._utcnow()
         self._backup.commit(end_time)
 
     def abort(self):
@@ -423,8 +423,8 @@ class BackupBuilder(object):
 class BackupData(object):
     '''Provides access to an existing backup.
     '''
-    def __init__(self, collection, bkinfo):
-        self._collection = collection
+    def __init__(self, storage, bkinfo):
+        self._storage = storage
         self._info = bkinfo
 
     def get_start_time(self):
@@ -458,7 +458,7 @@ class BackupData(object):
         if not filedata:
             return None
         return FileData(
-            self._collection._db,
+            self._storage._db,
             contentid = filedata.contentid,
             size = filedata.size,
             mtime = filedata.mtime,

@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-import collections
-
 import pyebakup.logger as logger
 
 class DevNullUIState(object):
@@ -9,8 +7,8 @@ class DevNullUIState(object):
         pass
 
 class BackupOperation(object):
-    def __init__(self, backupcollection, services=None):
-        self._backupcollection = backupcollection
+    def __init__(self, backupstorage, services=None):
+        self._backupstorage = backupstorage
         self._sources = []
         if services is None:
             services = {}
@@ -47,9 +45,9 @@ class BackupOperation(object):
         self._ui.set_status('backup', 'Starting backup operation')
         self._added_static_contentids = set()
         self._ui.set_status('backup', 'Getting previous backup')
-        self.previous = self._backupcollection.get_most_recent_backup()
+        self.previous = self._backupstorage.get_most_recent_backup()
         self._ui.set_status('backup', 'Creating new backup')
-        backup = self._backupcollection.start_backup()
+        backup = self._backupstorage.start_backup()
         with backup:
             for source in self._sources:
                 self._backup_single_source(source, backup)
@@ -57,7 +55,7 @@ class BackupOperation(object):
             backup.commit()
         self._ui.set_status('backup', 'Checking for removed static files')
         self._check_removed_static_files(
-            self._backupcollection.get_most_recent_backup())
+            self._backupstorage.get_most_recent_backup())
         self._ui.set_status('backup', 'Complete')
 
     def _backup_single_source(self, source, backup):
@@ -133,14 +131,14 @@ class BackupOperation(object):
 
     def _try_add_content(self, sourcefile, sourcepath):
         try:
-            return self._backupcollection.add_content(sourcefile)
+            return self._backupstorage.add_content(sourcefile)
         except PermissionError:
             self._logger.log_error(
                 'Permission denied to source file', sourcepath)
         return None
 
     def _try_add_content_from_data(self, data):
-        return self._backupcollection.add_content_data(data)
+        return self._backupstorage.add_content_data(data)
 
     def _get_old_cid_for_path(self, path):
         if not self.previous:

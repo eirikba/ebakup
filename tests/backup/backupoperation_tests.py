@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import collections
 import datetime
 import io
 import unittest
@@ -258,7 +257,7 @@ class SingleBackupStub(object):
         return BasicTree.get_directory_listing(('home', 'me') + path[1:])
 
 
-class BasicCollectionSpy(object):
+class BasicStorageSpy(object):
     def __init__(self):
         self._added_backup = None
         self._added_cids = []
@@ -282,9 +281,9 @@ class BasicCollectionSpy(object):
         return cid
 
 
-class SingleBackupCollectionSpy(BasicCollectionSpy):
+class SingleBackupStorageSpy(BasicStorageSpy):
     def __init__(self):
-        BasicCollectionSpy.__init__(self)
+        BasicStorageSpy.__init__(self)
         self._old_backup = SingleBackupStub()
 
     def get_most_recent_backup(self):
@@ -296,12 +295,12 @@ class SingleBackupCollectionSpy(BasicCollectionSpy):
 class TestBasicBackup(unittest.TestCase):
     def setUp(self):
         self.sourcetree = BasicTreeSpy()
-        self.collection = BasicCollectionSpy()
+        self.storage = BasicStorageSpy()
         self.logger = logger.Logger()
         services = {
             'logger': self.logger,
             }
-        bo = backupoperation.BackupOperation(self.collection, services=services)
+        bo = backupoperation.BackupOperation(self.storage, services=services)
         tree = bo.add_tree_to_backup(
             self.sourcetree, ('home', 'me'), ('main',))
         add_backup_handlers(
@@ -336,7 +335,7 @@ class TestBasicBackup(unittest.TestCase):
                 event.severity, logger.Logger.LOG_WARNING, msg=str(event))
 
     def test_correct_files_are_backed_up(self):
-        backup = self.collection._added_backup
+        backup = self.storage._added_backup
         self.assertCountEqual(
             self.expected_backed_up_files,
             [x[0] for x in backup._added_files])
@@ -346,7 +345,7 @@ class TestBasicBackup(unittest.TestCase):
         self.assertNoLoggedProblems()
 
     def test_files_are_backed_up_with_correct_content(self):
-        backup = self.collection._added_backup
+        backup = self.storage._added_backup
         expectedcids = []
         for totest in self.expected_backed_up_files:
             sourcepath = ('home', 'me') + totest[1:]
@@ -357,13 +356,13 @@ class TestBasicBackup(unittest.TestCase):
             bkfiles = backup._get_data_for_added_file(totest)
             self.assertEqual(1, len(bkfiles))
             self.assertEqual(expectedcid, bkfiles[0][1])
-        self.assertCountEqual(expectedcids, self.collection._added_cids)
+        self.assertCountEqual(expectedcids, self.storage._added_cids)
         self.assertCountEqual(
             expectedcids + [b''], [x[1] for x in backup._added_files])
         self.assertNoLoggedProblems()
 
     def test_files_are_backed_up_with_correct_metadata(self):
-        backup = self.collection._added_backup
+        backup = self.storage._added_backup
         for totest in self.expected_backed_up_files:
             sourcepath = ('home', 'me') + totest[1:]
             sourcefile = self.sourcetree.get_item_at_path(sourcepath)
@@ -394,10 +393,10 @@ class TestSecondBackup(unittest.TestCase):
         services = {
             'logger': self.logger
             }
-        self.collection = SingleBackupCollectionSpy()
+        self.storage = SingleBackupStorageSpy()
         self.sourcetree = BasicTreeSpy()
         self.bo = backupoperation.BackupOperation(
-            self.collection, services=services)
+            self.storage, services=services)
         tree = self.bo.add_tree_to_backup(
             self.sourcetree, ('home', 'me'), ('main',))
         add_backup_handlers(
@@ -436,7 +435,7 @@ class TestSecondBackup(unittest.TestCase):
         self.sourcetree._overrides[('home', 'me') + relpath] = ('file', b'n')
         self.bo.execute_backup()
 
-        backup = self.collection._added_backup
+        backup = self.storage._added_backup
         bkfiles = backup._get_data_for_added_file(('main',) + relpath)
         expectedcid = File(('file', b'n'), None)._get_cid()
         self.assertEqual(1, len(bkfiles))
@@ -462,7 +461,7 @@ class TestSecondBackup(unittest.TestCase):
         self.assertNoLoggedProblems()
         self.bo.execute_backup()
 
-        backup = self.collection._added_backup
+        backup = self.storage._added_backup
         bkfiles = backup._get_data_for_added_file(('main',) + relpath)
         self.assertEqual([], bkfiles)
 
@@ -487,7 +486,7 @@ class TestSecondBackup(unittest.TestCase):
         self.assertNoLoggedProblems()
         self.bo.execute_backup()
 
-        backup = self.collection._added_backup
+        backup = self.storage._added_backup
         bkfiles = backup._get_data_for_added_file(('main',) + relpath1)
         self.assertEqual([], bkfiles)
         bkfiles = backup._get_data_for_added_file(('main',) + relpath2)
@@ -519,13 +518,13 @@ class TestSecondBackup(unittest.TestCase):
         self.assertNoLoggedProblems()
         self.assertEqual('', self.stdout.getvalue())
         self.assertNoLoggedProblems()
-        backup = self.collection._added_backup
+        backup = self.storage._added_backup
         bkfiles = backup._get_data_for_added_file(('main',) + relpath)
         self.assertEqual(1, len(bkfiles))
         bkfile = bkfiles[0]
         new_cid = File(('file', b'n'), None)._get_cid()
         self.assertEqual(bkfile[1], new_cid)
-        self.assertIn(new_cid, self.collection._added_cids)
+        self.assertIn(new_cid, self.storage._added_cids)
 
     def test_files_with_unchanged_mtime_and_size_are_assumed_same(self):
         # Intentionally break the assumption that unchanged mtime and
@@ -539,8 +538,8 @@ class TestSecondBackup(unittest.TestCase):
         # symlinks are currently never "assumed unchanged", so it gets
         # added each time. They should typically be small and
         # relatively few, so it doesn't matter much.
-        self.assertEqual([b'cid:/home/missing'], self.collection._added_cids)
-        backup = self.collection._added_backup
+        self.assertEqual([b'cid:/home/missing'], self.storage._added_cids)
+        backup = self.storage._added_backup
         bkfiles = backup._get_data_for_added_file(('main',) + relpath)
         self.assertEqual(1, len(bkfiles))
         bkfile = bkfiles[0]
@@ -584,7 +583,7 @@ class TestSecondBackup(unittest.TestCase):
             ('main', 'myfiles', 'static'),
             ('main', 'myfiles', 'static', 'more'),
             ('main', 'tmp'))
-        backup = self.collection._added_backup
+        backup = self.storage._added_backup
         self.assertCountEqual(
             expected_files.keys(), [x[0] for x in backup._added_files])
         self.assertCountEqual(
@@ -604,7 +603,7 @@ class TestSecondBackup(unittest.TestCase):
             self.assertEqual(bkf[2], srcsize)
             self.assertEqual(bkf[3], fdata._get_mtime()[0])
             self.assertEqual(bkf[4], fdata._get_mtime()[1])
-        added_cids = self.collection._added_cids
+        added_cids = self.storage._added_cids
         for fid in (b'r', b't'):
             self.assertIn(File(('file', fid), None)._get_cid(), added_cids)
         for fid in (b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'f'):

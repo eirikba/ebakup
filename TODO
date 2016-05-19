@@ -51,7 +51,7 @@ right behaviour is.
 
 ---------------------------------------------------------------------------
 
-Missing test: BackupCollection._find_duplicate_content_of_file() is
+Missing test: BackupStorage._find_duplicate_content_of_file() is
 not tested at all.
 
 ---------------------------------------------------------------------------
@@ -104,7 +104,7 @@ every 5 minutes and writes any buffered data to disk.
 
 ---------------------------------------------------------------------------
 
-BackupCollection._make_path_from_contentid() hardcodes the splitting points.
+BackupStorage._make_path_from_contentid() hardcodes the splitting points.
 
 Test: Not created
 

@@ -13,13 +13,13 @@ backup mystuff
   source local:/home/me
     path mine
       static
-  collection local:/backup-1/backup
+  storage local:/backup-1/backup
 ------------------------------------------------------------
 
 The configuration is divided into sections and subsections etc.,
 depending on the indentation level. So in the above example, there is
 one section on the top level "backup mystuff". This section has two
-subsections, one "source" section and one "collection" section. The
+subsections, one "source" section and one "storage" section. The
 "source" section further contains a "path" section that again contains
 a "static" section.
 
@@ -32,13 +32,13 @@ The possible sections in the configuration files are:
 backup <name> - Describes the backup named <name>. Which files to back
     up. Where to store the backup. Etc.
   parent: -
-  children: source collection
+  children: source storage
 
 source <full-path> - Describes sources to be backed up.
   parent: backup
   children: path*
 
-collection <full-path> - Describes a place to store backups.
+storage <full-path> - Describes a place to store backups.
   parent: backup
   children: -
 
@@ -76,7 +76,7 @@ Section: backup
   backup <name>
 
   parent: -
-  children: source collection
+  children: source storage
 
 This section describes everything about a backup. It describes which
 files should be backed up, how they should be organized, how they
@@ -94,10 +94,10 @@ Section: source
 This section describes the files that should be backed up.
 
 
-Section: collection
-===================
+Section: storage
+================
 
-  collection <full-path>
+  storage <full-path>
 
   parent: backup
   children: -

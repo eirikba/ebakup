@@ -76,7 +76,7 @@ class SingleContentStorageStub(object):
         c = self._contents.get(cid)
         if c.content is None:
             raise FileNotFoundError(
-                'no such file or directory: /testcollection/content/' +
+                'no such file or directory: /teststorage/content/' +
                 str(cid))
         return FileReaderStub(c.content)
 
@@ -90,19 +90,19 @@ class FileReaderStub(object):
 
 
 class TestVerifyStorage(unittest.TestCase):
-    def test_verify_empty_collection_is_ok(self):
+    def test_verify_empty_storage_is_ok(self):
         verifier = VerifyStorage(EmptyStorageStub())
         result = ResultSpy()
         verifier.verify(result)
         self.assertEqual(set(), result.errors)
 
-    def test_verify_single_backup_collection_is_ok(self):
+    def test_verify_single_backup_storage_is_ok(self):
         verifier = VerifyStorage(SingleContentStorageStub())
         result = ResultSpy()
         verifier.verify(result)
         self.assertEqual(set(), result.errors)
 
-    def test_verify_single_backup_collection_with_missing_content(self):
+    def test_verify_single_backup_storage_with_missing_content(self):
         storage = SingleContentStorageStub()
         storage._override_content(b'cid123', None)
         verifier = VerifyStorage(storage)
@@ -110,7 +110,7 @@ class TestVerifyStorage(unittest.TestCase):
         verifier.verify(result)
         self.assertEqual(set((b'missing:cid123',)), result.errors)
 
-    def test_verify_single_backup_collection_with_corrupt_content(self):
+    def test_verify_single_backup_storage_with_corrupt_content(self):
         storage = SingleContentStorageStub()
         storage._override_content(b'cid123', b'different data')
         verifier = VerifyStorage(storage)

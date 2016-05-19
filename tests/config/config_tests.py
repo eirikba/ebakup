@@ -81,13 +81,13 @@ class TestSimpleConfig(unittest.TestCase):
         self.assertNotEqual(None, backup)
         self.assertEqual('home', backup.name)
 
-    def test_backup_home_collection(self):
+    def test_backup_home_storage(self):
         backup = self.config.get_backup_by_name('home')
         self.assertNotEqual(None, backup)
-        self.assertEqual(1, len(backup.collections))
-        collection = backup.collections[0]
-        self.assertEqual('local', collection.filesystem.name)
-        self.assertEqual(('backup', 'mine'), collection.path)
+        self.assertEqual(1, len(backup.storages))
+        storage = backup.storages[0]
+        self.assertEqual('local', storage.filesystem.name)
+        self.assertEqual(('backup', 'mine'), storage.path)
 
     def test_backup_home_source(self):
         backup = self.config.get_backup_by_name('home')
@@ -265,7 +265,7 @@ class TestDeprecatedSimpleConfig(unittest.TestCase):
             ('path', 'to', 'config'),
             content=textwrap.dedent('''\
                 backup home
-                   collection local:/backup/mine
+                   storage local:/backup/mine
                    source local:/home/me
                        targetpath home
                        path tmp
@@ -277,10 +277,10 @@ class TestDeprecatedSimpleConfig(unittest.TestCase):
                 ''').encode('utf-8'))
         conf.read_file(tree, ('path', 'to', 'config'))
 
-    def test_backup_home_collection(self):
+    def test_backup_home_storage(self):
         backup = self.config.get_backup_by_name('home')
         self.assertNotEqual(None, backup)
-        self.assertEqual(1, len(backup.collections))
-        collection = backup.collections[0]
-        self.assertEqual('local', collection.filesystem.name)
-        self.assertEqual(('backup', 'mine'), collection.path)
+        self.assertEqual(1, len(backup.storages))
+        storage = backup.storages[0]
+        self.assertEqual('local', storage.filesystem.name)
+        self.assertEqual(('backup', 'mine'), storage.path)

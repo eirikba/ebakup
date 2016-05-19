@@ -7,7 +7,7 @@ import re
 import sys
 import time
 
-import pyebakup.backupstorage.backupcollection as backupcollection
+import pyebakup.backupstorage.backupstorage as backupstorage
 import pyebakup.backup.backupoperation as backupoperation
 import pyebakup.database as database
 import pyebakup.filesys as filesys
@@ -65,15 +65,15 @@ def parse_commandline(commandline=None, msgfile=None):
         'backup', help='Perform one or more backup operations')
     backupparser.add_argument(
         '--create', action='store_true',
-        help='Create the backup collection before starting the backup')
+        help='Create the backup storage before starting the backup')
     backupparser.add_argument('backups', nargs='+', help='Which backups to run')
     infoparser = subparsers.add_parser(
         'info', help='Display information about the state of the backups')
     syncparser = subparsers.add_parser(
-        'sync', help='Synchronize multiple collections for the same backup set')
+        'sync', help='Synchronize multiple storages for the same backup set')
     syncparser.add_argument(
         '--create', action='store_true',
-        help='Create any missing backup collections')
+        help='Create any missing backup storages')
     syncparser.add_argument(
         'backups', nargs='*', help='Which backups to sync (default:all)')
     verifyparser = subparsers.add_parser(
@@ -130,8 +130,8 @@ def create_services(args, overrides):
     services = {
         'filesystem': filesys.get_file_system,
         'backupoperation': backupoperation.BackupOperation,
-        'backupcollection.create': backupcollection.create_collection,
-        'backupcollection.open': backupcollection.open_collection,
+        'backupstorage.create': backupstorage.create_storage,
+        'backupstorage.open': backupstorage.open_storage,
         'database.create': database.create_database,
         'database.open': database.Database,
         'utcnow': datetime.datetime.utcnow,

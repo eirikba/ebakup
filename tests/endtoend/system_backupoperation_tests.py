@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 
-import collections
 import datetime
 import hashlib
 import unittest
 
-import pyebakup.backupstorage.backupcollection as backupcollection
+import pyebakup.backupstorage.backupstorage as backupstorage
 import pyebakup.backup.backupoperation as backupoperation
 import fake_filesys
 
@@ -21,7 +20,7 @@ class TestSimpleBackup(unittest.TestCase):
     def setUp(self):
         storetree = fake_filesys.FakeFileSystem()
         storetree._allow_full_access_to_subtree(('path', 'to', 'backup'))
-        collection = backupcollection.create_collection(
+        storage = backupstorage.create_storage(
             storetree, ('path', 'to', 'backup'))
         sourcetree = fake_filesys.FakeFileSystem()
         basepath = ('home', 'me')
@@ -42,7 +41,7 @@ class TestSimpleBackup(unittest.TestCase):
             ('DSC_1886.JPG', 'DSC_1887.JPG', 'DSC_1888.JPG', 'DSC_1889.JPG'),
             fileid_first=40)
         sourcetree._allow_reading_subtree(basepath)
-        operation = backupoperation.BackupOperation(collection)
+        operation = backupoperation.BackupOperation(storage)
         backuptree = operation.add_tree_to_backup(sourcetree, basepath, ())
         bkroot = make_cfgsubtree(
             (('plain', ('tmp',), 'ignore'),
@@ -54,24 +53,24 @@ class TestSimpleBackup(unittest.TestCase):
         self.sourcetree = sourcetree
         self.basepath = basepath
         self.backuptree = backuptree
-        self.collection = collection
+        self.storage = storage
         self.operation = operation
         self.before_backup = datetime.datetime.utcnow()
         operation.execute_backup()
         self.after_backup = datetime.datetime.utcnow()
-        self.collection2 = backupcollection.open_collection(
+        self.storage2 = backupstorage.open_storage(
             storetree, ('path', 'to', 'backup'))
 
     def test_single_backup_created(self):
-        backup = self.collection2.get_most_recent_backup()
+        backup = self.storage2.get_most_recent_backup()
         self.assertNotEqual(None, backup)
         self.assertEqual(
             None,
-            self.collection2.get_most_recent_backup_before(
+            self.storage2.get_most_recent_backup_before(
                 backup.get_start_time()))
 
     def test_start_end_times_sensible(self):
-        backup = self.collection2.get_most_recent_backup()
+        backup = self.storage2.get_most_recent_backup()
         self.assertLessEqual(
             self.before_backup.replace(microsecond=0),
             backup.get_start_time())
@@ -81,7 +80,7 @@ class TestSimpleBackup(unittest.TestCase):
             backup.get_end_time(), self.after_backup)
 
     def test_correct_files_backed_up(self):
-        backup = self.collection2.get_most_recent_backup()
+        backup = self.storage2.get_most_recent_backup()
         dirs, files = backup.list_directory(())
         self.assertCountEqual(('Documents','tmp','Pictures'), dirs)
         self.assertCountEqual(('.emacs','notes.txt'), files)
@@ -101,7 +100,7 @@ class TestSimpleBackup(unittest.TestCase):
             files)
 
     def test_backed_up_files_have_correct_content(self):
-        backup = self.collection2.get_most_recent_backup()
+        backup = self.storage2.get_most_recent_backup()
         source = self.sourcetree
         basepath = self.basepath
         for path in (
@@ -118,7 +117,7 @@ class TestSimpleBackup(unittest.TestCase):
     def _check_same_content(self, tree, path, backup, bkpath):
         bkfile = backup.get_file_info(bkpath)
         cid = bkfile.contentid
-        content = self.collection2.get_content_reader(cid)
+        content = self.storage2.get_content_reader(cid)
         orig = tree.get_item_at_path(path)
         self.assertEqual(orig.get_size(), content.get_size())
         origdata = orig.get_data_slice(0, orig.get_size())
@@ -127,7 +126,7 @@ class TestSimpleBackup(unittest.TestCase):
             origdata, contentdata, msg='Content differ: ' + str(path))
 
     def test_backed_up_files_have_correct_metadata(self):
-        backup = self.collection2.get_most_recent_backup()
+        backup = self.storage2.get_most_recent_backup()
         source = self.sourcetree
         basepath = self.basepath
         for path in (
@@ -149,7 +148,7 @@ class TestSimpleBackup(unittest.TestCase):
             self.assertEqual(orig.get_size(), bkfile.size)
 
     def test_backed_up_files_have_correct_checksum(self):
-        backup = self.collection2.get_most_recent_backup()
+        backup = self.storage2.get_most_recent_backup()
         source = self.sourcetree
         basepath = self.basepath
         for path in (

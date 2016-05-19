@@ -5,7 +5,7 @@ import hashlib
 import io
 import unittest
 
-import pyebakup.backupstorage.backupcollection as backupcollection
+import pyebakup.backupstorage.backupstorage as backupstorage
 
 
 def raiseUnexpectedCallError():
@@ -319,17 +319,17 @@ class BasicBackupDatabaseStub(object):
 
 
 class TestUtilities(unittest.TestCase):
-    def test_make_path_from_contentid_in_new_collection(self):
+    def test_make_path_from_contentid_in_new_storage(self):
         # _make_path_from_contentid() is currently slightly broken in
         # that it doesn't check the existing splitting choices. Nor
         # does it make any attempt at optimized number of splits.
-        # However, for a clean, new collection, I think the strategy
+        # However, for a clean, new storage, I think the strategy
         # in this test makes sense anyway.
         services = {
             'database.open': lambda tree, path: BackupDummy(),
             'database.create': raiseUnexpectedCallError
             }
-        bc = backupcollection.open_collection(
+        bc = backupstorage.open_storage(
             SimpleDirectoryStub(), ('path', 'to', 'store'), services=services)
         mkpath = bc._make_path_from_contentid
 
@@ -353,7 +353,7 @@ class TestCreateBasicBackup(unittest.TestCase):
             'database.open': lambda tree, path: db,
             'database.create': raiseUnexpectedCallError
             }
-        bc = backupcollection.open_collection(
+        bc = backupstorage.open_storage(
             SimpleDirectoryStub(), ('backup',), services=services)
         backup = bc.start_backup(
             datetime.datetime(2015, 2, 14, 19, 55, 32, 328629))
@@ -408,37 +408,37 @@ class TestBasicBackup(unittest.TestCase):
             'database.open': lambda tree, path: BasicBackupDatabaseStub(),
             'database.create': raiseUnexpectedCallError,
             }
-        self.backupcollection = backupcollection.open_collection(
+        self.backupstorage = backupstorage.open_storage(
             BasicBackupDirectoryStub(), ('backup',), services=services)
 
     def test_backup_sequence(self):
-        backup = self.backupcollection.get_most_recent_backup()
+        backup = self.backupstorage.get_most_recent_backup()
         self.assertNotEqual(None, backup)
-        oldest = self.backupcollection.get_oldest_backup()
+        oldest = self.backupstorage.get_oldest_backup()
         self.assertEqual(backup.get_start_time(), oldest.get_start_time())
         self.assertEqual(
             None,
-            self.backupcollection.get_most_recent_backup_before(
+            self.backupstorage.get_most_recent_backup_before(
                 backup.get_start_time()))
         self.assertEqual(
             None,
-            self.backupcollection.get_oldest_backup_after(
+            self.backupstorage.get_oldest_backup_after(
                 backup.get_start_time()))
 
     def test_backup_start_time(self):
-        backup = self.backupcollection.get_most_recent_backup()
+        backup = self.backupstorage.get_most_recent_backup()
         self.assertEqual(
             datetime.datetime(2015, 2, 14, 19, 55, 32, 328629),
             backup.get_start_time())
 
     def test_backup_end_time(self):
-        backup = self.backupcollection.get_most_recent_backup()
+        backup = self.backupstorage.get_most_recent_backup()
         self.assertEqual(
             datetime.datetime(2015, 2, 14, 19, 55, 54, 954321),
             backup.get_end_time())
 
     def test_list_directory(self):
-        backup = self.backupcollection.get_most_recent_backup()
+        backup = self.backupstorage.get_most_recent_backup()
         dirs, files = backup.list_directory(())
         self.assertCountEqual(('homedir', 'outside'), dirs)
         self.assertCountEqual(('toplevel',), files)
@@ -462,7 +462,7 @@ class TestBasicBackup(unittest.TestCase):
         self.assertCountEqual((), files)
 
     def test_get_file_info(self):
-        backup = self.backupcollection.get_most_recent_backup()
+        backup = self.backupstorage.get_most_recent_backup()
         info = backup.get_file_info(('homedir', 'other.txt'))
         bk = BasicBackupStub()
         self.assertEqual(
@@ -482,14 +482,14 @@ class TestBasicBackup(unittest.TestCase):
         self.assertEqual(b'cksum:' + b'127' * 4 + b'12', info.good_checksum)
 
     def test_get_content_info(self):
-        bc = self.backupcollection
+        bc = self.backupstorage
         info = bc.get_content_info(b'cid:' + b'127' * 4 + b'12')
         self.assertEqual(b'cksum:' + b'127' * 4 + b'12', info.goodsum)
         self.assertEqual(
             datetime.datetime(2015, 2, 14, 19, 56, 7), info.first_seen)
 
     def test_get_content_reader(self):
-        bc = self.backupcollection
+        bc = self.backupstorage
         reader = bc.get_content_reader(b'cid:' + b'127' * 4 + b'12')
         self.assertNotEqual(None, reader)
         self.assertEqual(127, reader.get_size())
@@ -498,7 +498,7 @@ class TestBasicBackup(unittest.TestCase):
 
     def test_add_duplicate_content(self):
         bk = BasicBackupStub()
-        contentid = self.backupcollection.add_content(
+        contentid = self.backupstorage.add_content(
             SimpleFileItemStub(
                 bk._file_infos[('homedir', 'file.txt')]._content),
             now=datetime.datetime(2015, 2, 18, 5, 27, 43))
@@ -506,18 +506,18 @@ class TestBasicBackup(unittest.TestCase):
 
     def test_add_content_with_same_checksum(self):
         bk = BasicBackupStub()
-        contentid = self.backupcollection.add_content(
+        contentid = self.backupstorage.add_content(
             SimpleFileItemStub(
                 bk._file_infos[('homedir', 'file.txt')]._content + b'--'),
             now=datetime.datetime(2015, 2, 18, 5, 27, 43))
         self.assertEqual(b'cid:' + b'127' * 4 + b'123', contentid)
 
     def test_make_shadow_copy(self):
-        bk = self.backupcollection.get_backup_by_name('2015-02-14T19:55')
+        bk = self.backupstorage.get_backup_by_name('2015-02-14T19:55')
         info = bk.get_file_info(('homedir', 'other.txt'))
-        self.backupcollection.make_shadow_copy(
+        self.backupstorage.make_shadow_copy(
             info, self.storetree, ('path', 'to', 'shadow', 'other.txt'))
-        contentpath = self.backupcollection._make_path_from_contentid(
+        contentpath = self.backupstorage._make_path_from_contentid(
             info.contentid)
         self.assertEqual(('backup', 'content'), contentpath[:2])
         self.assertEqual(
@@ -529,7 +529,7 @@ class TestBasicBackup(unittest.TestCase):
 
     @unittest.skip('look into reviving when verification data is in place')
     def test_checksum_timeline(self):
-        bc = backupcollection.open_collection(
+        bc = backupstorage.open_storage(
             self.storetree, ('path', 'to', 'store'), services=self.services)
         bc.update_content_checksum(
             self.cid1, datetime.datetime(2015, 2, 15, 8, 4, 32), self.checksum1)
@@ -555,7 +555,7 @@ class TestBasicBackup(unittest.TestCase):
         bc.update_content_checksum(
             self.cid1, datetime.datetime(2015, 3, 16, 9, 52, 14), b'4' * 32)
 
-        info = self.backupcollection.get_content_info(self.cid1)
+        info = self.backupstorage.get_content_info(self.cid1)
         self.assertEqual(self.checksum1, info.goodsum)
         self.assertEqual(b'4' * 32, info.lastsum)
 
@@ -598,46 +598,46 @@ class TestTwoBackups(unittest.TestCase):
             'database.open': lambda tree, path: TwoBackupsDatabaseStub(),
             'database.create': raiseUnexpectedCallError,
             }
-        self.backupcollection = backupcollection.open_collection(
+        self.backupstorage = backupstorage.open_storage(
             SimpleDirectoryStub(), ('path', 'to', 'store'), services=services)
 
     def test_backup_sequence(self):
-        backup = self.backupcollection.get_most_recent_backup()
+        backup = self.backupstorage.get_most_recent_backup()
         self.assertNotEqual(None, backup)
         self.assertEqual(
             datetime.datetime(2015, 4, 20, 17, 0, 22, 737955),
             backup.get_start_time())
-        oldest = self.backupcollection.get_oldest_backup()
+        oldest = self.backupstorage.get_oldest_backup()
         self.assertEqual(
             datetime.datetime(2015, 2, 14, 19, 55, 32, 328629),
             oldest.get_start_time())
-        recent2 = self.backupcollection.get_most_recent_backup_before(
+        recent2 = self.backupstorage.get_most_recent_backup_before(
             backup.get_start_time())
-        old2 = self.backupcollection.get_oldest_backup_after(
+        old2 = self.backupstorage.get_oldest_backup_after(
             oldest.get_start_time())
         self.assertEqual(backup.get_start_time(), old2.get_start_time())
         self.assertEqual(oldest.get_start_time(), recent2.get_start_time())
         self.assertEqual(
             None,
-            self.backupcollection.get_most_recent_backup_before(
+            self.backupstorage.get_most_recent_backup_before(
                 recent2.get_start_time()))
         self.assertEqual(
             None,
-            self.backupcollection.get_oldest_backup_after(
+            self.backupstorage.get_oldest_backup_after(
                 old2.get_start_time()))
 
     def test_get_backup_by_name(self):
-        backup = self.backupcollection.get_backup_by_name('2015-04-20T17:00')
+        backup = self.backupstorage.get_backup_by_name('2015-04-20T17:00')
         self.assertEqual(
             datetime.datetime(2015, 4, 20, 17, 0, 22, 737955),
             backup.get_start_time())
-        backup = self.backupcollection.get_backup_by_name('2015-06-18T12:33')
+        backup = self.backupstorage.get_backup_by_name('2015-06-18T12:33')
         self.assertEqual(None, backup)
-        backup = self.backupcollection.get_backup_by_name('2015-02-14T19:55')
+        backup = self.backupstorage.get_backup_by_name('2015-02-14T19:55')
         self.assertEqual(
             datetime.datetime(2015, 2, 14, 19, 55, 32, 328629),
             backup.get_start_time())
-        backup = self.backupcollection.get_backup_by_name('2012-06-18T12:33')
+        backup = self.backupstorage.get_backup_by_name('2012-06-18T12:33')
         self.assertEqual(None, backup)
 
 
@@ -648,7 +648,7 @@ class TestSingleStuff(unittest.TestCase):
             'database.open': lambda tree, path: db,
             'database.create': raiseUnexpectedCallError,
             }
-        bc = backupcollection.open_collection(
+        bc = backupstorage.open_storage(
             SimpleDirectoryStub(), ('backup',), services=services)
 
         before_backup = datetime.datetime.utcnow()
@@ -676,7 +676,7 @@ class TestSingleStuff(unittest.TestCase):
             'database.open': lambda tree, path: EmptyDatabaseStub(),
             'database.create': raiseUnexpectedCallError,
             }
-        bc = backupcollection.open_collection(
+        bc = backupstorage.open_storage(
             SimpleDirectoryStub(), ('backup',), services=services)
         self.assertEqual(None, bc.get_most_recent_backup())
 
@@ -686,7 +686,7 @@ class TestSingleStuff(unittest.TestCase):
             'database.open': lambda tree, path: db,
             'database.create': raiseUnexpectedCallError,
             }
-        bc = backupcollection.open_collection(
+        bc = backupstorage.open_storage(
             SimpleDirectoryStub(), ('backup',), services=services)
         backup = bc.start_backup(
             datetime.datetime(2015, 2, 14, 19, 55, 32, 328629))
@@ -721,7 +721,7 @@ class TestBrokenUsage(unittest.TestCase):
             'database.open': lambda tree, path: FileExistsDatabaseStub(),
             'database.create': raiseUnexpectedCallError,
             }
-        bc = backupcollection.open_collection(
+        bc = backupstorage.open_storage(
             SimpleDirectoryStub(), ('backup',), services=services)
         backup = bc.start_backup(
             datetime.datetime(2015, 2, 14, 19, 55, 32, 328629))
@@ -733,9 +733,9 @@ class TestBrokenUsage(unittest.TestCase):
                 ('homedir', 'file.txt'), cid, 127,
                 datetime.datetime(2014, 9, 11, 9, 3, 54), 759831036)
 
-    def test_open_collection_that_does_not_exist(self):
+    def test_open_storage_that_does_not_exist(self):
         self.assertRaisesRegex(
             FileNotFoundError,
-            'Backup collection does not exist.*path.*to.*store',
-            backupcollection.open_collection,
+            'Backup storage does not exist.*path.*to.*store',
+            backupstorage.open_storage,
             EmptyDirectoryStub(), ('path', 'to', 'store'), services={})

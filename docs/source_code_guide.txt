@@ -60,11 +60,11 @@ cli.py - Contains the command-line based interface. Command line
 task_*.py - Contains the code that orchestrates each different task
     (e.g. backup, info, sync).
 
-backupcollection.py - Handles all the data stored in a single backup
-    collection. Delegates any operations on the database to
+backupstorage.py - Handles all the data stored in a single backup
+    storage. Delegates any operations on the database to
     database.py.
 
-database.py - Handles the database of a backup collection. Can store
+database.py - Handles the database of a backup storage. Can store
     and retrieve information about backups and content items. Does not
     handle the content items themselves.
 

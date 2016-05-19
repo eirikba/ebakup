@@ -2,8 +2,8 @@
 
 
 class ContentDataChecker(object):
-    def __init__(self, collection, reporter):
-        self.collection = collection
+    def __init__(self, storage, reporter):
+        self.storage = storage
         self._reporter = reporter
 
     def check_content_data(self, cid):
@@ -15,18 +15,18 @@ class ContentDataChecker(object):
 
     def get_content_reader(self, cid):
         try:
-            content = self.collection.get_content_reader(cid)
+            content = self.storage.get_content_reader(cid)
         except FileNotFoundError:
             return None
         return content
 
     def is_checksum_good(self, cid, content):
-        cinfo = self.collection.get_content_info(cid)
+        cinfo = self.storage.get_content_info(cid)
         content_checksum = self.calculate_checksum(content)
         return content_checksum == cinfo.goodsum
 
     def calculate_checksum(self, content):
-        checksummer = self.collection.get_checksum_algorithm()()
+        checksummer = self.storage.get_checksum_algorithm()()
         done = 0
         readsize = 10 * 1024 * 1024
         data = content.get_data_slice(done, readsize)

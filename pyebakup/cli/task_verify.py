@@ -21,9 +21,9 @@ class VerifyResult(object):
 
 class VerifyTask(object):
     def __init__(self, config, args):
-        cfgcollection = config.backups[0].collections[0]
-        self._collection = args.services['backupcollection.open'](
-            cfgcollection.filesystem, cfgcollection.path)
+        cfgstorage = config.backups[0].storages[0]
+        self._storage = args.services['backupstorage.open'](
+            cfgstorage.filesystem, cfgstorage.path)
         self._result = VerifyResult()
         self._printResultAtEnd = False
 
@@ -31,14 +31,14 @@ class VerifyTask(object):
         self._printResultAtEnd = True
 
     def execute(self):
-        verifier = VerifyStorage(self._collection)
+        verifier = VerifyStorage(self._storage)
         verifier.verify(self._result)
         if self._printResultAtEnd:
             self._printResult()
         return self._result
 
     def _printResult(self):
-        print('Results of verifying ' + str(self._collection._path) + ':')
+        print('Results of verifying ' + str(self._storage._path) + ':')
         if not self._result.errors:
             print('No errors')
         else:

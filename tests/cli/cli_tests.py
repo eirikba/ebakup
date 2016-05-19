@@ -43,8 +43,8 @@ class TestSimpleStuff(unittest.TestCase):
         expected_services = {
             'filesystem': callable,
             'backupoperation': callable,
-            'backupcollection.create': callable,
-            'backupcollection.open': callable,
+            'backupstorage.create': callable,
+            'backupstorage.open': callable,
             'database.create': callable,
             'database.open': callable,
             'uistate': lambda x: hasattr(x, 'make_http_handler'),

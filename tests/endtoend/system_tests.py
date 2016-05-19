@@ -11,7 +11,7 @@ import io
 import textwrap
 import unittest
 
-import pyebakup.backupstorage.backupcollection as backupcollection
+import pyebakup.backupstorage.backupstorage as backupstorage
 import pyebakup.cli as cli
 import pyebakup.database.datafile as datafile
 import fake_filesys
@@ -90,7 +90,7 @@ class TestFullSequence(unittest.TestCase):
         self._check_result_of_second_backup(stdout=out.getvalue())
         self.advance_utcnow(seconds=32)
         self.assertRaisesRegex(
-            FileNotFoundError, 'Backup collection does not exist.*second',
+            FileNotFoundError, 'Backup storage does not exist.*second',
             cli.cli_main, ('sync',), services=self.services, stdoutfile=out)
         self.advance_utcnow(seconds=17)
         out = io.StringIO()
@@ -195,8 +195,8 @@ class TestFullSequence(unittest.TestCase):
     def get_initial_config_file_content(self):
         return textwrap.dedent('''\
             backup home
-                collection local:/backups/home
-                collection local:/backups/second
+                storage local:/backups/home
+                storage local:/backups/second
                 source local:/home/me
                    paths .cache .thumbnails tmp
                        ignore
@@ -215,9 +215,9 @@ class TestFullSequence(unittest.TestCase):
         self.assertEqual(
             'Backup definitions:\n'
             '  backup home\n'
-            '    collection local:/backups/home\n'
+            '    storage local:/backups/home\n'
             '      (Does not exist)\n'
-            '    collection local:/backups/second\n'
+            '    storage local:/backups/second\n'
             '      (Does not exist)\n'
             '    source local:/home/me\n',
             outstr)
@@ -244,7 +244,7 @@ class TestFullSequence(unittest.TestCase):
             '3f32379fe4108e99279890faf44a836c6ad836ad331ea276d0a4b7858437091a',
             '9a56e724abdbeafb3c206603f085d887323695e4cbfabedbb25597d5d43012e0',
             '384d1cd1ecf7cbd6dfbd82894af0922bc113589d14d06c465eb145922ae00dd7',
-            '5e16a40318f071df23a3d2fb600f7943764bca4896020ba9a54a00c10f49e99e',
+            'c9c3c4ee9e82e5335fcc45121c683172c7f6d3a3355c53b95832cba8a5451382',
             'f4cefbc7f79d42224e638b1f1c9f26ec5e463d4258941ffb0159c2a97b846dc8',
             '49a95841301c58087a0b7b31bbed2d4bee95dda74a58a513457b7cd262f8759a',
             '9266be2ad9656a674b89ee113851aa31773a8c5414e6329fb9e605ea3d9415ac',
@@ -256,7 +256,7 @@ class TestFullSequence(unittest.TestCase):
         self.assertCountEqual(expected, contentfiles)
 
     def _check_db_after_initial_backup(self):
-        coll = backupcollection.open_collection(
+        coll = backupstorage.open_storage(
             self.fs, ('backups', 'home'), services=self.services)
         bkup = coll.get_most_recent_backup()
         self.assertEqual(
@@ -384,10 +384,10 @@ class TestFullSequence(unittest.TestCase):
         if False: # FIXME: last-verified data is currently broken
          self.assertEqual(
             'Backup definitions:\n  backup home\n'
-            '    collection local:/backups/home\n'
+            '    storage local:/backups/home\n'
             '      Least recently verified: 1995-01-01 00:00:20\n'
             '      Total number of content files: 7\n'
-            '    collection local:/backups/second\n'
+            '    storage local:/backups/second\n'
             '      (Does not exist)\n'
             '    source local:/home/me\n',
             outstr)
@@ -456,7 +456,7 @@ class TestFullSequence(unittest.TestCase):
             rest)
 
     def _check_db_after_second_backup(self):
-        coll = backupcollection.open_collection(self.fs, ('backups', 'home'))
+        coll = backupstorage.open_storage(self.fs, ('backups', 'home'))
         bkup = coll.get_most_recent_backup()
         self.assertEqual(
             datetime.datetime(1995, 1, 5, 0, 44, 0), bkup.get_start_time())

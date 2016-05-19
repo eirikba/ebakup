@@ -22,7 +22,7 @@ def unhexify(data):
         out.append(int(data[i:i+2], 16))
     return bytes(out)
 
-class FakeCollection(object):
+class FakeStorage(object):
     def __init__(self, path):
         self._path = path
         self._immutable = False
@@ -68,7 +68,7 @@ class FakeCollection(object):
                 contentid=cid)
             bk._add_file(bkf)
         if self._immutable:
-            raise AssertionError('Collection is immutable')
+            raise AssertionError('Storage is immutable')
         self._backups.append(bk)
         return bk
 
@@ -87,7 +87,7 @@ class FakeCollection(object):
             cid = cksum + str(disambig).encode('utf-8')
             oldcontent = self._content.get(cid)
         if self._immutable:
-            raise AssertionError('Collection is immutable')
+            raise AssertionError('Storage is immutable')
         self._content[cid] = content
         return cid
 
@@ -290,8 +290,8 @@ class FakeFileForHackyBackupReaderAccess(object):
 
 
 class FakeStreamingBackupWriter(object):
-    def __init__(self, collection, starttime):
-        self._collection = collection
+    def __init__(self, storage, starttime):
+        self._storage = storage
         self._starttime = starttime
         self._items = []
         self._backup = FakeBackup(starttime)
@@ -331,23 +331,23 @@ class FakeStreamingBackupWriter(object):
 
     def commit_and_close(self):
         self._closed = True
-        if self._collection._immutable:
-            raise AssertionError('Collection is immutable')
-        self._collection._backups.append(self._backup)
+        if self._storage._immutable:
+            raise AssertionError('Storage is immutable')
+        self._storage._backups.append(self._backup)
 
 class FakeTree(object):
     def __init__(self):
-        self._collections = {}
+        self._storages = {}
 
-    def _add_collection(self, coll):
-        for collpath in self._collections:
+    def _add_storage(self, coll):
+        for collpath in self._storages:
             assert coll._path[:len(collpath)] != collpath
             assert collpath[:len(coll._path)] != coll._path
-        self._collections[coll._path] = coll
+        self._storages[coll._path] = coll
 
     @staticmethod
-    def _get_collection(tree, path, services):
-        return tree._collections[path]
+    def _get_storage(tree, path, services):
+        return tree._storages[path]
 
     def is_accessible(self):
         return True
@@ -356,15 +356,15 @@ class FakeTree(object):
         return 'fake:' + str(path)
 
     def does_path_exist(self, path):
-        for collpath in self._collections:
+        for collpath in self._storages:
             if path[:len(collpath)] == collpath:
-                return self._collections[collpath]._does_path_exist(
+                return self._storages[collpath]._does_path_exist(
                     path[len(collpath):])
 
     def get_item_at_path(self, path):
-        for collpath in self._collections:
+        for collpath in self._storages:
             if path[:len(collpath)] == collpath:
-                return self._collections[collpath]._get_file_item_at_path(
+                return self._storages[collpath]._get_file_item_at_path(
                     path[len(collpath):])
         if not self.does_path_exist(self, path):
             raise FileNotFoundError()
@@ -406,25 +406,25 @@ class FakeUIState(object):
 
 class TestSync(unittest.TestCase):
     def setUp(self):
-        coll = FakeCollection(('backup', 'first'))
+        coll = FakeStorage(('backup', 'first'))
         coll._add_backup(
             datetime.datetime(2014, 6, 10, 14, 16, 7, 30092),
             files=testdata.files()[:16])
         coll.set_immutable()
-        coll2 = FakeCollection(('backup', 'second'))
+        coll2 = FakeStorage(('backup', 'second'))
         tree = FakeTree()
-        tree._add_collection(coll)
-        tree._add_collection(coll2)
+        tree._add_storage(coll)
+        tree._add_storage(coll2)
         config = FakeConfig()
         config.backups = [
             Conf(
                 name='test',
-                collections=(
+                storages=(
                     Conf(filesystem=tree, path=('backup', 'first')),
                     Conf(filesystem=tree, path=('backup', 'second'))
                 )) ]
         args = FakeArgs()
-        args.services['backupcollection.open'] = tree._get_collection
+        args.services['backupstorage.open'] = tree._get_storage
         args.backups = []
         self.coll = coll
         self.coll2 = coll2
@@ -437,11 +437,11 @@ class TestSync(unittest.TestCase):
         sync.execute()
         coll = self.coll
         coll2 = self.coll2
-        self.assertCollectionsEqual(coll, coll2)
+        self.assertStoragesEqual(coll, coll2)
         # The rest of these tests are in one sense not necessary,
-        # given that the collections have been tested equal. But it
+        # given that the storages have been tested equal. But it
         # tests some values of the new data with the original data
-        # rather than the source collection, which is potentially a
+        # rather than the source storage, which is potentially a
         # useful extra sanity check.
         self.assertEqual(1, len(coll2._backups))
         bk = coll2._backups[0]
@@ -473,7 +473,7 @@ class TestSync(unittest.TestCase):
                 coll2._get_content_by_id(bkfile.cid),
                 testfiles[path].content)
 
-    def assertCollectionsEqual(self, coll1, coll2):
+    def assertStoragesEqual(self, coll1, coll2):
         self.assertEqual(coll1._content, coll2._content)
         self.assertEqual(len(coll1._backups), len(coll2._backups))
         for bk1, bk2 in zip(coll1._backups, coll2._backups):
@@ -493,7 +493,7 @@ class TestSync(unittest.TestCase):
             files=testdata.files()[:16])
         sync = task_sync.SyncTask(self.config, self.args)
         sync.execute()
-        self.assertCollectionsEqual(self.coll, self.coll2)
+        self.assertStoragesEqual(self.coll, self.coll2)
 
     def test_sync_with_new_backup_and_existing_content(self):
         self.coll2._add_backup(
@@ -509,7 +509,7 @@ class TestSync(unittest.TestCase):
         self.assertEqual(contentcount, len(self.coll._content))
         sync = task_sync.SyncTask(self.config, self.args)
         sync.execute()
-        self.assertCollectionsEqual(self.coll, self.coll2)
+        self.assertStoragesEqual(self.coll, self.coll2)
 
     def test_initial_sync_with_two_backups(self):
         contentcount = len(self.coll._content)
@@ -521,4 +521,4 @@ class TestSync(unittest.TestCase):
         self.assertEqual(contentcount, len(self.coll._content))
         sync = task_sync.SyncTask(self.config, self.args)
         sync.execute()
-        self.assertCollectionsEqual(self.coll, self.coll2)
+        self.assertStoragesEqual(self.coll, self.coll2)

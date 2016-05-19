@@ -17,7 +17,7 @@ class MakeShadowTreeTask(object):
     def _make_shadow_tree(self):
         self.tree, self.target_path = self._convert_user_path_to_tree_and_path(
             self._args.target)
-        self.bc = self._get_source_collection()
+        self.bc = self._get_source_storage()
         self.snapshot = self._get_snapshot()
         self._make_shadow_subtree(())
 
@@ -26,15 +26,15 @@ class MakeShadowTreeTask(object):
         path = tree.path_from_string(stringpath)
         return tree, path
 
-    def _get_source_collection(self):
-        # Grabbing the first collection of the first backup. This will
+    def _get_source_storage(self):
+        # Grabbing the first storage of the first backup. This will
         # fail if the target path doesn't support hardlinks from that
-        # particular collection. (So the code should really look for
-        # the first collection that supports those hardlinks.)
+        # particular storage. (So the code should really look for
+        # the first storage that supports those hardlinks.)
         bkname = self._config.get_all_backup_names()[0]
         bk = self._config.get_backup_by_name(bkname)
-        bcconf = bk.collections[0]
-        return self._args.services['backupcollection.open'](
+        bcconf = bk.storages[0]
+        return self._args.services['backupstorage.open'](
             bcconf.filesystem, bcconf.path)
 
     def _get_snapshot(self):

@@ -29,36 +29,36 @@ class SyncTask(object):
         self._ui.set_status('syncing-backup', '....')
         self._ui.set_status('syncing', '....')
         collinfos = []
-        for conf in backupconf.collections:
+        for conf in backupconf.storages:
             if conf.filesystem.is_accessible:
                 self._ui.set_status(
                     'task-sync',
-                    'Opening collection ' +
+                    'Opening storage ' +
                     conf.filesystem.path_to_full_string(conf.path))
-                opener = self._services['backupcollection.open']
+                opener = self._services['backupstorage.open']
                 if (self._args.create and not
                         conf.filesystem.does_path_exist(conf.path)):
-                    opener = self._services['backupcollection.create']
-                collection = opener(
+                    opener = self._services['backupstorage.create']
+                storage = opener(
                     conf.filesystem, conf.path, services=self._services)
-                collinfos.append(CollectionData(conf, collection))
+                collinfos.append(StorageData(conf, storage))
             else:
                 self._logger.log_error(
-                    'missing collection', conf,
-                    'The collection will not be synced, neither from nor to.')
-                raise NotTestedError('Missing collection during sync')
+                    'missing storage', conf,
+                    'The storage will not be synced, neither from nor to.')
+                raise NotTestedError('Missing storage during sync')
         self._ui.set_status(
             'task-sync',
             'Syncing ' + backupconf.name +
-            ' (' + str(len(collinfos)) + ' collections)')
-        self._sync_collections(collinfos)
+            ' (' + str(len(collinfos)) + ' storages)')
+        self._sync_storages(collinfos)
         self._ui.set_status('task-sync', 'Sync complete for ' + backupconf.name)
 
-    def _sync_collections(self, collinfos):
+    def _sync_storages(self, collinfos):
         self._ui.set_status('syncing', 'Making list of backups')
         pending_backups = set()
         for coll in collinfos:
-            coll.backups = coll.collection.get_all_backup_names(
+            coll.backups = coll.storage.get_all_backup_names(
                 order_by='starttime')
             pending_backups.update(coll.backups)
         self._ui.set_status('syncing', 'Syncing backup sets')
@@ -87,7 +87,7 @@ class SyncTask(object):
             targetinfo.conf.filesystem.path_to_full_string(
                 targetinfo.conf.path))
         source = (
-            sourceinfo.collection.get_backup_file_reader_for_name(name))
+            sourceinfo.storage.get_backup_file_reader_for_name(name))
         item = next(source)
         assert item.kind == 'magic'
         assert item.value == b'ebakup backup data'
@@ -100,7 +100,7 @@ class SyncTask(object):
                 raise AssertionError('No "start time" in backup file')
         starttime = self._parse_start_time(item.value)
         target = (
-            targetinfo.collection.create_backup_file_in_replacement_mode(
+            targetinfo.storage.create_backup_file_in_replacement_mode(
                 starttime))
         prevkind = 'setting'
         kvids = set()
@@ -187,8 +187,8 @@ class SyncTask(object):
     def _copy_content(self, sourceinfo, targetinfo, contentid):
         self._ui.set_status(
             'syncing', 'Copy content ' + hexstr(contentid[:8]) + '...')
-        sourcecoll = sourceinfo.collection
-        targetcoll = targetinfo.collection
+        sourcecoll = sourceinfo.storage
+        targetcoll = targetinfo.storage
         sourcetree = sourceinfo.conf.filesystem
         targettree = targetinfo.conf.filesystem
         sourcepath = sourcecoll._make_path_from_contentid(contentid)
@@ -221,7 +221,7 @@ class SyncTask(object):
                 'Sync cid changed', contentid,
                 'The cid of copied content changed. That should mean '
                 'that there already is different content with the same '
-                'content id in the target collection. That is sufficiently '
+                'content id in the target storage. That is sufficiently '
                 'strange that I am calling it an error, even though '
                 'it should work fine.')
         return cid
@@ -263,7 +263,7 @@ class SyncTask(object):
         return False
 
     def _read_backupcids(self, info, name):
-        reader = info.collection.get_backup_file_reader_for_name(name)
+        reader = info.storage.get_backup_file_reader_for_name(name)
         dirs = { 0: () }
         bkcids = {}
         for item in reader:
@@ -296,16 +296,16 @@ class SyncTask(object):
 
     def _get_full_content_for_backup(self, collinfo, name):
         # This is cheating! But for now it gets me what I need.
-        reader = collinfo.collection.get_backup_file_reader_for_name(name)
+        reader = collinfo.storage.get_backup_file_reader_for_name(name)
         with reader._tree.get_item_at_path(reader._path) as f:
             return f.get_data_slice(0, f.get_size())
 
-class CollectionData(object):
-    def __init__(self, conf, collection):
+class StorageData(object):
+    def __init__(self, conf, storage):
         self.conf = conf
-        self.collection = collection
+        self.storage = storage
         self.backupcids = {}  # { backupname : { cid: path } }
-        self.added_content = {}  # { cid : { (source) CollectionData: cid } }
+        self.added_content = {}  # { cid : { (source) StorageData: cid } }
 
 hexits = '0123456789abcdef'
 def hexstr(data):

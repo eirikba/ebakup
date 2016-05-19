@@ -27,16 +27,16 @@ The elements of the system are:
 - The source files
 - The backup storage areas
 
-A "backup storage" is where a collection of backups are
-stored. Technically, it is just a directory somewhere. A simple setup
-would have some external hard drives and put one backup storage on
-each drive.
+A "backup storage" is where a collection of backups are stored.
+Technically, it is just a directory somewhere. A simple setup would
+have some external hard drives and put one backup storage on each
+drive.
 
 A "backup storage" contains:
 
 - A "content store"
 - A "database"
-- A collection of "shadow trees"
+- Potentially a collection of "shadow trees"
 
 When a backup is made, a new file is added to the database describing
 the particular backup. For every file that is backed up, the content
@@ -110,9 +110,9 @@ backup main
       ignore
   source local:/etc
     targetpath etc
-  collection local:/backup-1/backup
-  collection local:/backup-2/backup
-  collection local:/backup-3/backup
+  storage local:/backup-1/backup
+  storage local:/backup-2/backup
+  storage local:/backup-3/backup
 ------------------------------------------------------------
 
 This configuration declares a single "backup" called "main". It has
@@ -142,9 +142,9 @@ sections these items are quite simply paths, while for "path-glob" and
 "path-globs" the items are globs ("*", "?", "[...]" and "[!...]" are
 supported).
 
-The three "collection" settings point to three directories where
-backups are stored. The three directories shall typically contain the
-same data.
+The three "storage" settings point to three directories where backups
+are stored. The three directories shall typically contain the same
+data.
 
 
 Commands
@@ -202,7 +202,7 @@ command: backup
 Make a new backup for the backups named <backupnames...>.
 
 The current implementation makes the new backup to the first
-collection that is available. This may change.
+storage that is available. This may change.
 
 
 command: sync
@@ -210,12 +210,12 @@ command: sync
 
    ebakup sync [<backupnames...>]
 
-Synchronize the backup collections for the backups named
+Synchronize the backup storages for the backups named
 <backupnames...>. If no backup names are given, all backups in the
 configuration will be synchronized.
 
 For each backup, the synchronization consists of copying all backup
-descriptions to any collections where they are missing. And copying
+descriptions to any storages where they are missing. And copying
 all missing content items referenced by those backup descriptions as
 well.
 

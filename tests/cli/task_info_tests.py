@@ -21,7 +21,7 @@ class FakeConfig(object):
 
     def _add_full_config(self):
         bk = self._add_backup('mine')
-        coll = bk._add_collection(
+        coll = bk._add_storage(
             FakeFilesys('local'), ('data', 'backup1', 'mine'))
         src = bk._add_source(FakeFilesys('local'), ('home', 'me'))
         bk = self._add_backup('stuff')
@@ -44,12 +44,12 @@ class FakeConfig(object):
 class FakeBackupConfig(object):
     def __init__(self, name):
         self.name = name
-        self.collections = []
+        self.storages = []
         self.sources = []
 
-    def _add_collection(self, filesystem, path):
-        coll = FakeCollectionConfig(filesystem, path)
-        self.collections.append(coll)
+    def _add_storage(self, filesystem, path):
+        coll = FakeStorageConfig(filesystem, path)
+        self.storages.append(coll)
         return coll
 
     def _add_source(self, filesystem, path):
@@ -57,7 +57,7 @@ class FakeBackupConfig(object):
         self.sources.append(src)
         return src
 
-class FakeCollectionConfig(object):
+class FakeStorageConfig(object):
     def __init__(self, filesystem, path):
         self.filesystem = filesystem
         self.path = path
@@ -76,7 +76,7 @@ class FakeArgs(object):
         self._config = config
         self.services = {
             'logger': FakeLogger(),
-            'backupcollection.open': FakeCollectionMaker().open_collection,
+            'backupstorage.open': FakeStorageMaker().open_storage,
             'uistate': FakeUIState(),
             }
 
@@ -87,18 +87,18 @@ class FakeLogger(object):
     def print(self, msg):
         self._printed.append(msg)
 
-class FakeCollectionMaker(object):
+class FakeStorageMaker(object):
     def __init__(self):
-        self._collections = []
+        self._storages = []
 
-    def open_collection(self, tree, path, services=None):
+    def open_storage(self, tree, path, services=None):
         fullpath = tree.path_to_full_string(path)
-        for coll in self._collections:
+        for coll in self._storages:
             if coll._fullpath == fullpath:
                 return coll
-        return FakeCollection(fullpath)
+        return FakeStorage(fullpath)
 
-class FakeCollection(object):
+class FakeStorage(object):
     def __init__(self, fullpath):
         self._fullpath = fullpath
         self._content = []
@@ -174,18 +174,18 @@ class TestInfoForFullConfig(InfoTestSupport):
         config = FakeConfig()
         config._add_full_config()
         args = FakeArgs(config)
-        collection = FakeCollection('local:/data/backup1/mine')
-        collection._add_content(
+        storage = FakeStorage('local:/data/backup1/mine')
+        storage._add_content(
             cid_num=1, added=datetime.datetime(2015, 5, 17, 20, 47, 25))
-        collection._add_content(
+        storage._add_content(
             cid_num=2, added=datetime.datetime(2014, 9, 7, 7, 49, 45))
-        collection._add_content(
+        storage._add_content(
             cid_num=3, added=datetime.datetime(2015, 1, 15, 17, 47, 7))
-        collection._add_content(
+        storage._add_content(
             cid_num=4, added=datetime.datetime(2014, 3, 24, 16, 49, 50))
-        collfact = FakeCollectionMaker()
-        collfact._collections.append(collection)
-        args.services['backupcollection.open'] = collfact.open_collection
+        collfact = FakeStorageMaker()
+        collfact._storages.append(storage)
+        args.services['backupstorage.open'] = collfact.open_storage
         self._utcnow = datetime.datetime(2015, 6, 14, 14, 28, 54)
         args.services['utcnow'] = self.utcnow
         self.args = args
@@ -223,7 +223,7 @@ class TestInfoForFullConfig(InfoTestSupport):
         if False: # Not implemented yet
          self.assertInfoHasBlock(textwrap.dedent('''\
             backup mine
-              collection local:/data/backup1/mine
+              storage local:/data/backup1/mine
                 Least recently verified: 2014-03-24 16:49:50
                 Not verified for one year: 1 files
                 Not verified for three months: 3 files
@@ -238,7 +238,7 @@ class TestInfoForFullConfig(InfoTestSupport):
     def test_backup_mine_is_correct_partial(self):
         self.assertIn(textwrap.indent(textwrap.dedent('''\
             backup mine
-              collection local:/data/backup1/mine
+              storage local:/data/backup1/mine
                 Least recently verified: 2014-03-24 16:49:50
                 Total number of content files: 4
                 Not verified for one year: 1 files

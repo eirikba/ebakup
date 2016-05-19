@@ -14,12 +14,12 @@ class FakeConfig(object):
 class FakeBackupConfig(object):
     def __init__(self, name):
         self._name = name
-        self.collections = []
+        self.storages = []
         self.sources = []
 
-    def _add_simple_collection(self):
-        coll = FakeCollectionData(FakeTree('local'), ('data', 'backup'))
-        self.collections.append(coll)
+    def _add_simple_storage(self):
+        coll = FakeStorageData(FakeTree('local'), ('data', 'backup'))
+        self.storages.append(coll)
         source = FakeBackupSource(FakeTree('local'), ('home', 'me'), ())
         source.subtree_handlers = [
             (('tmp',), 'ignore'),
@@ -45,26 +45,26 @@ class FakeTree(object):
     def path_to_full_string(self, path):
         return 'faketree:' + str(path)
 
-class FakeCollectionData(object):
+class FakeStorageData(object):
     def __init__(self, filesystem, path):
         self.filesystem = filesystem
         self.path = path
 
-def open_collection(tree, path, services=None):
-    return FakeCollection(services.get('database.open'), tree, path)
+def open_storage(tree, path, services=None):
+    return FakeStorage(services.get('database.open'), tree, path)
 
-def create_collection(tree, path, services=None):
+def create_storage(tree, path, services=None):
     raise NotImplementedError()
 
-class FakeCollection(object):
+class FakeStorage(object):
     def __init__(self, action, tree, path):
         self._open_action = action
         self._tree = tree
         self._path = path
 
 class FakeBackupOperation(object):
-    def __init__(self, collection, services=None):
-        self._collection = collection
+    def __init__(self, storage, services=None):
+        self._storage = storage
         self._trees = []
         self._backup_done = False
         self._services = services
@@ -115,8 +115,8 @@ class FakeArgs(object):
         self._config = config
         self.services = {
             'backupoperation': self.create_operation,
-            'backupcollection.open': open_collection,
-            'backupcollection.create': create_collection,
+            'backupstorage.open': open_storage,
+            'backupstorage.create': create_storage,
             'database.create': 'argdbcreate',
             'database.open': 'argdbopen',
             'logger': 'arglogger',
@@ -127,8 +127,8 @@ class FakeArgs(object):
         self.backups = []
         self._operations = []
 
-    def create_operation(self, collection, services=None):
-        op = FakeBackupOperation(collection, services)
+    def create_operation(self, storage, services=None):
+        op = FakeBackupOperation(storage, services)
         self._operations.append(op)
         return op
 
@@ -144,7 +144,7 @@ class TestSimpleBackup(unittest.TestCase):
         args = FakeArgs(config)
         self.args = args
         bkupcfg = args._add_backup_config('backup1')
-        collection = bkupcfg._add_simple_collection()
+        storage = bkupcfg._add_simple_storage()
         bkup = task_backup.BackupTask(config, args)
         bkup.execute()
 
@@ -153,16 +153,16 @@ class TestSimpleBackup(unittest.TestCase):
         operation = self.args._operations[0]
         self.assertTrue(operation._backup_done)
 
-    def test_backup_performed_to_existing_collection(self):
+    def test_backup_performed_to_existing_storage(self):
         operation = self.args._operations[0]
-        collection = operation._collection
-        self.assertEqual('argdbopen', collection._open_action)
+        storage = operation._storage
+        self.assertEqual('argdbopen', storage._open_action)
 
-    def test_backup_to_collection_with_correct_path(self):
+    def test_backup_to_storage_with_correct_path(self):
         operation = self.args._operations[0]
-        collection = operation._collection
-        self.assertEqual('local', collection._tree._fsname)
-        self.assertEqual(('data', 'backup'), collection._path)
+        storage = operation._storage
+        self.assertEqual('local', storage._tree._fsname)
+        self.assertEqual(('data', 'backup'), storage._path)
 
     def test_backup_from_and_to_correct_path(self):
         operation = self.args._operations[0]

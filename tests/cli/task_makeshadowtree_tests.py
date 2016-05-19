@@ -24,9 +24,9 @@ class FakeConfig(object):
     def __init__(self):
         self._backups = [ FakeBackupConf() ]
 
-    def _makecollection(self, tree, path):
-        bc = FakeCollectionConf(tree, path)
-        self._backups[0].collections.append(bc)
+    def _makestorage(self, tree, path):
+        bc = FakeStorageConf(tree, path)
+        self._backups[0].storages.append(bc)
 
     def get_all_backup_names(self):
         return ['main']
@@ -57,16 +57,16 @@ class FakeTree(object):
 
 class FakeBackupConf(object):
     def __init__(self):
-        self.collections = []
+        self.storages = []
 
 
-class FakeCollectionConf(object):
+class FakeStorageConf(object):
     def __init__(self, tree, path):
         self.filesystem = tree
         self.path = path
 
 
-class FakeCollection(object):
+class FakeStorage(object):
     def __init__(self, tree, path):
         self._tree = tree
         self._path = path
@@ -149,37 +149,37 @@ class TestMakeShadowTree(unittest.TestCase):
         assert which == 'local'
         return self.tree
 
-    def open_backupcollection(self, tree, path):
+    def open_backupstorage(self, tree, path):
         assert tree == self.tree
-        for coll in self._collections:
+        for coll in self._storages:
             if tree == coll._tree and path == coll._path:
                 return coll
 
-    def _make_collection(self, tree, path):
-        bc = FakeCollection(tree, path)
-        self._collections.append(bc)
+    def _make_storage(self, tree, path):
+        bc = FakeStorage(tree, path)
+        self._storages.append(bc)
         return bc
 
     def setUp(self):
         self._setUp_set_common_vars()
         self._setUp_make_basic_objects()
-        self._setUp_make_collection_and_backup()
+        self._setUp_make_storage_and_backup()
         self._setUp_set_up_file_system()
         self._setUp_set_up_args()
 
     def _setUp_set_common_vars(self):
         self.maxDiff = None
         self.shadowroot = ('the', 'cwd', 'shadow')
-        self._collections = []
+        self._storages = []
 
     def _setUp_make_basic_objects(self):
         self.tree = FakeTree()
         self.config = FakeConfig()
         self.args = FakeArgs()
 
-    def _setUp_make_collection_and_backup(self):
-        self.config._makecollection(self.tree, ('backup1',))
-        self.bc = self._make_collection(self.tree, ('backup1',))
+    def _setUp_make_storage_and_backup(self):
+        self.config._makestorage(self.tree, ('backup1',))
+        self.bc = self._make_storage(self.tree, ('backup1',))
         self.bk = self.bc._make_backup('2014-08-05T05:07')
 
     def _setUp_set_up_file_system(self):
@@ -188,7 +188,7 @@ class TestMakeShadowTree(unittest.TestCase):
     def _setUp_set_up_args(self):
         args = self.args
         args.services['filesystem'] = self.get_filesystem
-        args.services['backupcollection.open'] = self.open_backupcollection
+        args.services['backupstorage.open'] = self.open_backupstorage
         args.target = 'shadow'
         args.snapshotname = '2014-08-05T05:07'
 
@@ -273,5 +273,5 @@ class TestMakeShadowTree(unittest.TestCase):
                 for x in names]
 
 
-# test: target directory does not support hard links from the collection
-# test: target directory only supports hard links from second collection
+# test: target directory does not support hard links from the storage
+# test: target directory only supports hard links from second storage
