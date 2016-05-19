@@ -61,6 +61,7 @@ expected_tests = set((
     'config.config_tests.TestSimpleConfig.test_backup_home_source_subtree_handler_iterator',
     'config.config_tests.TestVarious.test_read_non_existing_file',
     'config.config_tests.TestVarious.test_read_two_simple_files',
+    'config.config_tests.TestDeprecatedSimpleConfig.test_backup_home_collection',
     'database.database_tests.TestDatabaseWithManyBackups.test_backup_names_lists_all_backups',
     'database.database_tests.TestDatabaseWithManyBackups.test_get_most_recent_backup_before_scans_through_all_backups',
     'database.database_tests.TestDatabaseWithManyBackups.test_get_most_recent_backup_is_correct',

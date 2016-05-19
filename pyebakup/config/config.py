@@ -128,8 +128,14 @@ class CfgBackup(object):
         self.collections = []
         self.sources = []
 
-    def parse_enter_block(self, key, args):
+    def _translate_old_key(self, key, args):
         if key == 'collection':
+            return 'storage', args
+        return key, args
+
+    def parse_enter_block(self, key, args):
+        key, args = self._translate_old_key(key, args)
+        if key == 'storage':
             filesystem, path = parse_full_path(self.config.services, args)
             return CfgCollection(filesystem, path)
         if key == 'source':
@@ -137,7 +143,8 @@ class CfgBackup(object):
             return CfgSource(filesystem, path)
 
     def parse_exit_block(self, key, args, item):
-        if key == 'collection':
+        key, args = self._translate_old_key(key, args)
+        if key == 'storage':
             self.collections.append(item)
         if key == 'source':
             item.config_is_fully_parsed_so_finalize_data()

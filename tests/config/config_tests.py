@@ -64,7 +64,7 @@ class TestSimpleConfig(unittest.TestCase):
             ('path', 'to', 'config'),
             content=textwrap.dedent('''\
                 backup home
-                   collection local:/backup/mine
+                   storage local:/backup/mine
                    source local:/home/me
                        targetpath home
                        path tmp
@@ -154,7 +154,7 @@ class TestFullConfig(unittest.TestCase):
             ('path', 'to', 'config'),
             content=textwrap.dedent('''\
                 backup main
-                   collection local:/backup/mine
+                   storage local:/backup/mine
                    source local:/home/me
                        targetpath bkmain
                        path tmp
@@ -234,7 +234,7 @@ class TestVarious(unittest.TestCase):
             ('path', 'to', 'config'),
             content=textwrap.dedent('''\
                 backup home
-                   collection local:/backup/mine
+                   storage local:/backup/mine
                    source local:/home/me
                        targetpath home
                 ''').encode('utf-8'))
@@ -242,7 +242,7 @@ class TestVarious(unittest.TestCase):
             ('path', 'to', 'other', 'config'),
             content=textwrap.dedent('''\
                 backup other
-                   collection local:/backup/mine
+                   storage local:/backup/mine
                    source local:/home/other
                        targetpath other
                 ''').encode('utf-8'))
@@ -251,3 +251,36 @@ class TestVarious(unittest.TestCase):
         conf.read_file(tree, ('path', 'to', 'other', 'config'))
         self.assertEqual(2, len(conf.backups))
         self.assertCountEqual(('home', 'other'), (x.name for x in conf.backups))
+
+
+class TestDeprecatedSimpleConfig(unittest.TestCase):
+
+    def setUp(self):
+        services = { 'filesystem': FakeNamedTree }
+        conf = config.Config(services)
+        self.config = conf
+        tree = FakeTree()
+        self.tree = tree
+        tree.set_file(
+            ('path', 'to', 'config'),
+            content=textwrap.dedent('''\
+                backup home
+                   collection local:/backup/mine
+                   source local:/home/me
+                       targetpath home
+                       path tmp
+                           ignore
+                           path Q.pdf
+                               static
+                       path Pictures
+                           static
+                ''').encode('utf-8'))
+        conf.read_file(tree, ('path', 'to', 'config'))
+
+    def test_backup_home_collection(self):
+        backup = self.config.get_backup_by_name('home')
+        self.assertNotEqual(None, backup)
+        self.assertEqual(1, len(backup.collections))
+        collection = backup.collections[0]
+        self.assertEqual('local', collection.filesystem.name)
+        self.assertEqual(('backup', 'mine'), collection.path)
