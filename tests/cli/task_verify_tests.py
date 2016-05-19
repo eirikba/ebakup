@@ -9,6 +9,33 @@ def checksum(data):
     return b'cksum:' + data
 
 
+class ArgsStub(object):
+    def __init__(self):
+        self.services = {
+            'backupcollection.open': lambda x, y: x,
+        }
+
+
+class ConfigStub(object):
+    def __init__(self):
+        self.backups = []
+
+    def _add_single_collection_backup(self, coll):
+        self.backups.append(ConfigBackupStub())
+        self.backups[-1].collections.append(ConfigCollectionStub(coll))
+
+
+class ConfigBackupStub(object):
+    def __init__(self):
+        self.collections = []
+
+
+class ConfigCollectionStub(object):
+    def __init__(self, collection):
+        self.filesystem = collection
+        self.path = None
+
+
 class Empty(object):
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -39,6 +66,7 @@ class EmptyBackupCollectionStub(object):
         for cid in ():
             yield cid
 
+
 class Content(object):
     def __init__(self, content):
         self.content = content
@@ -46,6 +74,7 @@ class Content(object):
 
     def _override_content(self, content):
         self.content = content
+
 
 class SingleBackupCollectionStub(object):
     def __init__(self):
@@ -77,41 +106,39 @@ class SingleBackupCollectionStub(object):
 
 
 class TestTaskVerify(unittest.TestCase):
+    def setUp(self):
+        self.args = ArgsStub()
+        self.config = ConfigStub()
+
     def test_verify_empty_collection_is_ok(self):
-        services = {
-            }
-        coll = EmptyBackupCollectionStub()
-        task = task_verify.VerifyTask(coll, services=services)
+        self.config._add_single_collection_backup(EmptyBackupCollectionStub())
+        task = task_verify.VerifyTask(self.config, self.args)
         result = task.execute()
         self.assertEqual(0, len(result.errors))
         self.assertEqual(0, len(result.warnings))
 
     def test_verify_single_backup_collection_is_ok(self):
-        services = {
-            }
-        coll = SingleBackupCollectionStub()
-        task = task_verify.VerifyTask(coll, services=services)
+        self.config._add_single_collection_backup(SingleBackupCollectionStub())
+        task = task_verify.VerifyTask(self.config, self.args)
         result = task.execute()
         self.assertEqual(0, len(result.errors))
         self.assertEqual(0, len(result.warnings))
 
     def test_verify_single_backup_collection_with_missing_content(self):
-        services = {
-            }
         coll = SingleBackupCollectionStub()
         coll._override_content(b'cid123', None)
-        task = task_verify.VerifyTask(coll, services=services)
+        self.config._add_single_collection_backup(coll)
+        task = task_verify.VerifyTask(self.config, self.args)
         result = task.execute()
         self.assertEqual(1, len(result.errors))
         self.assertEqual(0, len(result.warnings))
         self.assertEqual("Content missing: 636964313233", result.errors[0])
 
     def test_verify_single_backup_collection_with_corrupt_content(self):
-        services = {
-            }
         coll = SingleBackupCollectionStub()
         coll._override_content(b'cid123', b'different data')
-        task = task_verify.VerifyTask(coll, services=services)
+        self.config._add_single_collection_backup(coll)
+        task = task_verify.VerifyTask(self.config, self.args)
         result = task.execute()
         self.assertEqual(1, len(result.errors))
         self.assertEqual(0, len(result.warnings))

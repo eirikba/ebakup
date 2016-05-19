@@ -231,6 +231,10 @@ expected_tests = set((
     'tools.tool_dump_early_format_tests.TestSimpleDump.test_trailing_garbage_in_settings_block',
     'tools.tool_dump_early_format_tests.TestSimpleDump.test_main_file',
     'tools.tool_dump_early_format_tests.TestSimpleDump.test_content_file',
+    'verify.verifystorage_tests.TestVerifyStorage.test_verify_empty_collection_is_ok',
+    'verify.verifystorage_tests.TestVerifyStorage.test_verify_single_backup_collection_is_ok',
+    'verify.verifystorage_tests.TestVerifyStorage.test_verify_single_backup_collection_with_corrupt_content',
+    'verify.verifystorage_tests.TestVerifyStorage.test_verify_single_backup_collection_with_missing_content',
     'database.valuecodecs_tests.TestCodecs.test_mtime_to_db_codec',
     'webui.webui_tests.TestWebUI.test_basic_404',
 ))

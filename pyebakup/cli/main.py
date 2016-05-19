@@ -198,10 +198,7 @@ def make_tasks_from_args(args):
     return tasks
 
 def _make_verify_task(config, args):
-    cfgcollection = config.backups[0].collections[0]
-    collection = args.services['backupcollection.open'](
-        cfgcollection.filesystem, cfgcollection.path)
-    task = VerifyTask(collection, services=args.services)
+    task = VerifyTask(config, args)
     task.printSummaryAfterCompletion()
     return task
 
