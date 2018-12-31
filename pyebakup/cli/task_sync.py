@@ -198,7 +198,7 @@ class SyncTask(object):
                 sourcetree.get_item_at_path(sourcepath))
             if cid != contentid:
                 self._logger.log_error(
-                    'Sync cid changed', contentid,
+                    'Sync cid changed', contentid.hex(),
                     'The cid of copied content changed even though the '
                     'original content id was unused. That is sufficiently '
                     'strange that I am calling it an error, even though '
@@ -210,7 +210,7 @@ class SyncTask(object):
         cid = targetcoll.add_content(sourcetree.get_item_at_path(sourcepath))
         if cid == contentid:
             self._logger.log_notice(
-                'Sync copied existing content', contentid,
+                'Sync copied existing content', contentid.hex(),
                 'A content item already existed in the clone, but ebakup spent '
                 'some effort on checking that they were the same. There is '
                 'nothing wrong with that, but it is inefficient. So if it '
@@ -218,7 +218,7 @@ class SyncTask(object):
                 'to avoid it.')
         else:
             self._logger.log_error(
-                'Sync cid changed', contentid,
+                'Sync cid changed', contentid.hex(),
                 'The cid of copied content changed. That should mean '
                 'that there already is different content with the same '
                 'content id in the target storage. That is sufficiently '
