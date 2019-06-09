@@ -17,14 +17,14 @@ data (and meta-data) from corruptions.
 
 And of course, the system should make all of this as easy as possible.
 
-In bullet point form:
+So for the backups themselves:
 
 - Configuration specifies which parts of the file system are "precious"
-- A "backup" stores all the "precious" data at that time
+- A "snapshot" stores all the "precious" data at that time
   - The content of each file
   - The tree structure of files and directories
   - Any relevant/important meta-data for both files and directories
-- All data added to the backup storage remains until explicitly removed
+- All data added to the backup storage remain until explicitly removed
 - All information in the backup storage can be checked for corruptions
 - All information is stored in multiple copies (so that if any one
   copy is destroyed, it can be restored from another copy).
@@ -32,43 +32,64 @@ In bullet point form:
   corruptions of the stored data.
 - Support for tracking files that should never change
 
-Features I don't particularly care about (and so I'm not bothering to
+Backups are no good if you can not get data out again:
+
+- Single files can be copied from any historical snapshot
+- Subtrees can be copied from any historical snapshot
+
+Other features that could be nice to have (I may add them some day):
+
+- Storing backups in cloud storage (backblaze, amazon, google, microsoft)
+- Support for encrypted backups (particularly for cloud storage)
+
+Features I don't particularly care about (and so I'm unlikely to
 implement support for it):
 
-- Restoring a system from a backup to recover from catastrophic
+- Restoring a full system from a backup to recover from catastrophic
   failure.
 
 
 Status
 ------
 
-(As of 2016-02-03)
+(As of 2019-06-09)
 
 The backup system makes backups successfully. I'm using it myself for
-that purpose (though that's not a very strong endorsement, given that
-the alternative is no backup at all).
+that purpose. That's not necessarily a very strong endorsement, given
+that the alternative is no backup at all. I have also successfully
+restored files, although that is still a highly manual process.
 
-I will most likely make some more backwards-incompatible changes to
-the backup storage. Since I am relying on this stuff now, I will have
-to make tools to upgrade (and verify correctness of upgrade) in that
-case.
+So what works?
 
-The main missing piece now is verification (make sure all data has
-been checked for corruption "recently"). And the support for
-retrieving files out of the backup again is somewhat rudimentary. And
-it would be nice with a better UI.
+- Creating backup snapshots
+  - of a single "root" directory
+  - with include/exclude paths
+  - checksums everywhere
+- All database data is verified every time it is used
+- Verify operation checks all content data
+- Syncing storages (mostly)
+- Creating a "shadow copy" of a snapshot (using hardlinks)
+- Any problem leads to ebakup exiting with an error message, not
+  silently introducing errors into the backups
 
-I have spent some effort on the verification. Which turned out to be
-much harder than I had anticipated. But I think I have something that
-makes sense now, so hopefully I can make that work soonish.
+What's missing?
+
+- Copy-out files and trees from a snapshot
+- "Verify" operation does not check the database files
+- Repair (replace corrupt data with good data from other source)
+- Edge case handling for syncing storages
+  - (I believe sync works correctly in most cases, but I know I didn't
+    meticulously construct that code for being always correct.)
+- Files that change during the backup operation
+- Nice UI
 
 The current python code is painfully slow at decoding the database
 files. I need to do something about that. I'm considering rewriting it
 in C++. It is also using a lot of memory, which I also think a rewrite
 to C++ could help with.
 
-It has been more than half a year since I started this project, and in
-that time I have learned a few things.
+As I said in February 2016, I have learned a few things since I
+started this project.
 
 I have learned a lot about what ebakup is, or should be. Which means I
 now want to make a lot of changes to the system. Particularly to the
@@ -94,7 +115,8 @@ This is not what I want. If my computer suddenly vanishes into a
 parallel dimension one day, I will buy a new computer, install the
 system from scratch and copy any files I care about from some
 alternative source. Making sure such an alternative source exists is
-primarily what ebakup is about.
+primarily what ebakup is about. That, and being able to restore
+individual files that somehow get lost or corrupt.
 
 A secondary feature that I think is nice is to have long-term history.
 Having old versions of all files available so I can see what they were
@@ -146,9 +168,15 @@ exceptionally unlikely that the data in the database will have random
 errors that can't be detected. And when such an error is found, the
 "untrusted" part of the backup will be quite small.
 
+These block checksums are checked every time a block is read, so no
+action will ever be taken on corrupt data.
+
 Similarly, every item added to the content store has its checksum
 (also currently sha-256) stored. Thus undetectable corruptions to the
-content of files are also extremely unlikely.
+content of files are also extremely unlikely. There's currently no
+verification of these checksums. Personally, I sometimes run a full
+recursive diff on my content storages as a simple form of corruption
+detection.
 
 So what happens when things do get corrupt? If ebakup's support for
 multiple copies of backups have been used, hopefully there should be
