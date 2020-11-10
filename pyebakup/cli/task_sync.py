@@ -293,6 +293,7 @@ class SyncTask(object):
                     'While not wrong as such, this is rather unexpected '
                     'and I do not handle it (yet). In fact, it is so '
                     'unexpected that I suspect a bug somewhere.')
+        return base
 
     def _get_full_content_for_backup(self, collinfo, name):
         # This is cheating! But for now it gets me what I need.
