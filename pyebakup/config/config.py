@@ -169,7 +169,7 @@ class CfgSource(object):
     def parse_enter_block(self, key, args):
         if key == 'targetpath':
             path = self.filesystem.relative_path_from_string(args)
-            if self.targetpath is not ():
+            if self.targetpath:
                 raise InvalidDataError(
                     'Tried to set targetpath twice for the same source: ' +
                     str(self.targetpath) + ' and ' + str(path))
