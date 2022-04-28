@@ -240,7 +240,7 @@ class TestBasics(unittest.TestCase):
         while not data.endswith(b'\r\n0\r\n\r\n'):
             data += sock.recv(4096)
         while not data2.endswith(b'\r\n0\r\n\r\n'):
-            data2 += sock.recv(4096)
+            data2 += sock2.recv(4096)
         self.server.stop()
         sock.close()
         sock2.close()
