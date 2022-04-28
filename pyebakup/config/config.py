@@ -28,9 +28,9 @@ class Config(object):
             return
         with f:
             data = f.get_data_slice(0, f.get_size())
-        self._read_config_data(data.decode('utf-8'))
+        self.read_config_string(data.decode('utf-8'))
 
-    def _read_config_data(self, data):
+    def read_config_string(self, data):
         if data[-1] != '\n':
             data = data + '\n'
         data = ConfigData(data)

@@ -252,6 +252,34 @@ class TestVarious(unittest.TestCase):
         self.assertEqual(2, len(conf.backups))
         self.assertCountEqual(('home', 'other'), (x.name for x in conf.backups))
 
+    def test_globs_work_in_intermediate_path_components(self):
+        services = { 'filesystem': FakeNamedTree }
+        config_string = textwrap.dedent('''\
+                backup home
+                   storage local:/backup/mine
+                   source local:/home/me
+                       targetpath home
+                       path-globs some-*-dir/subdir
+                           static
+                           path inner
+                               ignore
+                ''')
+        conf = config.Config(services)
+        conf.read_config_string(config_string)
+        backup = conf.get_backup_by_name('home')
+        source = backup.sources[0]
+        self.assertEqual('dynamic', source.get_handler_for_path(('other',)))
+        self.assertEqual('dynamic', source.get_handler_for_path(
+            ('some-strange-dir',)))
+        self.assertEqual('static', source.get_handler_for_path(
+            ('some-strange-dir', 'subdir')))
+        self.assertEqual('static', source.get_handler_for_path(
+            ('some-strange-dir', 'subdir', 'other')))
+        self.assertEqual('ignore', source.get_handler_for_path(
+            ('some-strange-dir', 'subdir', 'inner')))
+        self.assertEqual('ignore', source.get_handler_for_path(
+            ('some-strange-dir', 'subdir', 'inner', 'more')))
+
 
 class TestDeprecatedSimpleConfig(unittest.TestCase):
 
