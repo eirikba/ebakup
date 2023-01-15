@@ -218,7 +218,7 @@ expected_tests = set((
     'cli.task_sync_tests.TestSync.test_initial_sync_with_two_backups',
     'cli.task_sync_tests.TestSync.test_simple_initial_sync',
     'cli.task_sync_tests.TestSync.test_sync_with_common_backups',
-    'cli.task_sync_tests.TestSync.test_sync_with_new_backup_and_existing_content',
+    'cli.task_sync_tests.TestSync.test_sync_when_first_storage_has_one_extra_backup_it_is_copied_to_second_storage',
     'cli.task_verify_tests.TestTaskVerify.test_verify_empty_storage_is_ok',
     'cli.task_verify_tests.TestTaskVerify.test_verify_single_backup_storage_is_ok',
     'cli.task_verify_tests.TestTaskVerify.test_verify_single_backup_storage_with_corrupt_content',

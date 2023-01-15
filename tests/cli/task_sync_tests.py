@@ -112,7 +112,7 @@ class FakeStorage(object):
     def _does_path_exist(self, path):
         if len(path) == 0:
             return True
-        if path in ( ('content',), ('db') ):
+        if path in ( ('content',), ('db',) ):
             return True
         if len(path) == 4 and path[0] == 'content':
             if len(path[1]) == 2 and len(path[2]) == 2:
@@ -495,7 +495,7 @@ class TestSync(unittest.TestCase):
         sync.execute()
         self.assertStoragesEqual(self.coll, self.coll2)
 
-    def test_sync_with_new_backup_and_existing_content(self):
+    def test_sync_when_first_storage_has_one_extra_backup_it_is_copied_to_second_storage(self):
         self.coll2._add_backup(
             datetime.datetime(2014, 6, 10, 14, 16, 7, 30092),
             files=testdata.files()[:16])

@@ -89,9 +89,9 @@ class TestFullSequence(unittest.TestCase):
         self.advance_utcnow(seconds=80)
         self._check_result_of_second_backup(stdout=out.getvalue())
         self.advance_utcnow(seconds=32)
-        self.assertRaisesRegex(
-            FileNotFoundError, 'Backup storage does not exist.*second',
-            cli.cli_main, ('sync',), services=self.services, stdoutfile=out)
+        cli.cli_main(('sync',), services=self.services, stdoutfile=out)
+        self.assertRegex(out.getvalue(),
+                'missing storage.*second.*will not be synced')
         self.advance_utcnow(seconds=17)
         out = io.StringIO()
         cli.cli_main(

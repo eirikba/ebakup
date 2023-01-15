@@ -30,29 +30,41 @@ class SyncTask(object):
         self._ui.set_status('syncing', '....')
         collinfos = []
         for conf in backupconf.storages:
-            if conf.filesystem.is_accessible:
+            opener = None
+            if self._is_storage_present(conf):
+                opener = self._services['backupstorage.open']
+            elif self._args.create and conf.filesystem.is_accessible:
+                opener = self._services['backupstorage.create']
+            if opener:
                 self._ui.set_status(
                     'task-sync',
                     'Opening storage ' +
                     conf.filesystem.path_to_full_string(conf.path))
-                opener = self._services['backupstorage.open']
-                if (self._args.create and not
-                        conf.filesystem.does_path_exist(conf.path)):
-                    opener = self._services['backupstorage.create']
                 storage = opener(
                     conf.filesystem, conf.path, services=self._services)
                 collinfos.append(StorageData(conf, storage))
             else:
-                self._logger.log_error(
-                    'missing storage', conf,
+                self._logger.log_warning(
+                    'missing storage',
+                    conf.filesystem.path_to_full_string(conf.path),
                     'The storage will not be synced, neither from nor to.')
-                raise NotTestedError('Missing storage during sync')
+                #raise NotTestedError('Missing storage during sync')
         self._ui.set_status(
             'task-sync',
             'Syncing ' + backupconf.name +
             ' (' + str(len(collinfos)) + ' storages)')
         self._sync_storages(collinfos)
         self._ui.set_status('task-sync', 'Sync complete for ' + backupconf.name)
+
+    def _is_storage_present(self, storage):
+        if not storage.filesystem.is_accessible: return False
+        if not storage.filesystem.does_path_exist(storage.path):
+            return False
+        if not storage.filesystem.does_path_exist(storage.path + ('db',)):
+            raise AssertionError(
+                'storage path exists, but not the "db" subdir: '
+                + storage.filesystem.path_to_full_string(storage.path))
+        return True
 
     def _sync_storages(self, collinfos):
         self._ui.set_status('syncing', 'Making list of backups')
